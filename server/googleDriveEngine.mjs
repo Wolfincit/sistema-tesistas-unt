@@ -86,13 +86,124 @@ function formatBytesLabel(bytes) {
 }
 
 // ======================================================
-// ESTADO EN MEMORIA + COLA SERIALIZADA DE ESCRITURA
+// ESTADO EN MEMORIA + COLA SERIALIZADA + BÓVEDA CIFRADA AES-256-GCM
 // ======================================================
 let configCache = null;
 let accessTokenCache = { token: null, expiresAt: 0 };
 let dbMemoryCache = null;
 let driveWriteChain = Promise.resolve();
 let pendingOAuthStates = new Map();
+let autoHealPromise = null;
+let lastAutoHealAt = 0;
+let autoHealSummary = {
+  healed: false,
+  migratedFromOrigin: '',
+  currentOrigin: '',
+  vaultSynced: false,
+  lastHealAt: ''
+};
+
+const VAULT_KEY_NAME = 'unt_industrial_drive_vault_v1';
+
+function deriveAesKey(passphrase) {
+  const material = String(
+    passphrase ||
+      process.env.UNT_VAULT_SECRET ||
+      process.env.GOOGLE_CLIENT_SECRET ||
+      'UNT-INDUSTRIAL-VAULT-DEFAULT-KEY'
+  );
+  return crypto.createHash('sha256').update(material).digest();
+}
+
+function encryptPayloadAesGcm(obj, passphrase = '') {
+  const key = deriveAesKey(passphrase);
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const plain = Buffer.from(JSON.stringify(obj), 'utf-8');
+  const encrypted = Buffer.concat([cipher.update(plain), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return {
+    alg: 'aes-256-gcm',
+    iv: iv.toString('base64'),
+    tag: tag.toString('base64'),
+    data: encrypted.toString('base64'),
+    createdAt: new Date().toISOString()
+  };
+}
+
+function decryptPayloadAesGcm(envelope, passphrase = '') {
+  if (!envelope || !envelope.iv || !envelope.tag || !envelope.data) {
+    throw new Error('Formato de seguro cifrado inválido.');
+  }
+  const key = deriveAesKey(passphrase);
+  const decipher = crypto.createDecipheriv(
+    'aes-256-gcm',
+    key,
+    Buffer.from(envelope.iv, 'base64')
+  );
+  decipher.setAuthTag(Buffer.from(envelope.tag, 'base64'));
+  const plain = Buffer.concat([
+    decipher.update(Buffer.from(envelope.data, 'base64')),
+    decipher.final()
+  ]);
+  return JSON.parse(plain.toString('utf-8'));
+}
+
+function isRemoteVaultConfigured() {
+  return Boolean(process.env.UNT_VAULT_URL && process.env.UNT_VAULT_TOKEN);
+}
+
+async function saveConfigToRemoteVault(cfg) {
+  if (!isRemoteVaultConfigured()) return false;
+  try {
+    const baseUrl = process.env.UNT_VAULT_URL.replace(/\/$/, '');
+    const encrypted = encryptPayloadAesGcm({
+      clientId: cfg.clientId,
+      clientSecret: cfg.clientSecret,
+      refreshToken: cfg.refreshToken,
+      accountEmail: cfg.accountEmail,
+      accountName: cfg.accountName,
+      rootFolderId: cfg.rootFolderId,
+      rootFolderName: cfg.rootFolderName,
+      expedientesFolderId: cfg.expedientesFolderId,
+      audiosFolderId: cfg.audiosFolderId,
+      formatosFolderId: cfg.formatosFolderId,
+      dbFileId: cfg.dbFileId,
+      connectedAt: cfg.connectedAt
+    });
+    const res = await fetch(`${baseUrl}/set/${encodeURIComponent(VAULT_KEY_NAME)}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.UNT_VAULT_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(encrypted)
+    });
+    autoHealSummary.vaultSynced = res.ok;
+    return res.ok;
+  } catch (err) {
+    console.warn('[Drive Vault] No se pudo guardar en bóveda remota:', err.message);
+    return false;
+  }
+}
+
+async function loadConfigFromRemoteVault() {
+  if (!isRemoteVaultConfigured()) return null;
+  try {
+    const baseUrl = process.env.UNT_VAULT_URL.replace(/\/$/, '');
+    const res = await fetch(`${baseUrl}/get/${encodeURIComponent(VAULT_KEY_NAME)}`, {
+      headers: { Authorization: `Bearer ${process.env.UNT_VAULT_TOKEN}` }
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const rawResult = typeof json.result === 'string' ? JSON.parse(json.result) : json.result;
+    if (!rawResult || !rawResult.data) return null;
+    return decryptPayloadAesGcm(rawResult);
+  } catch (err) {
+    console.warn('[Drive Vault] No se pudo leer bóveda remota:', err.message);
+    return null;
+  }
+}
 
 function loadConfig() {
   if (configCache) return configCache;
@@ -109,16 +220,212 @@ function loadConfig() {
     audiosFolderId: fromDisk.audiosFolderId || '',
     formatosFolderId: fromDisk.formatosFolderId || '',
     dbFileId: fromDisk.dbFileId || '',
-    connectedAt: fromDisk.connectedAt || ''
+    connectedAt: fromDisk.connectedAt || '',
+    lastServerOrigin: fromDisk.lastServerOrigin || ''
   };
   return configCache;
 }
 
-function saveConfig(patch) {
+function saveConfig(patch, { syncVault = true } = {}) {
   const current = loadConfig();
   configCache = { ...current, ...patch };
   writeJsonSafe(DRIVE_CONFIG_PATH, configCache);
+  if (syncVault && isRemoteVaultConfigured()) {
+    saveConfigToRemoteVault(configCache).catch(() => {});
+  }
   return configCache;
+}
+
+/**
+ * SEGURO AUTOMÁTICO DE MIGRACIÓN Y AUTO-RECUPERACIÓN DE SERVIDOR:
+ * - Si el sistema arranca en un servidor nuevo o tras un reinicio de Render:
+ *   1. Si hay Bóveda Cifrada (UNT_VAULT_URL), descarga y coloca automáticamente
+ *      las llaves + token + carpeta de Google Drive sin intervención manual.
+ *   2. Si existen GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET + GOOGLE_DRIVE_REFRESH_TOKEN,
+ *      auto-descubre la carpeta raíz (_BD_Sistema_Tesistas_UNT.json / Expedientes_Ing_Industrial_UNT),
+ *      restaura los IDs de subcarpetas y recarga toda la BD desde Google Drive automáticamente.
+ */
+export async function autoHealDriveConnection(currentOrigin = '') {
+  if (autoHealPromise) return autoHealPromise;
+  if (Date.now() - lastAutoHealAt < 5000 && configCache?.dbFileId) {
+    return autoHealSummary;
+  }
+
+  autoHealPromise = (async () => {
+    try {
+      let cfg = loadConfig();
+
+      // Detectar cambio de servidor / dominio
+      if (currentOrigin && cfg.lastServerOrigin && cfg.lastServerOrigin !== currentOrigin) {
+        autoHealSummary.migratedFromOrigin = cfg.lastServerOrigin;
+        autoHealSummary.currentOrigin = currentOrigin;
+        console.log(`[Seguro Servidor] Cambio de servidor detectado: ${cfg.lastServerOrigin} -> ${currentOrigin}`);
+      } else if (currentOrigin) {
+        autoHealSummary.currentOrigin = currentOrigin;
+      }
+
+      // Paso 1: Si faltan credenciales o refreshToken, intentar auto-recuperar desde la Bóveda Cifrada remota
+      if ((!cfg.clientId || !cfg.clientSecret || !cfg.refreshToken) && isRemoteVaultConfigured()) {
+        const recovered = await loadConfigFromRemoteVault();
+        if (recovered) {
+          cfg = saveConfig(
+            {
+              clientId: cfg.clientId || recovered.clientId || '',
+              clientSecret: cfg.clientSecret || recovered.clientSecret || '',
+              refreshToken: cfg.refreshToken || recovered.refreshToken || '',
+              accountEmail: cfg.accountEmail || recovered.accountEmail || '',
+              accountName: cfg.accountName || recovered.accountName || '',
+              rootFolderId: cfg.rootFolderId || recovered.rootFolderId || '',
+              rootFolderName: cfg.rootFolderName || recovered.rootFolderName || '',
+              expedientesFolderId: cfg.expedientesFolderId || recovered.expedientesFolderId || '',
+              audiosFolderId: cfg.audiosFolderId || recovered.audiosFolderId || '',
+              formatosFolderId: cfg.formatosFolderId || recovered.formatosFolderId || '',
+              dbFileId: cfg.dbFileId || recovered.dbFileId || '',
+              connectedAt: cfg.connectedAt || recovered.connectedAt || ''
+            },
+            { syncVault: false }
+          );
+          autoHealSummary.healed = true;
+          autoHealSummary.vaultSynced = true;
+          console.log('[Seguro Servidor] Llaves y vínculo de Google Drive auto-restaurados desde Bóveda Cifrada.');
+        }
+      }
+
+      // Paso 2: Si ya tiene llaves + refreshToken, auto-descubrir carpeta raíz y subcarpetas si faltan tras reinicio/migración
+      if (cfg.clientId && cfg.clientSecret && cfg.refreshToken) {
+        let rootId = cfg.rootFolderId;
+
+        // Auto-descubrir la carpeta donde vive _BD_Sistema_Tesistas_UNT.json si rootFolderId no estaba seteado
+        if (!rootId) {
+          const qDbGlobal = `name = '${DB_FILE_NAME}' and trashed = false`;
+          const dbRes = await driveFetch(
+            `${GOOGLE_DRIVE_API}/files?${new URLSearchParams({
+              q: qDbGlobal,
+              fields: 'files(id,name,parents)',
+              pageSize: '1',
+              supportsAllDrives: 'true',
+              includeItemsFromAllDrives: 'true'
+            }).toString()}`
+          );
+          if (dbRes.ok) {
+            const dbData = await dbRes.json();
+            const foundDb = dbData.files?.[0];
+            if (foundDb?.parents?.[0]) {
+              rootId = foundDb.parents[0];
+              saveConfig({ rootFolderId: rootId, dbFileId: foundDb.id }, { syncVault: false });
+              cfg = loadConfig();
+            }
+          }
+        }
+
+        if (rootId && (!cfg.expedientesFolderId || !cfg.audiosFolderId || !cfg.formatosFolderId || !cfg.dbFileId || !cfg.rootFolderName)) {
+          await selectRootFolder(rootId);
+          autoHealSummary.healed = true;
+          console.log('[Seguro Servidor] Estructura de Google Drive y Base de Datos restauradas automáticamente.');
+        } else if (rootId && cfg.dbFileId) {
+          await reloadDbFromDrive();
+        }
+      }
+
+      if (currentOrigin && cfg.lastServerOrigin !== currentOrigin) {
+        saveConfig({ lastServerOrigin: currentOrigin }, { syncVault: false });
+      }
+      autoHealSummary.lastHealAt = new Date().toISOString();
+      lastAutoHealAt = Date.now();
+      return autoHealSummary;
+    } catch (err) {
+      console.warn('[Seguro Servidor] Auto-recuperación omitida:', err.message);
+      return autoHealSummary;
+    } finally {
+      autoHealPromise = null;
+    }
+  })();
+
+  return autoHealPromise;
+}
+
+export function exportMigrationBundle(passphrase) {
+  const pass = String(passphrase || '').trim();
+  if (pass.length < 6) {
+    throw new Error('Ingrese una clave de respaldo de al menos 6 caracteres para cifrar el paquete de migración.');
+  }
+  const cfg = loadConfig();
+  if (!cfg.clientId || !cfg.clientSecret) {
+    throw new Error('Primero configure las llaves de Google OAuth antes de generar el seguro de migración.');
+  }
+  const envelope = encryptPayloadAesGcm(
+    {
+      clientId: cfg.clientId,
+      clientSecret: cfg.clientSecret,
+      refreshToken: cfg.refreshToken,
+      accountEmail: cfg.accountEmail,
+      accountName: cfg.accountName,
+      rootFolderId: cfg.rootFolderId,
+      rootFolderName: cfg.rootFolderName,
+      expedientesFolderId: cfg.expedientesFolderId,
+      audiosFolderId: cfg.audiosFolderId,
+      formatosFolderId: cfg.formatosFolderId,
+      dbFileId: cfg.dbFileId
+    },
+    pass
+  );
+
+  return {
+    format: 'UNT_INDUSTRIAL_SERVER_SHIELD_V1',
+    accountEmail: cfg.accountEmail || '',
+    rootFolderName: cfg.rootFolderName || '',
+    envelope
+  };
+}
+
+export async function importMigrationBundle(bundle, passphrase) {
+  const pass = String(passphrase || '').trim();
+  if (!pass) throw new Error('Debe ingresar la clave de respaldo del archivo .untkey.');
+  const envelope = bundle?.envelope || bundle;
+  let decrypted;
+  try {
+    decrypted = decryptPayloadAesGcm(envelope, pass);
+  } catch {
+    throw new Error('Clave incorrecta o archivo de seguro .untkey dañado.');
+  }
+  if (!decrypted.clientId || !decrypted.clientSecret) {
+    throw new Error('El paquete no contiene llaves válidas de Google OAuth.');
+  }
+
+  accessTokenCache = { token: null, expiresAt: 0 };
+  saveConfig({
+    clientId: decrypted.clientId,
+    clientSecret: decrypted.clientSecret,
+    refreshToken: decrypted.refreshToken || '',
+    accountEmail: decrypted.accountEmail || '',
+    accountName: decrypted.accountName || '',
+    rootFolderId: decrypted.rootFolderId || '',
+    rootFolderName: decrypted.rootFolderName || '',
+    expedientesFolderId: decrypted.expedientesFolderId || '',
+    audiosFolderId: decrypted.audiosFolderId || '',
+    formatosFolderId: decrypted.formatosFolderId || '',
+    dbFileId: decrypted.dbFileId || ''
+  });
+
+  await autoHealDriveConnection();
+  return getDriveStatus();
+}
+
+export function getEnvMigrationSnippet() {
+  const cfg = loadConfig();
+  const lines = [
+    '# Seguro de Migración de Servidor — Sistema Tesistas Ing. Industrial UNT',
+    '# Pegue estas variables en Render -> Environment o en el archivo .env de cualquier servidor nuevo:',
+    `GOOGLE_CLIENT_ID=${cfg.clientId || ''}`,
+    `GOOGLE_CLIENT_SECRET=${cfg.clientSecret || ''}`,
+    `GOOGLE_DRIVE_REFRESH_TOKEN=${cfg.refreshToken || ''}`,
+    `GOOGLE_DRIVE_ROOT_FOLDER_ID=${cfg.rootFolderId || ''}`
+  ];
+  return {
+    ready: Boolean(cfg.clientId && cfg.clientSecret),
+    hasDriveLink: Boolean(cfg.refreshToken && cfg.rootFolderId),
+    envText: lines.join('\n')
+  };
 }
 
 function isDriveConnected() {
@@ -303,6 +610,7 @@ async function driveFetch(url, options = {}) {
 // ESTADO, CUOTA DE 15 GB Y EXPLORADOR DE CARPETAS DRIVE
 // ======================================================
 export async function getDriveStatus(origin = '') {
+  await autoHealDriveConnection(origin);
   const cfg = loadConfig();
   const hasEnvCredentials = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
   const configured = Boolean(cfg.clientId && cfg.clientSecret);
@@ -370,7 +678,15 @@ export async function getDriveStatus(origin = '') {
       usedBytes: localBytes,
       usedLabel: formatBytesLabel(localBytes)
     },
-    hasBackupEnvHint: Boolean(cfg.refreshToken && !process.env.GOOGLE_DRIVE_REFRESH_TOKEN)
+    hasBackupEnvHint: Boolean(cfg.refreshToken && !process.env.GOOGLE_DRIVE_REFRESH_TOKEN),
+    serverShield: {
+      envLoaded: hasEnvCredentials,
+      vaultConfigured: isRemoteVaultConfigured(),
+      vaultSynced: autoHealSummary.vaultSynced,
+      autoHealed: autoHealSummary.healed,
+      migratedFromOrigin: autoHealSummary.migratedFromOrigin || '',
+      currentOrigin: origin || autoHealSummary.currentOrigin || ''
+    }
   };
 }
 
@@ -670,7 +986,8 @@ function enqueueDriveSync(dbSnapshot) {
 }
 
 let lastDrivePullAt = 0;
-export async function getDbState({ forceDrivePull = false } = {}) {
+export async function getDbState({ forceDrivePull = false, origin = '' } = {}) {
+  await autoHealDriveConnection(origin);
   const cfg = loadConfig();
   if (isDriveReadyWithFolder() && cfg.dbFileId && (forceDrivePull || Date.now() - lastDrivePullAt > 12000)) {
     lastDrivePullAt = Date.now();

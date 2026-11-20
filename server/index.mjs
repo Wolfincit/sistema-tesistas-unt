@@ -10,6 +10,7 @@
  *   (o PORT=8080 node server/index.mjs)
  */
 
+import './envLoader.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,7 +37,11 @@ import {
   uploadFormatoFile,
   streamFileById,
   deleteFileById,
-  deleteTesistaFolderComplete
+  deleteTesistaFolderComplete,
+  autoHealDriveConnection,
+  exportMigrationBundle,
+  importMigrationBundle,
+  getEnvMigrationSnippet
 } from './googleDriveEngine.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -357,13 +362,44 @@ export async function handleApiRequest(req, res) {
     return true;
   }
 
+  if (urlObj.pathname === '/api/drive/migration-export' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const bundle = exportMigrationBundle(body.passphrase);
+      sendJson(res, 200, bundle);
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/drive/migration-import' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const status = await importMigrationBundle(body.bundle, body.passphrase);
+      sendJson(res, 200, status);
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/drive/env-template' && req.method === 'GET') {
+    try {
+      sendJson(res, 200, getEnvMigrationSnippet());
+    } catch (err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
   // ======================================================
   // API BASE DE DATOS COMPARTIDA (GOOGLE DRIVE / LOCAL)
   // ======================================================
   if (urlObj.pathname === '/api/db/state' && req.method === 'GET') {
     try {
       const force = urlObj.searchParams.get('force') === '1';
-      const state = await getDbState({ forceDrivePull: force });
+      const state = await getDbState({ forceDrivePull: force, origin: getRequestOrigin(req) });
       sendJson(res, 200, state);
     } catch (err) {
       sendJson(res, 500, { error: err.message });
@@ -522,5 +558,7 @@ if (isDirectRun) {
 
   server.listen(PORT, HOST, () => {
     console.log(`✅ Sistema de Gestión de Tesistas UNT listo en http://${HOST}:${PORT}`);
+    // Activar Seguro Automático al arrancar: auto-recupera llaves/Drive si cambió o se reinició el servidor
+    autoHealDriveConnection().catch(() => {});
   });
 }

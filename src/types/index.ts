@@ -268,6 +268,14 @@ export interface DriveStatusInfo {
     usedLabel: string;
   };
   hasBackupEnvHint?: boolean;
+  serverShield?: {
+    envLoaded: boolean;
+    vaultConfigured: boolean;
+    vaultSynced: boolean;
+    autoHealed: boolean;
+    migratedFromOrigin: string;
+    currentOrigin: string;
+  };
 }
 
 export interface FaqItem {

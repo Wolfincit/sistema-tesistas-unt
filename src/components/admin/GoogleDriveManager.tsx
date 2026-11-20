@@ -20,7 +20,10 @@ import {
   Copy,
   AlertCircle,
   X,
-  Link2
+  Link2,
+  Download,
+  Upload,
+  Lock
 } from 'lucide-react';
 
 interface BreadcrumbItem {
@@ -46,6 +49,12 @@ export const GoogleDriveManager: React.FC = () => {
   const [creandoCarpeta, setCreandoCarpeta] = useState<boolean>(false);
   const [nuevoNombreCarpeta, setNuevoNombreCarpeta] = useState<string>('Expedientes_Ing_Industrial_UNT');
   const [enlaceCarpetaManual, setEnlaceCarpetaManual] = useState<string>('');
+
+  // Seguro de Migración de Servidor (.untkey cifrado AES-256-GCM)
+  const [mostrarSeguroPanel, setMostrarSeguroPanel] = useState<boolean>(false);
+  const [claveSeguroExport, setClaveSeguroExport] = useState<string>('');
+  const [claveSeguroImport, setClaveSeguroImport] = useState<string>('');
+  const [archivoSeguroPendiente, setArchivoSeguroPendiente] = useState<any>(null);
 
   const cargarCarpetasDrive = useCallback(async (parentId = 'root', query = '') => {
     setCargandoCarpetas(true);
@@ -208,6 +217,86 @@ export const GoogleDriveManager: React.FC = () => {
       agregarToast('error', 'Error', err.message);
     } finally {
       setCargandoAccion(false);
+    }
+  };
+
+  const handleDescargarSeguroMigracion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCargandoAccion(true);
+    try {
+      const bundle = await driveApiService.exportMigrationBundle(claveSeguroExport);
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Seguro_Servidor_UNT_${new Date().toISOString().slice(0, 10)}.untkey`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setClaveSeguroExport('');
+      agregarToast(
+        'success',
+        'Seguro Cifrado Descargado (.untkey)',
+        'Guarde este archivo cifrado AES-256: al cambiar de servidor podrá restaurar todas las llaves y Drive en 1 clic.'
+      );
+    } catch (err: any) {
+      agregarToast('error', 'No se pudo generar el seguro', err.message);
+    } finally {
+      setCargandoAccion(false);
+    }
+  };
+
+  const handleCargarArchivoSeguro = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result || '{}'));
+        setArchivoSeguroPendiente(parsed);
+        agregarToast('info', 'Archivo Cargado', 'Ingrese la clave del archivo .untkey y pulse Restaurar.');
+      } catch {
+        agregarToast('error', 'Archivo inválido', 'Seleccione un archivo .untkey válido generado por el sistema.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleRestaurarSeguroMigracion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!archivoSeguroPendiente) return;
+    setCargandoAccion(true);
+    try {
+      await driveApiService.importMigrationBundle(archivoSeguroPendiente, claveSeguroImport);
+      await refrescarDriveStatus();
+      await refrescarTodo();
+      setArchivoSeguroPendiente(null);
+      setClaveSeguroImport('');
+      setMostrarSeguroPanel(false);
+      agregarToast(
+        'success',
+        'Servidor Restaurado Automáticamente',
+        'Se colocaron las llaves, se reconectó Google Drive y se recuperó la Base de Datos en este servidor.'
+      );
+    } catch (err: any) {
+      agregarToast('error', 'No se pudo restaurar', err.message);
+    } finally {
+      setCargandoAccion(false);
+    }
+  };
+
+  const handleCopiarPlantillaEnv = async () => {
+    try {
+      const { envText } = await driveApiService.getEnvTemplate();
+      await navigator.clipboard.writeText(envText);
+      agregarToast(
+        'success',
+        'Variables de Fábrica Copiadas',
+        'Pégales una sola vez en Render -> Environment o en el archivo .env de cualquier servidor nuevo.'
+      );
+    } catch (err: any) {
+      agregarToast('error', 'Error', err.message);
     }
   };
 
@@ -499,6 +588,127 @@ export const GoogleDriveManager: React.FC = () => {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Seguro Automático Anti-Reinicio y Cambio de Servidor */}
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+        <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Seguro Automático contra Cambio o Reinicio de Servidor
+                </h3>
+                {driveStatus?.serverShield?.vaultConfigured ? (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                    ✓ Bóveda Cifrada Auto-Recuperable Activa
+                  </span>
+                ) : driveStatus?.serverShield?.envLoaded ? (
+                  <span className="px-2 py-0.5 rounded-full bg-blue-100 text-unt-blue text-[10px] font-bold">
+                    ✓ Llaves de Fábrica Activas en Servidor
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
+                    Auto-descubrimiento Drive Activo
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                Si el sistema cambia de servidor o se reinicia, auto-recupera las llaves (.env / Bóveda cifrada AES-256), localiza automáticamente la carpeta de Google Drive y restaura toda la base de datos sin intervención manual.
+              </p>
+              {driveStatus?.serverShield?.migratedFromOrigin && (
+                <p className="text-[11px] text-emerald-700 font-semibold mt-1">
+                  ✓ Cambio de servidor detectado ({driveStatus.serverShield.migratedFromOrigin} → {driveStatus.serverShield.currentOrigin}) y auto-recuperado.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setMostrarSeguroPanel(!mostrarSeguroPanel)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold cursor-pointer shrink-0"
+          >
+            <span>{mostrarSeguroPanel ? 'Ocultar Seguro' : 'Respaldar / Restaurar Seguro'}</span>
+            <ChevronRight className={`w-3.5 h-3.5 transition-transform ${mostrarSeguroPanel ? 'rotate-90' : ''}`} />
+          </button>
+        </div>
+
+        {mostrarSeguroPanel && (
+          <div className="p-5 border-t border-slate-100 bg-slate-50/60 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            {/* Exportar Seguro Cifrado (.untkey) o Copiar .env */}
+            <form onSubmit={handleDescargarSeguroMigracion} className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+              <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                <Download className="w-4 h-4 text-unt-blue" />
+                <span>Generar Seguro Cifrado (.untkey) para Migración</span>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Empaqueta las llaves y el vínculo de Drive cifrados con <strong>AES-256-GCM</strong> para trasladarlos a un servidor nuevo en 1 paso.
+              </p>
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={claveSeguroExport}
+                onChange={(e) => setClaveSeguroExport(e.target.value)}
+                placeholder="Cree una clave de respaldo (mín. 6 caracteres)"
+                className="w-full p-2 rounded-lg border border-slate-300 text-xs"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={cargandoAccion}
+                  className="px-3.5 py-2 rounded-lg bg-unt-blue hover:bg-unt-blue-light text-white font-bold text-xs cursor-pointer"
+                >
+                  Descargar .untkey
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCopiarPlantillaEnv}
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-semibold text-xs cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copiar variables .env</span>
+                </button>
+              </div>
+            </form>
+
+            {/* Restaurar Seguro Cifrado (.untkey) en Nuevo Servidor */}
+            <form onSubmit={handleRestaurarSeguroMigracion} className="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+              <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                <Upload className="w-4 h-4 text-emerald-600" />
+                <span>Restaurar Seguro (.untkey) en un Servidor Nuevo</span>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Si cambió de servidor y el nuevo arranca vacío, seleccione su archivo <code>.untkey</code> y todo quedará conectado al instante.
+              </p>
+              <label className="block w-full p-2.5 rounded-lg border border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 text-center font-semibold text-unt-blue cursor-pointer">
+                {archivoSeguroPendiente
+                  ? `✓ Archivo cargado (${archivoSeguroPendiente.accountEmail || 'Seguro UNT'})`
+                  : 'Seleccionar archivo .untkey'}
+                <input type="file" accept=".untkey,.json" onChange={handleCargarArchivoSeguro} className="hidden" />
+              </label>
+              <input
+                type="password"
+                required
+                value={claveSeguroImport}
+                onChange={(e) => setClaveSeguroImport(e.target.value)}
+                placeholder="Clave del archivo .untkey"
+                className="w-full p-2 rounded-lg border border-slate-300 text-xs"
+              />
+              <button
+                type="submit"
+                disabled={cargandoAccion || !archivoSeguroPendiente}
+                className="px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs cursor-pointer"
+              >
+                Restaurar Llaves y Drive Ahora
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
       {/* Bloque Técnico: Oculto automáticamente cuando el sistema ya tiene sus llaves configuradas en el servidor */}

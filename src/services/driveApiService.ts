@@ -184,5 +184,34 @@ export const driveApiService = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'No se pudo eliminar la carpeta del tesista.');
     return data;
+  },
+
+  async exportMigrationBundle(passphrase: string): Promise<any> {
+    const res = await fetch('/api/drive/migration-export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ passphrase })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'No se pudo generar el seguro de migración.');
+    return data;
+  },
+
+  async importMigrationBundle(bundle: any, passphrase: string): Promise<DriveStatusInfo> {
+    const res = await fetch('/api/drive/migration-import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bundle, passphrase })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'No se pudo restaurar el seguro de migración.');
+    return data;
+  },
+
+  async getEnvTemplate(): Promise<{ ready: boolean; hasDriveLink: boolean; envText: string }> {
+    const res = await fetch('/api/drive/env-template');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'No se pudo obtener la plantilla .env.');
+    return data;
   }
 };
