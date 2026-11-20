@@ -145,6 +145,17 @@ export const GoogleDriveManager: React.FC = () => {
     }
   };
 
+  const handleCrearYActivarAutomatico = async () => {
+    setCargandoAccion(true);
+    try {
+      const creada = await driveApiService.createFolder('Expedientes_Ing_Industrial_UNT', 'root');
+      await handleSeleccionarCarpetaDestino(creada.id);
+    } catch (err: any) {
+      agregarToast('error', 'No se pudo crear la carpeta automática', err.message);
+      setCargandoAccion(false);
+    }
+  };
+
   const handleSeleccionarCarpetaDestino = async (folderIdOrLink: string) => {
     setCargandoAccion(true);
     try {
@@ -349,14 +360,24 @@ export const GoogleDriveManager: React.FC = () => {
                   </a>
                 </div>
               ) : (
-                <div className="pt-2 border-t border-slate-200">
+                <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row gap-2">
                   <button
                     type="button"
+                    disabled={cargandoAccion}
+                    onClick={handleCrearYActivarAutomatico}
+                    className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    <FolderPlus className="w-4 h-4" />
+                    <span>Crear carpeta automáticamente</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={cargandoAccion}
                     onClick={handleAbrirExaminar}
-                    className="w-full py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs cursor-pointer flex items-center justify-center gap-1.5"
+                    className="flex-1 py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
                     <FolderOpen className="w-4 h-4" />
-                    <span>Examinar y elegir carpeta donde guardar expedientes</span>
+                    <span>Examinar mi Drive</span>
                   </button>
                 </div>
               )}
@@ -480,7 +501,8 @@ export const GoogleDriveManager: React.FC = () => {
         </div>
       </div>
 
-      {/* Bloque Técnico Colapsable (Solo configuración inicial de 1 sola vez para el Administrador / Desarrollador) */}
+      {/* Bloque Técnico: Oculto automáticamente cuando el sistema ya tiene sus llaves configuradas en el servidor */}
+      {!driveStatus?.hasEnvCredentials && (
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
         <button
           type="button"
@@ -569,6 +591,7 @@ export const GoogleDriveManager: React.FC = () => {
           </div>
         )}
       </div>
+      )}
 
       {/* Modal Visual: Examinar Carpetas de Google Drive */}
       {modalExaminarAbierto && (
