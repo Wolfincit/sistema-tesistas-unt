@@ -23,6 +23,10 @@ import {
 } from 'lucide-react';
 import { audioPlayerService, AudioPlaybackHandle } from '../../services/audioPlayerService';
 
+// Bandera temporal para la etapa de evaluación académica.
+// Cambiar a `false` antes del lanzamiento final para retirar el botón de rotación rápida.
+const MODO_EVALUACION_HABILITADO = true;
+
 interface HeaderProps {
   onToggleSidebar?: () => void;
   sidebarAbierto?: boolean;
@@ -78,8 +82,15 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const estaComunicadoLeido = (com: { leido?: boolean; leidoPor?: string[] }) => {
+    if (usuario?.id && Array.isArray(com.leidoPor)) {
+      return com.leidoPor.includes(usuario.id);
+    }
+    return Boolean(com.leido);
+  };
+
   const pendientesCount = documentos.filter((d) => d.estado === 'En revisión').length;
-  const noLeidosComunicados = comunicados.filter((c) => !c.leido).length;
+  const noLeidosComunicados = comunicados.filter((c) => !estaComunicadoLeido(c)).length;
   const totalNotificaciones = noLeidosComunicados + (rolActual === 'secretaria' ? pendientesCount : 0);
 
   const handleReproducirAudioComunicado = (audioUrl?: string, textoRespaldo?: string, id?: string) => {
@@ -219,11 +230,13 @@ export const Header: React.FC<HeaderProps> = ({
                       <div className="max-h-[420px] overflow-y-auto divide-y divide-slate-100">
                         {/* Lista de Comunicados Generales de Secretaría */}
                         {comunicados.length > 0 ? (
-                          comunicados.map((com) => (
+                          comunicados.map((com) => {
+                            const leidoPorMi = estaComunicadoLeido(com);
+                            return (
                             <div
                               key={com.id}
                               className={`p-3.5 space-y-2 transition-colors ${
-                                !com.leido ? 'bg-blue-50/50' : 'hover:bg-slate-50'
+                                !leidoPorMi ? 'bg-blue-50/50' : 'hover:bg-slate-50'
                               }`}
                             >
                               <div className="flex items-start justify-between gap-2">
@@ -283,7 +296,7 @@ export const Header: React.FC<HeaderProps> = ({
                               <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400">
                                 <span className="truncate max-w-[200px]">Por: {com.autor}</span>
                                 <div className="flex items-center gap-2">
-                                  {!com.leido && (
+                                  {!leidoPorMi && (
                                     <button
                                       type="button"
                                       onClick={() => marcarLeidoComunicado(com.id)}
@@ -305,7 +318,8 @@ export const Header: React.FC<HeaderProps> = ({
                                 </div>
                               </div>
                             </div>
-                          ))
+                            );
+                          })
                         ) : (
                           <div className="p-6 text-center text-xs text-slate-400">
                             No hay comunicados generales emitidos.
@@ -327,27 +341,48 @@ export const Header: React.FC<HeaderProps> = ({
                   )}
                 </div>
 
-                {/* Insignia de Rol Verificado (Sin escalación de privilegios) */}
-                <div className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/10 border border-white/15 text-xs font-semibold">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
-                  <span className="text-amber-300 font-bold">
-                    {rolActual === 'secretaria' ? 'Secretaría Académica' : 'Tesista Acreditado'}
-                  </span>
-                </div>
+                {/* Botón Temporal de Rotación de Vista (Solo durante Evaluación) */}
+                {MODO_EVALUACION_HABILITADO ? (
+                  <button
+                    type="button"
+                    onClick={cambiarRolDemo}
+                    title="Botón temporal para evaluadores: alternar entre vista de Tesista y Secretaría Académica"
+                    className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-400/15 hover:bg-amber-400/25 border border-amber-300/40 text-xs font-bold text-amber-200 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-amber-300" />
+                    <span className="hidden md:inline">
+                      {rolActual === 'secretaria' ? 'Ver como Tesista' : 'Ver como Secretaría'}
+                    </span>
+                    <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-100 hidden xl:inline">
+                      Evaluación
+                    </span>
+                  </button>
+                ) : (
+                  <div className="hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white/10 border border-white/15 text-xs font-semibold">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+                    <span className="text-amber-300 font-bold">
+                      {rolActual === 'secretaria' ? 'Secretaría Académica' : 'Tesista Acreditado'}
+                    </span>
+                  </div>
+                )}
 
                 {/* Perfil Institucional de Usuario + Botón Volver a Vista Pública */}
                 <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-white/20">
                   <div className="flex items-center gap-2 select-none">
                     <div className="w-8 h-8 rounded-full bg-white text-[#082F64] font-bold text-xs flex items-center justify-center shadow-xs">
-                      {rolActual === 'secretaria' ? 'S' : (usuario.nombre ? usuario.nombre.charAt(0).toUpperCase() : 'U')}
+                      {usuario.nombre ? usuario.nombre.charAt(0).toUpperCase() : rolActual === 'secretaria' ? 'S' : 'U'}
                     </div>
 
                     <div className="hidden lg:flex flex-col">
-                      <span className="text-xs font-bold text-white max-w-[140px] truncate leading-tight">
-                        {rolActual === 'secretaria' ? 'Secretaría Académica' : usuario.nombre}
+                      <span className="text-xs font-bold text-white max-w-[160px] truncate leading-tight">
+                        {usuario.nombre || (rolActual === 'secretaria' ? 'Secretaría Académica' : 'Tesista UNT')}
                       </span>
-                      <span className="text-[10px] text-blue-200 leading-none">
-                        {rolActual === 'secretaria' ? 'Escuela de Ing. Industrial' : (usuario.codigoMatricula ? `Cód: ${usuario.codigoMatricula}` : 'Tesista Habilitado')}
+                      <span className="text-[10px] text-blue-200 leading-none truncate max-w-[160px]">
+                        {rolActual === 'secretaria'
+                          ? usuario.email || 'Secretaría Académica'
+                          : usuario.codigoMatricula
+                          ? `Cód: ${usuario.codigoMatricula}`
+                          : 'Tesista Habilitado'}
                       </span>
                     </div>
                   </div>

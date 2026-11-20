@@ -10,6 +10,7 @@ import {
   FormatoInstitucional,
   ConsultaTesista,
   CorreoAutorizado,
+  CuentaSecretaria,
   ComunicadoGeneral,
   FaqItem
 } from '../types';
@@ -95,8 +96,9 @@ interface AppContextType {
   evaluarResolucionConsulta: (id: string, conforme: boolean, repreguntaTexto?: string) => Promise<void>;
   eliminarConsulta: (id: string) => Promise<void>;
 
-  // Control de Accesos y Padrón de Egresados
+  // Control de Accesos y Padrón de Egresados + Múltiples Secretarias Independientes
   correosAutorizados: CorreoAutorizado[];
+  cuentasSecretaria: CuentaSecretaria[];
   agregarCorreoAutorizado: (datos: {
     correo: string;
     nombreGraduando: string;
@@ -110,6 +112,15 @@ interface AppContextType {
   vaciarPadron: () => Promise<void>;
   importarCorreosMasivo: (textoOArchivo: string) => Promise<{ agregados: number; omitidos: number }>;
   restablecerPadron: () => Promise<void>;
+  agregarSecretaria: (datos: {
+    correo: string;
+    nombre: string;
+    cargo: string;
+    passwordInicial?: string;
+  }) => Promise<void>;
+  toggleActivoSecretaria: (id: string) => Promise<void>;
+  eliminarSecretaria: (id: string) => Promise<void>;
+  resetearPasswordSecretaria: (id: string) => Promise<void>;
 
   // Comunicados Generales con Nota de Voz
   comunicados: ComunicadoGeneral[];
@@ -159,6 +170,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [formatos, setFormatos] = useState<FormatoInstitucional[]>([]);
   const [consultas, setConsultas] = useState<ConsultaTesista[]>([]);
   const [correosAutorizados, setCorreosAutorizados] = useState<CorreoAutorizado[]>([]);
+  const [cuentasSecretaria, setCuentasSecretaria] = useState<CuentaSecretaria[]>([]);
+  const [ultimoTesistaActivo, setUltimoTesistaActivo] = useState<UserProfile | null>(null);
+  const [ultimaSecretariaActiva, setUltimaSecretariaActiva] = useState<UserProfile | null>(null);
   const [comunicados, setComunicados] = useState<ComunicadoGeneral[]>([]);
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -182,7 +196,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const cargarDatos = async () => {
     try {
-      const [res, blq, hab, docs, slotsMap, defSlots, fmts, cons, corrs, coms, faqsList] = await Promise.all([
+      const [res, blq, hab, docs, slotsMap, defSlots, fmts, cons, corrs, secs, coms, faqsList] = await Promise.all([
         auditorioService.getReservas(),
         auditorioService.getBloqueos(),
         auditorioService.getFechasHabilitadas(),
@@ -192,6 +206,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         formatosService.getFormatos(),
         consultasService.getConsultas(),
         accesosService.getCorreos(),
+        accesosService.getSecretarias(),
         comunicadosService.getComunicados(),
         faqService.getFaqs()
       ]);
@@ -204,6 +219,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setFormatos(fmts);
       setConsultas(cons);
       setCorreosAutorizados(corrs);
+      setCuentasSecretaria(secs);
       setComunicados(coms);
       setFaqs(faqsList);
     } catch (error) {
@@ -219,13 +235,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const cambiarRolDemo = () => {
     const nuevoRol: UserRole = rolActual === 'tesista' ? 'secretaria' : 'tesista';
-    const nuevoUsuario = MOCK_USERS[nuevoRol];
+
+    if (usuario?.rol === 'tesista') {
+      setUltimoTesistaActivo(usuario);
+    } else if (usuario?.rol === 'secretaria') {
+      setUltimaSecretariaActiva(usuario);
+    }
+
+    let nuevoUsuario: UserProfile;
+    if (nuevoRol === 'tesista') {
+      if (ultimoTesistaActivo) {
+        nuevoUsuario = ultimoTesistaActivo;
+      } else {
+        const primerTesista = correosAutorizados.find((c) => c.activo) || correosAutorizados[0];
+        nuevoUsuario = primerTesista
+          ? {
+              id: `usr-${primerTesista.codigoMatricula}`,
+              email: primerTesista.correo,
+              nombre: primerTesista.nombreGraduando,
+              rol: 'tesista',
+              codigoMatricula: primerTesista.codigoMatricula,
+              departamento: 'Escuela Profesional de Ingeniería Industrial',
+              facultad: 'Facultad de Ingeniería (UNT)'
+            }
+          : MOCK_USERS.tesista;
+      }
+    } else {
+      if (ultimaSecretariaActiva) {
+        nuevoUsuario = ultimaSecretariaActiva;
+      } else {
+        const primeraSec = cuentasSecretaria.find((s) => s.activo) || cuentasSecretaria[0];
+        nuevoUsuario = primeraSec
+          ? {
+              id: primeraSec.id,
+              email: primeraSec.correo,
+              nombre: primeraSec.nombre,
+              rol: 'secretaria',
+              codigoMatricula: 'SEC-UNT',
+              departamento: primeraSec.cargo,
+              facultad: 'Facultad de Ingeniería (UNT)'
+            }
+          : MOCK_USERS.secretaria;
+      }
+    }
+
     setUsuario(nuevoUsuario);
     storageService.set(USER_SESSION_KEY, nuevoUsuario);
     agregarToast(
       'info',
-      'Modo Demostración',
-      `Cambiaste al rol de: ${nuevoRol === 'tesista' ? 'Tesista (Estudiante)' : 'Secretaría Académica (Administrador)'}`
+      'Modo Evaluación (Rotación Temporal)',
+      `Vista activa: ${nuevoRol === 'tesista' ? `Tesista (${nuevoUsuario.nombre})` : `${nuevoUsuario.nombre} (${nuevoUsuario.email})`}`
     );
   };
 
@@ -237,12 +296,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return false;
     }
 
+    // Detectar automáticamente si el correo pertenece al padrón independiente de Secretarias
+    const registroSecretaria = cuentasSecretaria.find(
+      (s) => s.correo.toLowerCase() === emailNormalizado
+    );
     let roleToAssign: UserRole = rolElegido || 'tesista';
-    if (emailNormalizado.includes('secretaria') || emailNormalizado.includes('admin') || emailNormalizado.includes('decanato')) {
+    if (registroSecretaria && rolElegido !== 'tesista') {
+      roleToAssign = 'secretaria';
+    } else if (!registroSecretaria && rolElegido === 'secretaria') {
       roleToAssign = 'secretaria';
     }
 
-    // CONTROL DE ACCESO ESTRICTO CON CONTRASEÑA PARA TESISTAS
+    // CONTROL DE ACCESO ESTRICTO CON CONTRASEÑA INDEPENDIENTE PARA TESISTAS
     if (roleToAssign === 'tesista') {
       const registroCorreo = correosAutorizados.find(
         (c) => c.correo.toLowerCase() === emailNormalizado
@@ -286,24 +351,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       };
 
       setUsuario(loggedUser);
+      setUltimoTesistaActivo(loggedUser);
       storageService.set(USER_SESSION_KEY, loggedUser);
       agregarToast('success', 'Acceso de Tesista Acreditado', `Bienvenido(a) al Módulo de Titulación, ${loggedUser.nombre}`);
       return true;
     }
 
-    // Secretaría Académica
+    // CONTROL DE ACCESO INDEPENDIENTE PARA MÚLTIPLES SECRETARIAS (@unitru.edu.pe)
     if (!emailNormalizado.endsWith('@unitru.edu.pe')) {
       agregarToast('error', 'Acceso denegado', 'Secretaría Académica requiere correo institucional @unitru.edu.pe');
       return false;
     }
-    if (!accesosService.verificarSecretariaPassword(pwdLimpia)) {
-      agregarToast('error', 'Contraseña Incorrecta', 'La contraseña de Secretaría Académica no es válida.');
+    if (!registroSecretaria) {
+      agregarToast(
+        'error',
+        'Cuenta de Secretaría no registrada',
+        'Ese correo no figura en el personal autorizado de Secretaría Académica.'
+      );
       return false;
     }
-    const baseUser = MOCK_USERS.secretaria;
-    setUsuario(baseUser);
-    storageService.set(USER_SESSION_KEY, baseUser);
-    agregarToast('success', 'Panel de Secretaría Académica', `Bienvenida al Panel de Gestión, ${baseUser.nombre}`);
+    if (!registroSecretaria.activo) {
+      agregarToast(
+        'warning',
+        'Cuenta Suspendida',
+        'Esta cuenta de Secretaría se encuentra suspendida temporalmente.'
+      );
+      return false;
+    }
+    if (!accesosService.verificarPasswordSecretariaRegistro(registroSecretaria, pwdLimpia)) {
+      agregarToast('error', 'Contraseña Incorrecta', 'La contraseña de esta cuenta de Secretaría no es válida.');
+      return false;
+    }
+
+    const secUser: UserProfile = {
+      id: registroSecretaria.id,
+      email: registroSecretaria.correo,
+      nombre: registroSecretaria.nombre,
+      rol: 'secretaria',
+      codigoMatricula: 'SEC-UNT',
+      departamento: registroSecretaria.cargo,
+      facultad: 'Facultad de Ingeniería (UNT)'
+    };
+    setUsuario(secUser);
+    setUltimaSecretariaActiva(secUser);
+    storageService.set(USER_SESSION_KEY, secUser);
+    agregarToast('success', 'Panel de Secretaría Académica', `Bienvenida(o), ${secUser.nombre}`);
     return true;
   };
 
@@ -311,7 +403,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!usuario) return false;
     try {
       if (usuario.rol === 'secretaria') {
-        accesosService.cambiarSecretariaPassword(passwordActual, nuevaPassword);
+        const actualizada = await accesosService.cambiarPasswordSecretariaPorCorreo(
+          usuario.email,
+          passwordActual,
+          nuevaPassword
+        );
+        setCuentasSecretaria((prev) =>
+          prev.map((s) => (s.id === actualizada.id ? actualizada : s))
+        );
       } else {
         const actualizado = await accesosService.cambiarPasswordTesista(
           usuario.email,
@@ -325,7 +424,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       agregarToast(
         'success',
         'Contraseña Actualizada',
-        'Su nueva contraseña personal quedó guardada de forma segura.'
+        'Su nueva contraseña personal quedó guardada de forma segura (hash SHA-256).'
       );
       return true;
     } catch (e: any) {
@@ -761,11 +860,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const evaluarResolucionConsulta = async (id: string, conforme: boolean, repreguntaTexto?: string) => {
     try {
-      const updated = await consultasService.evaluarResolucion({ id, conforme, repreguntaTexto });
-      setConsultas((prev) => prev.map((c) => (c.id === id ? updated : c)));
-      if (conforme) {
-        agregarToast('success', 'Consulta Resuelta', 'Ha confirmado que su duda quedó resuelta satisfactoriamente.');
+      const resultado = await consultasService.evaluarResolucion({ id, conforme, repreguntaTexto });
+      if (resultado.eliminada) {
+        setConsultas((prev) => prev.filter((c) => c.id !== id));
+        agregarToast(
+          'success',
+          'Consulta Resuelta y Eliminada',
+          'Confirmaste que tu duda quedó resuelta. La consulta y sus notas de voz adjuntas fueron eliminadas automáticamente para liberar espacio.'
+        );
       } else {
+        const updated = resultado.consulta;
+        setConsultas((prev) => prev.map((c) => (c.id === id ? updated : c)));
         if (updated.estado === 'Cerrada') {
           agregarToast('warning', 'Límite de Intentos Alcanzado', 'Se completaron los 2 intentos de aclaración para este ticket.');
         } else {
@@ -781,6 +886,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       await consultasService.eliminarConsulta(id);
       setConsultas((prev) => prev.filter((c) => c.id !== id));
+      agregarToast(
+        'info',
+        'Consulta Eliminada',
+        'El ticket y sus notas de voz adjuntas fueron eliminados del sistema.'
+      );
     } catch (e: any) {
       agregarToast('error', 'Error al eliminar', e.message);
     }
@@ -879,6 +989,64 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  // Gestión Independiente de Cuentas de Secretaría Académica
+  const agregarSecretaria = async (datos: {
+    correo: string;
+    nombre: string;
+    cargo: string;
+    passwordInicial?: string;
+  }) => {
+    try {
+      const nueva = await accesosService.agregarSecretaria(datos);
+      setCuentasSecretaria((prev) => [nueva, ...prev]);
+      agregarToast(
+        'success',
+        'Secretaria Registrada',
+        `Se creó la cuenta independiente para ${nueva.nombre} (${nueva.correo}).`
+      );
+    } catch (e: any) {
+      agregarToast('error', 'No se pudo registrar cuenta', e.message);
+    }
+  };
+
+  const toggleActivoSecretaria = async (id: string) => {
+    try {
+      const updated = await accesosService.toggleActivoSecretaria(id);
+      setCuentasSecretaria((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      agregarToast(
+        'info',
+        'Estado Actualizado',
+        `Cuenta de Secretaría ${updated.activo ? 'Habilitada' : 'Suspendida'}.`
+      );
+    } catch (e: any) {
+      agregarToast('error', 'Operación bloqueada', e.message);
+    }
+  };
+
+  const eliminarSecretaria = async (id: string) => {
+    try {
+      await accesosService.eliminarSecretaria(id);
+      setCuentasSecretaria((prev) => prev.filter((s) => s.id !== id));
+      agregarToast('info', 'Cuenta Retirada', 'Se eliminó la cuenta independiente de Secretaría.');
+    } catch (e: any) {
+      agregarToast('error', 'Operación bloqueada', e.message);
+    }
+  };
+
+  const resetearPasswordSecretaria = async (id: string) => {
+    try {
+      const updated = await accesosService.resetearPasswordSecretaria(id);
+      setCuentasSecretaria((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      agregarToast(
+        'info',
+        'Clave Restablecida',
+        `La contraseña de ${updated.nombre} volvió a la clave institucional base (UNT2026*).`
+      );
+    } catch (e: any) {
+      agregarToast('error', 'Error al restablecer clave', e.message);
+    }
+  };
+
   // Comunicados Generales con Nota de Voz
   const emitirComunicado = async (datos: {
     titulo: string;
@@ -900,8 +1068,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const marcarLeidoComunicado = async (id: string) => {
     try {
-      await comunicadosService.marcarLeido(id);
-      setComunicados((prev) => prev.map((c) => (c.id === id ? { ...c, leido: true } : c)));
+      const userId = usuario?.id;
+      await comunicadosService.marcarLeido(id, userId);
+      setComunicados((prev) =>
+        prev.map((c) => {
+          if (c.id !== id) return c;
+          if (userId) {
+            const previos = c.leidoPor || [];
+            return { ...c, leidoPor: previos.includes(userId) ? previos : [...previos, userId] };
+          }
+          return { ...c, leido: true };
+        })
+      );
     } catch (e: any) {
       console.error(e);
     }
@@ -991,6 +1169,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         evaluarResolucionConsulta,
         eliminarConsulta,
         correosAutorizados,
+        cuentasSecretaria,
         agregarCorreoAutorizado,
         editarCorreoAutorizado,
         toggleActivoCorreo,
@@ -999,6 +1178,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         vaciarPadron,
         importarCorreosMasivo,
         restablecerPadron,
+        agregarSecretaria,
+        toggleActivoSecretaria,
+        eliminarSecretaria,
+        resetearPasswordSecretaria,
         comunicados,
         emitirComunicado,
         marcarLeidoComunicado,

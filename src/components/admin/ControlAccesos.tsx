@@ -11,12 +11,14 @@ import {
   FileSpreadsheet, 
   X,
   KeyRound,
-  RotateCcw
+  RotateCcw,
+  ShieldCheck
 } from 'lucide-react';
 
 export const ControlAccesos: React.FC = () => {
   const { 
     correosAutorizados, 
+    cuentasSecretaria,
     agregarCorreoAutorizado, 
     toggleActivoCorreo, 
     eliminarCorreoAutorizado, 
@@ -24,12 +26,18 @@ export const ControlAccesos: React.FC = () => {
     vaciarPadron,
     importarCorreosMasivo,
     resetearPasswordTesista,
+    agregarSecretaria,
+    toggleActivoSecretaria,
+    eliminarSecretaria,
+    resetearPasswordSecretaria,
     agregarToast
   } = useApp();
 
+  const [subTab, setSubTab] = useState<'tesistas' | 'secretarias'>('tesistas');
   const [busqueda, setBusqueda] = useState<string>('');
   const [modalManualAbierto, setModalManualAbierto] = useState<boolean>(false);
   const [modalImportarAbierto, setModalImportarAbierto] = useState<boolean>(false);
+  const [modalSecretariaAbierto, setModalSecretariaAbierto] = useState<boolean>(false);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [correo, setCorreo] = useState<string>('');
   const [nombre, setNombre] = useState<string>('');
@@ -37,6 +45,12 @@ export const ControlAccesos: React.FC = () => {
   const [promocion, setPromocion] = useState<string>('2026-I');
   const [textoImportacion, setTextoImportacion] = useState<string>('');
   const [procesando, setProcesando] = useState<boolean>(false);
+
+  // Campos para nueva cuenta independiente de Secretaría
+  const [secCorreo, setSecCorreo] = useState<string>('');
+  const [secNombre, setSecNombre] = useState<string>('');
+  const [secCargo, setSecCargo] = useState<string>('Asistente de Grados y Títulos');
+  const [secPasswordInicial, setSecPasswordInicial] = useState<string>('UNT2026*');
 
   const correosFiltrados = correosAutorizados.filter((c) => {
     if (!busqueda.trim()) return true;
@@ -93,48 +107,202 @@ export const ControlAccesos: React.FC = () => {
     setModalImportarAbierto(false);
   };
 
+  const handleCrearSecretaria = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!secCorreo.trim() || !secNombre.trim()) return;
+    await agregarSecretaria({
+      correo: secCorreo.trim(),
+      nombre: secNombre.trim(),
+      cargo: secCargo.trim() || 'Secretaría Académica',
+      passwordInicial: secPasswordInicial.trim() || 'UNT2026*'
+    });
+    setSecCorreo('');
+    setSecNombre('');
+    setSecCargo('Asistente de Grados y Títulos');
+    setSecPasswordInicial('UNT2026*');
+    setModalSecretariaAbierto(false);
+  };
+
   const totalHabilitados = correosAutorizados.filter((c) => c.activo).length;
+  const totalSecretariasActivas = cuentasSecretaria.filter((s) => s.activo).length;
 
   return (
     <div className="space-y-4">
       {/* Cabecera */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <Users className="w-4 h-4 text-unt-blue" />
-            <span>Control de Accesos y Padrón de Egresados</span>
-            <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-unt-blue text-[11px] font-bold">
-              {totalHabilitados} habilitados
-            </span>
-          </h3>
-          <p className="text-xs text-slate-500">
-            Los estudiantes solo podrán iniciar sesión si su correo institucional (@unitru.edu.pe) figura en esta lista oficial.
-          </p>
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <Users className="w-4 h-4 text-unt-blue" />
+              <span>Control de Accesos Independientes (Tesistas y Secretarias)</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Cada tesista y cada secretaria cuenta con su propio correo institucional independiente y contraseña cifrada (SHA-256).
+            </p>
+          </div>
+
+          {/* Botones de Carga y Gestión según pestaña */}
+          <div className="flex flex-wrap items-center gap-2">
+            {subTab === 'tesistas' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setModalImportarAbierto(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl transition-colors cursor-pointer"
+                >
+                  <UploadCloud className="w-3.5 h-3.5 text-unt-blue" />
+                  <span>Importar Masivo (CSV / Excel / TXT)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setModalManualAbierto(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-unt-blue hover:bg-unt-blue-light rounded-xl shadow-2xs transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Agregar Tesista</span>
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setModalSecretariaAbierto(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-unt-blue hover:bg-unt-blue-light rounded-xl shadow-2xs transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Agregar Cuenta de Secretaría</span>
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Botones de Carga y Gestión */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Selector de Pestañas: Padrón de Tesistas vs Personal de Secretaría */}
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
           <button
             type="button"
-            onClick={() => setModalImportarAbierto(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl transition-colors cursor-pointer"
+            onClick={() => setSubTab('tesistas')}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+              subTab === 'tesistas'
+                ? 'bg-[#082F64] text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
           >
-            <UploadCloud className="w-3.5 h-3.5 text-unt-blue" />
-            <span>Subir Excel / Word / TXT</span>
+            <Users className="w-3.5 h-3.5" />
+            <span>Padrón de Tesistas</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] ${subTab === 'tesistas' ? 'bg-white/20 text-white' : 'bg-white text-slate-700'}`}>
+              {totalHabilitados} activos
+            </span>
           </button>
 
           <button
             type="button"
-            onClick={() => setModalManualAbierto(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-unt-blue hover:bg-unt-blue-light rounded-xl shadow-2xs transition-colors cursor-pointer"
+            onClick={() => setSubTab('secretarias')}
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+              subTab === 'secretarias'
+                ? 'bg-[#082F64] text-white shadow-2xs'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ Agregar Correo</span>
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Personal de Secretaría (Independientes)</span>
+            <span className={`px-2 py-0.5 rounded-full text-[10px] ${subTab === 'secretarias' ? 'bg-white/20 text-white' : 'bg-white text-slate-700'}`}>
+              {totalSecretariasActivas} activas
+            </span>
           </button>
         </div>
       </div>
 
-      {/* Buscador y Tabla de Correos Autorizados */}
+      {subTab === 'secretarias' ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4">
+          <div className="text-xs text-slate-600 bg-blue-50/70 border border-blue-100 p-3 rounded-xl">
+            Cada integrante del equipo administrativo inicia sesión con su <strong>propio correo @unitru.edu.pe</strong> y su <strong>propia contraseña personal</strong>. Sus dictámenes de expedientes y respuestas a consultas quedan registrados a su nombre.
+          </div>
+
+          <div className="overflow-x-auto border border-slate-200/70 rounded-xl">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                <tr>
+                  <th className="p-3.5">Correo Institucional</th>
+                  <th className="p-3.5">Nombre / Responsable</th>
+                  <th className="p-3.5">Cargo / Área</th>
+                  <th className="p-3.5">Contraseña</th>
+                  <th className="p-3.5">Estado</th>
+                  <th className="p-3.5 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {cuentasSecretaria.map((s) => (
+                  <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="p-3.5 font-mono font-bold text-unt-blue">{s.correo}</td>
+                    <td className="p-3.5 font-semibold text-slate-800">{s.nombre}</td>
+                    <td className="p-3.5 text-slate-600">{s.cargo}</td>
+                    <td className="p-3.5">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            s.passwordCambiada
+                              ? 'bg-indigo-50 text-indigo-800 border border-indigo-200'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          <KeyRound className="w-3 h-3" />
+                          <span>{s.passwordCambiada ? 'Clave personal' : 'Clave base'}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => resetearPasswordSecretaria(s.id)}
+                          title="Restablecer contraseña a clave base (UNT2026*)"
+                          className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="p-3.5">
+                      <button
+                        type="button"
+                        onClick={() => toggleActivoSecretaria(s.id)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer transition-colors ${
+                          s.activo
+                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                            : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
+                        }`}
+                      >
+                        {s.activo ? (
+                          <>
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Activa</span>
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-3 h-3 text-slate-400" />
+                            <span>Suspendida</span>
+                          </>
+                        )}
+                      </button>
+                    </td>
+                    <td className="p-3.5 text-right">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (confirm(`¿Eliminar la cuenta de Secretaría "${s.correo}"?`)) {
+                            await eliminarSecretaria(s.id);
+                          }
+                        }}
+                        className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Eliminar cuenta de Secretaría"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+      /* Buscador y Tabla de Correos Autorizados */
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="relative sm:w-72">
@@ -347,6 +515,104 @@ export const ControlAccesos: React.FC = () => {
           </table>
         </div>
       </div>
+      )}
+
+      {/* Modal Agregar Nueva Cuenta Independiente de Secretaría */}
+      {modalSecretariaAbierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
+            <div className="p-4 bg-[#082F64] text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-300" />
+                <h3 className="text-sm font-bold">Registrar Cuenta Independiente de Secretaría</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalSecretariaAbierto(false)}
+                className="p-1 text-white/80 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCrearSecretaria} className="p-5 space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Correo Institucional (@unitru.edu.pe):
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={secCorreo}
+                  onChange={(e) => setSecCorreo(e.target.value)}
+                  placeholder="nombre.secretaria@unitru.edu.pe"
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Nombre Completo del Personal:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={secNombre}
+                  onChange={(e) => setSecNombre(e.target.value)}
+                  placeholder="Ej: Lic. María Elena Paredes Rojas"
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Cargo / Función:</label>
+                  <input
+                    type="text"
+                    required
+                    value={secCargo}
+                    onChange={(e) => setSecCargo(e.target.value)}
+                    placeholder="Asistente de Grados y Títulos"
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Contraseña Inicial:</label>
+                  <input
+                    type="text"
+                    required
+                    minLength={6}
+                    value={secPasswordInicial}
+                    onChange={(e) => setSecPasswordInicial(e.target.value)}
+                    placeholder="Mín. 6 caracteres"
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-mono"
+                  />
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-500">
+                Esta cuenta es totalmente independiente y podrá cambiar su propia contraseña personal al iniciar sesión.
+              </p>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setModalSecretariaAbierto(false)}
+                  className="px-3.5 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-unt-blue hover:bg-unt-blue-light text-white font-bold rounded-xl shadow-2xs cursor-pointer"
+                >
+                  Crear Cuenta de Secretaría
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal Agregar Individual */}
       {modalManualAbierto && (
@@ -480,13 +746,13 @@ export const ControlAccesos: React.FC = () => {
               {/* Opción 2: Pegar lista de correos */}
               <form onSubmit={handleImportarTexto} className="space-y-2">
                 <label className="block font-bold text-slate-700">
-                  O pegue una lista de correos directamente:
+                  O pegue una lista de 10, 50 o 100+ tesistas (solo correos o formato CSV: correo, nombre, matrícula, promoción):
                 </label>
                 <textarea
                   rows={4}
                   value={textoImportacion}
                   onChange={(e) => setTextoImportacion(e.target.value)}
-                  placeholder="ejemplo1@unitru.edu.pe&#10;ejemplo2@unitru.edu.pe&#10;ejemplo3@unitru.edu.pe..."
+                  placeholder="jperez@unitru.edu.pe, Juan Pérez López, 1021400501, 2026-I&#10;mgarcia@unitru.edu.pe, María García Torres, 1021400502, 2026-I"
                   className="w-full p-2.5 text-xs rounded-xl border border-slate-300 bg-white font-mono"
                 />
                 <button

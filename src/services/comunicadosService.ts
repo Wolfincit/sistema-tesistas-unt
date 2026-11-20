@@ -34,7 +34,8 @@ export const comunicadosService = {
       audioDuracion: datos.audioDuracion || '0:25',
       fecha: fechaHora,
       autor: datos.autor,
-      leido: false
+      leido: false,
+      leidoPor: []
     };
 
     const actualizados = [nuevo, ...actuales];
@@ -42,14 +43,28 @@ export const comunicadosService = {
     return nuevo;
   },
 
-  async marcarLeido(id: string): Promise<void> {
+  async marcarLeido(id: string, usuarioId?: string): Promise<void> {
     const actuales = await this.getComunicados();
-    const actualizados = actuales.map((c) => (c.id === id ? { ...c, leido: true } : c));
+    const actualizados = actuales.map((c) => {
+      if (c.id !== id) return c;
+      if (usuarioId) {
+        const previos = c.leidoPor || [];
+        const leidoPor = previos.includes(usuarioId) ? previos : [...previos, usuarioId];
+        return { ...c, leidoPor };
+      }
+      return { ...c, leido: true };
+    });
     await this.saveComunicados(actualizados);
   },
 
   async eliminarComunicado(id: string): Promise<void> {
     const actuales = await this.getComunicados();
+    const objetivo = actuales.find((c) => c.id === id);
+    if (objetivo?.audioUrl?.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(objetivo.audioUrl);
+      } catch (_) {}
+    }
     const actualizados = actuales.filter((c) => c.id !== id);
     await this.saveComunicados(actualizados);
   }

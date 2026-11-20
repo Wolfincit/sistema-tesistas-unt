@@ -12,7 +12,9 @@ import {
   User, 
   ShieldCheck,
   Volume2,
-  X
+  X,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
 import { audioPlayerService, AudioPlaybackHandle } from '../../services/audioPlayerService';
@@ -26,6 +28,12 @@ export const TesistaConsultas: React.FC = () => {
   const [reproduciendoAudioId, setReproduciendoAudioId] = useState<string | null>(null);
   const [consultaEnAclaracionId, setConsultaEnAclaracionId] = useState<string | null>(null);
   const [textoAclaracion, setTextoAclaracion] = useState<string>('');
+  const [consultaAConfirmarResuelta, setConsultaAConfirmarResuelta] = useState<{
+    id: string;
+    asunto: string;
+    tieneAudio: boolean;
+  } | null>(null);
+  const [procesandoResolucion, setProcesandoResolucion] = useState<boolean>(false);
   const playbackHandleRef = useRef<AudioPlaybackHandle | null>(null);
 
   // Filtrar consultas del tesista autenticado
@@ -248,12 +256,18 @@ export const TesistaConsultas: React.FC = () => {
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
-                          {/* Botón Check: Resuelto */}
+                          {/* Botón Check: Resuelto (con confirmación de auto-eliminación) */}
                           <button
                             type="button"
-                            onClick={() => evaluarResolucionConsulta(c.id, true)}
+                            onClick={() =>
+                              setConsultaAConfirmarResuelta({
+                                id: c.id,
+                                asunto: c.asunto,
+                                tieneAudio: Boolean(c.respuestaAudioDuracion)
+                              })
+                            }
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-                            title="Confirmar que la duda está resuelta"
+                            title="Confirmar que la duda está resuelta (se eliminará automáticamente del buzón)"
                           >
                             <CheckCircle2 className="w-4 h-4" />
                             <span>✓ Duda Resuelta</span>
@@ -343,6 +357,83 @@ export const TesistaConsultas: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Modal de Confirmación: Marcar Duda Resuelta y Auto-Eliminar Consulta + Audio */}
+      {consultaAConfirmarResuelta && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
+          onClick={() => !procesandoResolucion && setConsultaAConfirmarResuelta(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 bg-emerald-700 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-200" />
+                <h3 className="text-sm font-bold tracking-tight">Confirmar Consulta Resuelta</h3>
+              </div>
+              <button
+                type="button"
+                disabled={procesandoResolucion}
+                onClick={() => setConsultaAConfirmarResuelta(null)}
+                className="p-1 text-white/80 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs text-slate-700">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                  Consulta a cerrar:
+                </span>
+                <p className="font-bold text-slate-900">{consultaAConfirmarResuelta.asunto}</p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-950 flex items-start gap-2.5 leading-relaxed">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold block mb-0.5">Limpieza automática de almacenamiento:</span>
+                  Al confirmar que tu duda quedó resuelta, esta consulta{' '}
+                  {consultaAConfirmarResuelta.tieneAudio ? 'y sus notas de voz adjuntas ' : ''}
+                  se <strong>eliminarán automáticamente</strong> del sistema para mantener el buzón limpio y liberar espacio.
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={procesandoResolucion}
+                  onClick={() => setConsultaAConfirmarResuelta(null)}
+                  className="px-3.5 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={procesandoResolucion}
+                  onClick={async () => {
+                    if (playbackHandleRef.current) {
+                      playbackHandleRef.current.stop();
+                      playbackHandleRef.current = null;
+                      setReproduciendoAudioId(null);
+                    }
+                    setProcesandoResolucion(true);
+                    await evaluarResolucionConsulta(consultaAConfirmarResuelta.id, true);
+                    setProcesandoResolucion(false);
+                    setConsultaAConfirmarResuelta(null);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-2xs cursor-pointer disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{procesandoResolucion ? 'Eliminando...' : 'Sí, está resuelta (Eliminar)'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Nueva Consulta */}
       {modalNuevaConsulta && (

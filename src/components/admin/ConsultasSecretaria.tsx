@@ -17,13 +17,15 @@ import {
   Megaphone,
   X,
   Radio,
-  FileText
+  FileText,
+  Trash2
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
 import { audioPlayerService, AudioPlaybackHandle } from '../../services/audioPlayerService';
 
 export const ConsultasSecretaria: React.FC = () => {
-  const { consultas, responderConsulta, emitirComunicado, agregarFaq } = useApp();
+  const { consultas, responderConsulta, eliminarConsulta, emitirComunicado, agregarFaq } = useApp();
+  const [consultaAEliminar, setConsultaAEliminar] = useState<ConsultaTesista | null>(null);
   const [consultaSeleccionadaId, setConsultaSeleccionadaId] = useState<string | null>(
     consultas.length > 0 ? consultas[0].id : null
   );
@@ -346,9 +348,20 @@ export const ConsultasSecretaria: React.FC = () => {
                     {consultaActiva.asunto}
                   </h4>
                 </div>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  {consultaActiva.fechaEnvio}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    {consultaActiva.fechaEnvio}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setConsultaAEliminar(consultaActiva)}
+                    title="Eliminar consulta y liberar sus audios adjuntos"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Eliminar</span>
+                  </button>
+                </div>
               </div>
 
               {/* Mensajes (Duda del Tesista + Respuesta si existe) */}
@@ -572,6 +585,68 @@ export const ConsultasSecretaria: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Modal de Confirmación para Eliminar Consulta + Audios */}
+      {consultaAEliminar && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
+          onClick={() => setConsultaAEliminar(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 bg-rose-700 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-rose-200" />
+                <h3 className="text-sm font-bold">Eliminar Consulta y Audios</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConsultaAEliminar(null)}
+                className="p-1 text-white/80 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 text-xs text-slate-700">
+              <p className="leading-relaxed">
+                ¿Está segura(o) de eliminar la consulta <strong>"{consultaAEliminar.asunto}"</strong> de{' '}
+                <strong>{consultaAEliminar.tesistaNombre}</strong>?
+              </p>
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900">
+                Esta acción eliminará el ticket y cualquier nota de voz adjunta de forma definitiva para liberar espacio.
+                Si desea conservar la respuesta para otros tesistas, puede publicarla antes en <strong>Preguntas Frecuentes</strong>.
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setConsultaAEliminar(null)}
+                  className="px-3.5 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (playbackHandleRef.current) {
+                      playbackHandleRef.current.stop();
+                      playbackHandleRef.current = null;
+                      setReproduciendoAudioId(null);
+                    }
+                    await eliminarConsulta(consultaAEliminar.id);
+                    setConsultaAEliminar(null);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-2xs cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Sí, eliminar consulta</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Emitir Comunicado General */}
       {modalComunicadoAbierto && (

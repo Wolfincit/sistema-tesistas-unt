@@ -207,6 +207,17 @@ export interface CorreoAutorizado {
   passwordCambiada?: boolean;
 }
 
+export interface CuentaSecretaria {
+  id: string;
+  correo: string;
+  nombre: string;
+  cargo: string;
+  fechaRegistro: string;
+  activo: boolean;
+  password?: string;
+  passwordCambiada?: boolean;
+}
+
 export interface ComunicadoGeneral {
   id: string;
   titulo: string;
@@ -216,6 +227,7 @@ export interface ComunicadoGeneral {
   fecha: string;
   autor: string;
   leido?: boolean;
+  leidoPor?: string[];
 }
 
 export interface FaqItem {

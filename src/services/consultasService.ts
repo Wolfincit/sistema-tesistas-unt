@@ -4,6 +4,21 @@ import { storageService } from './storageService';
 
 const CONSULTAS_KEY = 'unt_industrial_consultas';
 
+function liberarAudiosConsulta(consulta?: ConsultaTesista): void {
+  if (!consulta) return;
+  const urls: (string | undefined)[] = [
+    consulta.respuestaAudioUrl,
+    ...(consulta.mensajesSeguimiento || []).map((m) => m.audioUrl)
+  ];
+  for (const u of urls) {
+    if (u && u.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(u);
+      } catch (_) {}
+    }
+  }
+}
+
 export const consultasService = {
   async getConsultas(): Promise<ConsultaTesista[]> {
     return storageService.get<ConsultaTesista[]>(CONSULTAS_KEY, INITIAL_CONSULTAS);
@@ -90,7 +105,7 @@ export const consultasService = {
     id: string;
     conforme: boolean;
     repreguntaTexto?: string;
-  }): Promise<ConsultaTesista> {
+  }): Promise<{ eliminada: boolean; consulta: ConsultaTesista }> {
     const consultas = await this.getConsultas();
     const idx = consultas.findIndex((c) => c.id === params.id);
     if (idx === -1) {
@@ -102,34 +117,36 @@ export const consultasService = {
     const fechaHora = `${now.toISOString().split('T')[0]} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     const intentosActuales = consulta.intentosReapertura || 0;
 
-    let nuevoEstado: 'Resuelta' | 'Reabierta' | 'Cerrada' = 'Resuelta';
-    let nuevaConformidad: 'conforme' | 'no_conforme' = 'conforme';
-    let nuevosIntentos = intentosActuales;
+    if (params.conforme) {
+      // Auto-eliminación de la consulta y sus audios adjuntos al confirmar conformidad
+      liberarAudiosConsulta(consulta);
+      const filtradas = consultas.filter((c) => c.id !== params.id);
+      await this.saveConsultas(filtradas);
+      return {
+        eliminada: true,
+        consulta: {
+          ...consulta,
+          estado: 'Resuelta',
+          conformidadTesista: 'conforme'
+        }
+      };
+    }
+
+    const nuevaConformidad: 'no_conforme' = 'no_conforme';
+    const nuevosIntentos = intentosActuales + 1;
     const mensajes = [...(consulta.mensajesSeguimiento || [])];
 
-    if (params.conforme) {
-      nuevoEstado = 'Resuelta';
-      nuevaConformidad = 'conforme';
-    } else {
-      nuevaConformidad = 'no_conforme';
-      nuevosIntentos = intentosActuales + 1;
-
-      if (params.repreguntaTexto) {
-        mensajes.push({
-          id: `seg-tes-${Date.now()}`,
-          remitente: 'tesista',
-          autor: consulta.tesistaNombre,
-          fecha: fechaHora,
-          mensajeTexto: params.repreguntaTexto
-        });
-      }
-
-      if (nuevosIntentos >= 2) {
-        nuevoEstado = 'Cerrada';
-      } else {
-        nuevoEstado = 'Reabierta';
-      }
+    if (params.repreguntaTexto) {
+      mensajes.push({
+        id: `seg-tes-${Date.now()}`,
+        remitente: 'tesista',
+        autor: consulta.tesistaNombre,
+        fecha: fechaHora,
+        mensajeTexto: params.repreguntaTexto
+      });
     }
+
+    const nuevoEstado: 'Reabierta' | 'Cerrada' = nuevosIntentos >= 2 ? 'Cerrada' : 'Reabierta';
 
     const updated: ConsultaTesista = {
       ...consulta,
@@ -143,11 +160,13 @@ export const consultasService = {
 
     consultas[idx] = updated;
     await this.saveConsultas(consultas);
-    return updated;
+    return { eliminada: false, consulta: updated };
   },
 
   async eliminarConsulta(id: string): Promise<void> {
     const consultas = await this.getConsultas();
+    const objetivo = consultas.find((c) => c.id === id);
+    liberarAudiosConsulta(objetivo);
     const filtradas = consultas.filter((c) => c.id !== id);
     await this.saveConsultas(filtradas);
   }
