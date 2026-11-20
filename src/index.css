@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --color-unt-blue: #082F64;
+  --color-unt-blue-dark: #051F42;
+  --color-unt-blue-light: #0C4D96;
+  --color-unt-blue-selected: #1765B5;
+  --color-unt-bg: #F7F9FC;
+  --color-unt-border: #DBE4EF;
+  --color-unt-gold: #C59B27;
+  --color-unt-gold-dark: #9F7B18;
+  --color-unt-gold-light: #FBF7EA;
+}
+
+body {
+  margin: 0;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: #F7F9FC;
+  color: #1E293B;
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes grifitoFloat {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(1deg);
+  }
+}
+
+@keyframes grifitoWingLeft {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-18deg) scaleY(1.1);
+  }
+}
+
+@keyframes grifitoWingRight {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(18deg) scaleY(1.1);
+  }
+}
+
+@keyframes grifitoTail {
+  0%, 100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(15deg);
+  }
+}
+
+@keyframes grifitoWalk {
+  0% {
+    left: 20px;
+  }
+  48% {
+    transform: scaleX(1);
+  }
+  50% {
+    left: calc(100% - 160px);
+    transform: scaleX(-1);
+  }
+  98% {
+    transform: scaleX(-1);
+  }
+  100% {
+    left: 20px;
+    transform: scaleX(1);
+  }
+}
+
+.animate-grifito-float {
+  animation: grifitoFloat 3s ease-in-out infinite;
+}
+
+.animate-wing-left {
+  transform-origin: 26px 52px;
+  animation: grifitoWingLeft 1.2s ease-in-out infinite;
+}
+
+.animate-wing-right {
+  transform-origin: 74px 52px;
+  animation: grifitoWingRight 1.2s ease-in-out infinite;
+}
+
+.animate-grifito-tail {
+  transform-origin: 30px 80px;
+  animation: grifitoTail 2s ease-in-out infinite;
+}

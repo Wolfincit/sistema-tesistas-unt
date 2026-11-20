@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: sistema-tesistas-ing-industrial-unt
+    runtime: node
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /healthz
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: node server/index.mjs
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: HOST
+        value: 0.0.0.0
+      - key: NODE_ENV
+        value: production
