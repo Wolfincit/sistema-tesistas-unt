@@ -12,7 +12,8 @@ import {
   CorreoAutorizado,
   CuentaSecretaria,
   ComunicadoGeneral,
-  FaqItem
+  FaqItem,
+  DriveStatusInfo
 } from '../types';
 import { MOCK_USERS } from '../data/mockUsers';
 import { TIME_SLOTS } from '../data/mockAuditorio';
@@ -24,6 +25,7 @@ import { accesosService } from '../services/accesosService';
 import { comunicadosService } from '../services/comunicadosService';
 import { faqService } from '../services/faqService';
 import { storageService } from '../services/storageService';
+import { driveApiService } from '../services/driveApiService';
 import confetti from 'canvas-confetti';
 
 export interface ToastMessage {
@@ -75,6 +77,11 @@ interface AppContextType {
   subirDocumento: (tipoId: TipoDocumentoId, archivo: File | { name: string; size: string }) => Promise<void>;
   revisarDocumento: (id: string, estado: 'Aprobado' | 'Observado', observacion?: string) => Promise<void>;
   eliminarDocumento: (id: string) => Promise<void>;
+  eliminarExpedienteTesistaCompleto: (params: {
+    tesistaId: string;
+    tesistaNombre: string;
+    tesistaCodigo: string;
+  }) => Promise<void>;
   editarTituloDocumento: (id: string, nuevoNombre: string) => Promise<void>;
 
   // Formatos Oficiales (Subidos por Secretaría, descargados por Tesistas)
@@ -92,7 +99,13 @@ interface AppContextType {
   // Consultas y Preguntas en Tiempo Real (Texto y Audio)
   consultas: ConsultaTesista[];
   crearConsulta: (datos: { asunto: string; mensaje: string }) => Promise<void>;
-  responderConsulta: (params: { id: string; respuestaTexto?: string; respuestaAudioDuracion?: string; respuestaAudioUrl?: string }) => Promise<void>;
+  responderConsulta: (params: {
+    id: string;
+    respuestaTexto?: string;
+    respuestaAudioDuracion?: string;
+    respuestaAudioUrl?: string;
+    audioBlob?: Blob | null;
+  }) => Promise<void>;
   evaluarResolucionConsulta: (id: string, conforme: boolean, repreguntaTexto?: string) => Promise<void>;
   eliminarConsulta: (id: string) => Promise<void>;
 
@@ -129,9 +142,14 @@ interface AppContextType {
     mensaje: string;
     audioUrl?: string;
     audioDuracion?: string;
+    audioBlob?: Blob | null;
   }) => Promise<void>;
   marcarLeidoComunicado: (id: string) => Promise<void>;
   eliminarComunicado: (id: string) => Promise<void>;
+
+  // Google Drive como BD y Almacenamiento
+  driveStatus: DriveStatusInfo | null;
+  refrescarDriveStatus: () => Promise<DriveStatusInfo | null>;
 
   // Preguntas Frecuentes (Alimentadas y editables por Secretaría)
   faqs: FaqItem[];
@@ -175,6 +193,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [ultimaSecretariaActiva, setUltimaSecretariaActiva] = useState<UserProfile | null>(null);
   const [comunicados, setComunicados] = useState<ComunicadoGeneral[]>([]);
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
+  const [driveStatus, setDriveStatus] = useState<DriveStatusInfo | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
 
@@ -194,8 +213,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const cargarDatos = async () => {
+  const refrescarDriveStatus = async (): Promise<DriveStatusInfo | null> => {
+    const status = await driveApiService.getStatus();
+    setDriveStatus(status);
+    return status;
+  };
+
+  const cargarDatos = async (forceDrivePull = false) => {
     try {
+      // 1. Intentar sincronizar primero desde la BD compartida del servidor / Google Drive
+      const [remoteDb, statusDrive] = await Promise.all([
+        driveApiService.getDbState(forceDrivePull),
+        driveApiService.getStatus()
+      ]);
+      if (statusDrive) setDriveStatus(statusDrive);
+
+      if (remoteDb?.collections) {
+        const c = remoteDb.collections;
+        if (Array.isArray(c.reservas)) storageService.set('unt_industrial_reservas', c.reservas);
+        if (Array.isArray(c.bloqueos)) storageService.set('unt_industrial_bloqueos', c.bloqueos);
+        if (Array.isArray(c.fechasHabilitadas)) storageService.set('unt_industrial_fechas_habilitadas', c.fechasHabilitadas);
+        if (c.slotsPorFecha && typeof c.slotsPorFecha === 'object') storageService.set('unt_industrial_slots_by_date', c.slotsPorFecha);
+        if (Array.isArray(c.defaultSlots)) storageService.set('unt_industrial_slots_default', c.defaultSlots);
+        if (Array.isArray(c.documentos)) storageService.set('unt_industrial_documentos', c.documentos);
+        if (Array.isArray(c.formatos)) storageService.set('unt_industrial_formatos_oficiales', c.formatos);
+        if (Array.isArray(c.consultas)) storageService.set('unt_industrial_consultas', c.consultas);
+        if (Array.isArray(c.correosAutorizados)) storageService.set('unt_industrial_correos_autorizados', c.correosAutorizados);
+        if (Array.isArray(c.cuentasSecretaria)) storageService.set('unt_industrial_cuentas_secretaria_v1', c.cuentasSecretaria);
+        if (Array.isArray(c.comunicados)) storageService.set('unt_industrial_comunicados_generales', c.comunicados);
+        if (Array.isArray(c.faqs)) storageService.set('unt_industrial_faqs_v1', c.faqs);
+      }
+
       const [res, blq, hab, docs, slotsMap, defSlots, fmts, cons, corrs, secs, coms, faqsList] = await Promise.all([
         auditorioService.getReservas(),
         auditorioService.getBloqueos(),
@@ -230,8 +278,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   useEffect(() => {
-    cargarDatos();
+    cargarDatos(false);
   }, []);
+
+  // Sincronización multi-PC automática cada 20s mientras haya una sesión privada activa
+  useEffect(() => {
+    if (!usuario) return;
+    const timer = setInterval(() => {
+      cargarDatos(false);
+    }, 20000);
+    return () => clearInterval(timer);
+  }, [usuario?.id]);
 
   const cambiarRolDemo = () => {
     const nuevoRol: UserRole = rolActual === 'tesista' ? 'secretaria' : 'tesista';
@@ -688,19 +745,57 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const subirDocumento = async (tipoId: TipoDocumentoId, archivo: File | { name: string; size: string }) => {
     if (!usuario) return;
     try {
-      const tamanoFormateado = 'size' in archivo && typeof archivo.size === 'number'
-        ? `${(archivo.size / (1024 * 1024)).toFixed(2)} MB`
-        : 'size' in archivo && typeof archivo.size === 'string'
+      const codigoTesista = usuario.codigoMatricula || '1021400219';
+      const existente = documentos.find(
+        (d) => d.tesistaId === usuario.id && d.tipoId === tipoId
+      );
+
+      let tamanoFormateado =
+        'size' in archivo && typeof archivo.size === 'number'
+          ? `${(archivo.size / (1024 * 1024)).toFixed(2)} MB`
+          : 'size' in archivo && typeof archivo.size === 'string'
           ? archivo.size
           : '1.5 MB';
+
+      let archivoFileId: string | undefined;
+      let archivoUrl: string | undefined;
+      let driveFileUrl: string | undefined;
+      let driveFolderId: string | undefined;
+      let driveFolderUrl: string | undefined;
+      let almacenamiento: 'google-drive' | 'local' | undefined;
+
+      // Subida real de bytes del PDF al servidor / Google Drive (crea carpeta del alumno automáticamente)
+      if (archivo instanceof File) {
+        const uploaded = await driveApiService.uploadDocumento({
+          file: archivo,
+          tesistaId: usuario.id,
+          tesistaNombre: usuario.nombre,
+          tesistaCodigo: codigoTesista,
+          tipoId,
+          anteriorFileId: existente?.archivoFileId
+        });
+        archivoFileId = uploaded.fileId;
+        archivoUrl = uploaded.previewUrl;
+        driveFileUrl = uploaded.driveFileUrl || undefined;
+        driveFolderId = uploaded.driveFolderId || undefined;
+        driveFolderUrl = uploaded.driveFolderUrl || undefined;
+        almacenamiento = uploaded.storage;
+        tamanoFormateado = uploaded.sizeLabel || tamanoFormateado;
+      }
 
       const docActualizado = await documentosService.subirDocumento({
         tesistaId: usuario.id,
         tesistaNombre: usuario.nombre,
-        tesistaCodigo: usuario.codigoMatricula || '1021400219',
+        tesistaCodigo: codigoTesista,
         tipoId,
         nombreArchivo: archivo.name,
-        archivoTamano: tamanoFormateado
+        archivoTamano: tamanoFormateado,
+        archivoFileId,
+        archivoUrl,
+        driveFileUrl,
+        driveFolderId,
+        driveFolderUrl,
+        almacenamiento
       });
 
       setDocumentos((prev) => {
@@ -713,7 +808,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return [...prev, docActualizado];
       });
 
-      agregarToast('success', 'Documento Registrado', `Se cargó "${archivo.name}". Su estado pasó a: En revisión.`);
+      refrescarDriveStatus();
+      agregarToast(
+        'success',
+        almacenamiento === 'google-drive' ? 'PDF Guardado en Google Drive' : 'Documento Registrado',
+        almacenamiento === 'google-drive'
+          ? `"${archivo.name}" se guardó automáticamente en su carpeta de Google Drive. Estado: En revisión.`
+          : `Se cargó "${archivo.name}". Su estado pasó a: En revisión.`
+      );
     } catch (e: any) {
       agregarToast('error', 'Error al cargar', e.message);
     }
@@ -775,9 +877,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       const docReseteado = await documentosService.eliminarDocumento(id);
       setDocumentos((prev) => prev.map((d) => (d.id === id ? docReseteado : d)));
+      refrescarDriveStatus();
       agregarToast('info', 'Documento Eliminado', `Se retiró el archivo del expediente. El requisito volvió al estado Pendiente.`);
     } catch (e: any) {
       agregarToast('error', 'Error al eliminar documento', e.message);
+    }
+  };
+
+  const eliminarExpedienteTesistaCompleto = async (params: {
+    tesistaId: string;
+    tesistaNombre: string;
+    tesistaCodigo: string;
+  }) => {
+    try {
+      const docsTesista = documentos.filter(
+        (d) => d.tesistaId === params.tesistaId || d.tesistaCodigo === params.tesistaCodigo
+      );
+      const driveFolderId = docsTesista.find((d) => d.driveFolderId)?.driveFolderId || '';
+      const fileIds = docsTesista.map((d) => d.archivoFileId || '').filter(Boolean);
+
+      const resDrive = await driveApiService.deleteTesistaFolder({
+        tesistaId: params.tesistaId,
+        tesistaNombre: params.tesistaNombre,
+        tesistaCodigo: params.tesistaCodigo,
+        driveFolderId,
+        fileIds
+      });
+
+      const docsRestantes = await documentosService.eliminarExpedientePorTesista(params.tesistaId);
+      setDocumentos(docsRestantes);
+
+      // Liberar también sus reservas si quedaron en el calendario
+      const todasReservas = await auditorioService.getReservas();
+      const reservasRestantes = todasReservas.filter(
+        (r) => r.tesistaId !== params.tesistaId && r.codigoMatricula !== params.tesistaCodigo
+      );
+      if (reservasRestantes.length !== todasReservas.length) {
+        await auditorioService.saveReservas(reservasRestantes);
+        setReservas(reservasRestantes);
+      }
+
+      refrescarDriveStatus();
+      agregarToast(
+        'success',
+        'Expediente Titulado y Eliminado',
+        resDrive.deletedFromDrive
+          ? `Se eliminó la carpeta individual de ${params.tesistaNombre} y todos sus PDFs de Google Drive para liberar espacio.`
+          : `Se eliminó el expediente completo y los archivos de ${params.tesistaNombre}.`
+      );
+    } catch (e: any) {
+      agregarToast('error', 'Error al eliminar expediente', e.message || 'No se pudo completar la limpieza.');
     }
   };
 
@@ -845,10 +994,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     respuestaTexto?: string;
     respuestaAudioDuracion?: string;
     respuestaAudioUrl?: string;
+    audioBlob?: Blob | null;
   }) => {
     try {
+      let audioUrlFinal = params.respuestaAudioUrl;
+      let audioFileIdFinal: string | undefined;
+
+      if (params.audioBlob) {
+        const up = await driveApiService.uploadAudio(
+          params.audioBlob,
+          `consulta_${params.id}_${Date.now()}.webm`
+        );
+        audioUrlFinal = up.audioUrl;
+        audioFileIdFinal = up.fileId;
+      }
+
       const respondida = await consultasService.responderConsulta({
-        ...params,
+        id: params.id,
+        respuestaTexto: params.respuestaTexto,
+        respuestaAudioDuracion: params.respuestaAudioDuracion,
+        respuestaAudioUrl: audioUrlFinal,
+        respuestaAudioFileId: audioFileIdFinal,
         respondidoPor: usuario?.nombre || 'Secretaría Académica'
       });
       setConsultas((prev) => prev.map((c) => (c.id === params.id ? respondida : c)));
@@ -1053,10 +1219,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     mensaje: string;
     audioUrl?: string;
     audioDuracion?: string;
+    audioBlob?: Blob | null;
   }) => {
     try {
+      let audioUrlFinal = datos.audioUrl;
+      let audioFileIdFinal: string | undefined;
+
+      if (datos.audioBlob) {
+        const up = await driveApiService.uploadAudio(
+          datos.audioBlob,
+          `comunicado_${Date.now()}.webm`
+        );
+        audioUrlFinal = up.audioUrl;
+        audioFileIdFinal = up.fileId;
+      }
+
       const nuevo = await comunicadosService.emitirComunicado({
-        ...datos,
+        titulo: datos.titulo,
+        mensaje: datos.mensaje,
+        audioUrl: audioUrlFinal,
+        audioFileId: audioFileIdFinal,
+        audioDuracion: datos.audioDuracion,
         autor: usuario?.nombre || 'Secretaría Académica'
       });
       setComunicados((prev) => [nuevo, ...prev]);
@@ -1159,6 +1342,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         subirDocumento,
         revisarDocumento,
         eliminarDocumento,
+        eliminarExpedienteTesistaCompleto,
         editarTituloDocumento,
         formatos,
         subirFormato,
@@ -1190,11 +1374,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         agregarFaq,
         editarFaq,
         eliminarFaq,
+        driveStatus,
+        refrescarDriveStatus,
         toasts,
         agregarToast,
         removerToast,
         cargando,
-        refrescarTodo: cargarDatos
+        refrescarTodo: () => cargarDatos(true)
       }}
     >
       {children}

@@ -66,7 +66,14 @@ export const audioPlayerService = {
       }
     };
 
-    if (params.audioUrl && params.audioUrl.startsWith('blob:')) {
+    const esUrlAudioReal =
+      Boolean(params.audioUrl) &&
+      (params.audioUrl!.startsWith('blob:') ||
+        params.audioUrl!.startsWith('/api/files/') ||
+        params.audioUrl!.startsWith('http://') ||
+        params.audioUrl!.startsWith('https://'));
+
+    if (esUrlAudioReal && params.audioUrl) {
       try {
         elementoAudio = new Audio(params.audioUrl);
         elementoAudio.onended = finalizar;

@@ -9,7 +9,8 @@ import {
   MessageSquare,
   FileText,
   Users,
-  HelpCircle
+  HelpCircle,
+  HardDrive
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -25,7 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   abiertoMovil = false,
   onCerrarMovil
 }) => {
-  const { rolActual, reservas, documentos, usuario, consultas } = useApp();
+  const { rolActual, reservas, documentos, usuario, consultas, driveStatus } = useApp();
 
   const pendientesReserva = reservas.filter((r) => r.estado === 'pre-reserva').length;
   const pendientesDoc = documentos.filter((d) => d.estado === 'En revisión').length;
@@ -75,6 +76,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'admin-faqs',
       label: 'Preguntas Frecuentes',
       icon: HelpCircle,
+      badge: 0
+    },
+    {
+      id: 'admin-drive',
+      label: driveStatus?.storageMode === 'google-drive' ? 'Google Drive (Activo)' : 'Almacenamiento Drive',
+      icon: HardDrive,
       badge: 0
     }
   ];

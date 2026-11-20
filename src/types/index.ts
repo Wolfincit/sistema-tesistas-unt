@@ -134,6 +134,12 @@ export interface DocumentoExpediente {
   observacion?: string;
   fechaRevision?: string;
   revisadoPor?: string;
+  archivoFileId?: string;
+  archivoUrl?: string;
+  driveFileUrl?: string;
+  driveFolderId?: string;
+  driveFolderUrl?: string;
+  almacenamiento?: 'google-drive' | 'local';
 }
 
 export interface KpiData {
@@ -171,6 +177,7 @@ export interface MensajeTicketSeguimiento {
   fecha: string;
   mensajeTexto: string;
   audioUrl?: string;
+  audioFileId?: string;
   audioDuracion?: string;
 }
 
@@ -185,6 +192,7 @@ export interface ConsultaTesista {
   estado: 'Pendiente' | 'Resuelta' | 'Reabierta' | 'Cerrada';
   respuestaTexto?: string;
   respuestaAudioUrl?: string;
+  respuestaAudioFileId?: string;
   respuestaAudioDuracion?: string;
   fechaRespuesta?: string;
   respondidoPor?: string;
@@ -223,11 +231,43 @@ export interface ComunicadoGeneral {
   titulo: string;
   mensaje: string;
   audioUrl?: string;
+  audioFileId?: string;
   audioDuracion?: string;
   fecha: string;
   autor: string;
   leido?: boolean;
   leidoPor?: string[];
+}
+
+export interface DriveStatusInfo {
+  configured: boolean;
+  hasEnvCredentials: boolean;
+  connected: boolean;
+  errorConexion: string | null;
+  accountEmail: string;
+  accountName: string;
+  redirectUri: string;
+  rootFolderId: string;
+  rootFolderName: string;
+  rootFolderUrl: string;
+  expedientesFolderId: string;
+  audiosFolderId: string;
+  formatosFolderId: string;
+  dbFileId: string;
+  storageMode: 'google-drive' | 'local-server';
+  quota: {
+    usedBytes: number;
+    limitBytes: number;
+    usedLabel: string;
+    limitLabel: string;
+    percent: number;
+  } | null;
+  localStats?: {
+    filesCount: number;
+    usedBytes: number;
+    usedLabel: string;
+  };
+  hasBackupEnvHint?: boolean;
 }
 
 export interface FaqItem {

@@ -1,6 +1,7 @@
 import { DocumentoExpediente, TipoDocumentoId, DocumentoEstado } from '../types';
 import { DOCUMENTOS_REQUERIDOS, INITIAL_EXPEDIENTES } from '../data/mockDocumentos';
 import { storageService } from './storageService';
+import { driveApiService } from './driveApiService';
 
 const DOCUMENTOS_KEY = 'unt_industrial_documentos';
 
@@ -11,6 +12,7 @@ export const documentosService = {
 
   async saveAll(docs: DocumentoExpediente[]): Promise<void> {
     storageService.set(DOCUMENTOS_KEY, docs);
+    await driveApiService.saveCollection('documentos', docs);
   },
 
   /**
@@ -50,6 +52,12 @@ export const documentosService = {
     tipoId: TipoDocumentoId;
     nombreArchivo: string;
     archivoTamano: string;
+    archivoFileId?: string;
+    archivoUrl?: string;
+    driveFileUrl?: string;
+    driveFolderId?: string;
+    driveFolderUrl?: string;
+    almacenamiento?: 'google-drive' | 'local';
   }): Promise<DocumentoExpediente> {
     const all = await this.getAll();
     const reqInfo = DOCUMENTOS_REQUERIDOS.find((r) => r.id === params.tipoId);
@@ -71,7 +79,13 @@ export const documentosService = {
       archivoTamano: params.archivoTamano,
       fechaSubida: fechaHora,
       estado: 'En revisión',
-      observacion: undefined // Limpia observación previa si era resubida
+      observacion: undefined, // Limpia observación previa si era resubida
+      archivoFileId: params.archivoFileId,
+      archivoUrl: params.archivoUrl,
+      driveFileUrl: params.driveFileUrl,
+      driveFolderId: params.driveFolderId,
+      driveFolderUrl: params.driveFolderUrl,
+      almacenamiento: params.almacenamiento
     };
 
     if (existingIdx >= 0) {
@@ -118,6 +132,10 @@ export const documentosService = {
       throw new Error('Documento no encontrado.');
     }
 
+    if (all[idx].archivoFileId) {
+      await driveApiService.deleteFile(all[idx].archivoFileId);
+    }
+
     const reseteado: DocumentoExpediente = {
       ...all[idx],
       estado: 'Pendiente',
@@ -126,12 +144,23 @@ export const documentosService = {
       fechaSubida: undefined,
       observacion: undefined,
       fechaRevision: undefined,
-      revisadoPor: undefined
+      revisadoPor: undefined,
+      archivoFileId: undefined,
+      archivoUrl: undefined,
+      driveFileUrl: undefined,
+      almacenamiento: undefined
     };
 
     all[idx] = reseteado;
     await this.saveAll(all);
     return reseteado;
+  },
+
+  async eliminarExpedientePorTesista(tesistaId: string): Promise<DocumentoExpediente[]> {
+    const all = await this.getAll();
+    const restantes = all.filter((d) => d.tesistaId !== tesistaId);
+    await this.saveAll(restantes);
+    return restantes;
   },
 
   async editarTituloDocumento(id: string, nuevoNombreArchivo: string): Promise<DocumentoExpediente> {

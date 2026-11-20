@@ -1,6 +1,7 @@
 import { CorreoAutorizado, CuentaSecretaria } from '../types';
 import { INITIAL_CORREOS_AUTORIZADOS } from '../data/mockCorreosAutorizados';
 import { storageService } from './storageService';
+import { driveApiService } from './driveApiService';
 import { hashPasswordSalted, verificarPasswordHash, sanitizarTextoSeguro } from '../utils/security';
 
 const CORREOS_KEY = 'unt_industrial_correos_autorizados';
@@ -78,7 +79,9 @@ export const accesosService = {
   },
 
   async saveCorreos(correos: CorreoAutorizado[]): Promise<void> {
-    storageService.set(CORREOS_KEY, correos.map(normalizarRegistroConHash));
+    const hashed = correos.map(normalizarRegistroConHash);
+    storageService.set(CORREOS_KEY, hashed);
+    await driveApiService.saveCollection('correosAutorizados', hashed);
   },
 
   // =====================================================
@@ -108,7 +111,9 @@ export const accesosService = {
   },
 
   async saveSecretarias(secretarias: CuentaSecretaria[]): Promise<void> {
-    storageService.set(SECRETARIAS_KEY, secretarias.map(normalizarSecretariaConHash));
+    const hashed = secretarias.map(normalizarSecretariaConHash);
+    storageService.set(SECRETARIAS_KEY, hashed);
+    await driveApiService.saveCollection('cuentasSecretaria', hashed);
   },
 
   verificarPasswordSecretariaRegistro(registro: CuentaSecretaria, rawPassword: string): boolean {

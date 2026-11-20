@@ -1,5 +1,6 @@
 import { FaqItem } from '../types';
 import { storageService } from './storageService';
+import { driveApiService } from './driveApiService';
 
 const FAQ_STORAGE_KEY = 'unt_industrial_faqs_v1';
 
@@ -50,6 +51,7 @@ export const faqService = {
     };
     const actualizada = [nueva, ...lista];
     storageService.set(FAQ_STORAGE_KEY, actualizada);
+    await driveApiService.saveCollection('faqs', actualizada);
     return nueva;
   },
 
@@ -71,6 +73,7 @@ export const faqService = {
     });
     if (!editada) throw new Error('Pregunta frecuente no encontrada');
     storageService.set(FAQ_STORAGE_KEY, actualizada);
+    await driveApiService.saveCollection('faqs', actualizada);
     return editada;
   },
 
@@ -78,5 +81,6 @@ export const faqService = {
     const lista = await this.getFaqs();
     const actualizada = lista.filter((item) => item.id !== id);
     storageService.set(FAQ_STORAGE_KEY, actualizada);
+    await driveApiService.saveCollection('faqs', actualizada);
   }
 };

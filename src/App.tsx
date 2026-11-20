@@ -167,6 +167,12 @@ const AppContent: React.FC = () => {
                     onCambiarPestana={(v) => setVistaActual(v)}
                   />
                 )}
+                {vistaActual === 'admin-drive' && (
+                  <AdminDashboardPage
+                    subPestanaInicial="drive"
+                    onCambiarPestana={(v) => setVistaActual(v)}
+                  />
+                )}
                 {vistaActual === 'admin-kpis' && (
                   <AdminDashboardPage
                     subPestanaInicial="consultas"

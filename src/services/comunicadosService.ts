@@ -1,5 +1,6 @@
 import { ComunicadoGeneral } from '../types';
 import { storageService } from './storageService';
+import { driveApiService } from './driveApiService';
 
 const COMUNICADOS_KEY = 'unt_industrial_comunicados_generales';
 
@@ -13,12 +14,14 @@ export const comunicadosService = {
 
   async saveComunicados(comunicados: ComunicadoGeneral[]): Promise<void> {
     storageService.set(COMUNICADOS_KEY, comunicados);
+    await driveApiService.saveCollection('comunicados', comunicados);
   },
 
   async emitirComunicado(datos: {
     titulo: string;
     mensaje: string;
     audioUrl?: string;
+    audioFileId?: string;
     audioDuracion?: string;
     autor: string;
   }): Promise<ComunicadoGeneral> {
@@ -31,6 +34,7 @@ export const comunicadosService = {
       titulo: datos.titulo.trim(),
       mensaje: datos.mensaje.trim(),
       audioUrl: datos.audioUrl,
+      audioFileId: datos.audioFileId,
       audioDuracion: datos.audioDuracion || '0:25',
       fecha: fechaHora,
       autor: datos.autor,
@@ -64,6 +68,9 @@ export const comunicadosService = {
       try {
         URL.revokeObjectURL(objetivo.audioUrl);
       } catch (_) {}
+    }
+    if (objetivo?.audioFileId) {
+      await driveApiService.deleteFile(objetivo.audioFileId);
     }
     const actualizados = actuales.filter((c) => c.id !== id);
     await this.saveComunicados(actualizados);

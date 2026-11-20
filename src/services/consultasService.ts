@@ -1,10 +1,11 @@
 import { ConsultaTesista } from '../types';
 import { INITIAL_CONSULTAS } from '../data/mockConsultas';
 import { storageService } from './storageService';
+import { driveApiService } from './driveApiService';
 
 const CONSULTAS_KEY = 'unt_industrial_consultas';
 
-function liberarAudiosConsulta(consulta?: ConsultaTesista): void {
+async function liberarAudiosConsulta(consulta?: ConsultaTesista): Promise<void> {
   if (!consulta) return;
   const urls: (string | undefined)[] = [
     consulta.respuestaAudioUrl,
@@ -17,6 +18,13 @@ function liberarAudiosConsulta(consulta?: ConsultaTesista): void {
       } catch (_) {}
     }
   }
+  const fileIds: string[] = [
+    consulta.respuestaAudioFileId || '',
+    ...(consulta.mensajesSeguimiento || []).map((m) => m.audioFileId || '')
+  ].filter(Boolean);
+  for (const fid of fileIds) {
+    await driveApiService.deleteFile(fid);
+  }
 }
 
 export const consultasService = {
@@ -26,6 +34,7 @@ export const consultasService = {
 
   async saveConsultas(consultas: ConsultaTesista[]): Promise<void> {
     storageService.set(CONSULTAS_KEY, consultas);
+    await driveApiService.saveCollection('consultas', consultas);
   },
 
   async crearConsulta(datos: {
@@ -60,6 +69,7 @@ export const consultasService = {
     respuestaTexto?: string;
     respuestaAudioDuracion?: string;
     respuestaAudioUrl?: string;
+    respuestaAudioFileId?: string;
     respondidoPor: string;
   }): Promise<ConsultaTesista> {
     const consultas = await this.getConsultas();
@@ -80,6 +90,7 @@ export const consultasService = {
         fecha: fechaHora,
         mensajeTexto: params.respuestaTexto || 'Nota de voz explicativa adjunta.',
         audioUrl: params.respuestaAudioUrl,
+        audioFileId: params.respuestaAudioFileId,
         audioDuracion: params.respuestaAudioDuracion
       });
     }
@@ -89,7 +100,8 @@ export const consultasService = {
       estado: 'Resuelta',
       conformidadTesista: 'pendiente_confirmacion',
       respuestaTexto: params.respuestaTexto || consultas[idx].respuestaTexto,
-      respuestaAudioUrl: params.respuestaAudioUrl || (params.respuestaAudioDuracion ? `audio-${Date.now()}.mp3` : consultas[idx].respuestaAudioUrl),
+      respuestaAudioUrl: params.respuestaAudioUrl || consultas[idx].respuestaAudioUrl,
+      respuestaAudioFileId: params.respuestaAudioFileId || consultas[idx].respuestaAudioFileId,
       respuestaAudioDuracion: params.respuestaAudioDuracion || consultas[idx].respuestaAudioDuracion,
       fechaRespuesta: fechaHora,
       respondidoPor: params.respondidoPor,
@@ -118,8 +130,8 @@ export const consultasService = {
     const intentosActuales = consulta.intentosReapertura || 0;
 
     if (params.conforme) {
-      // Auto-eliminación de la consulta y sus audios adjuntos al confirmar conformidad
-      liberarAudiosConsulta(consulta);
+      // Auto-eliminación de la consulta y sus audios adjuntos (Google Drive / servidor) al confirmar conformidad
+      await liberarAudiosConsulta(consulta);
       const filtradas = consultas.filter((c) => c.id !== params.id);
       await this.saveConsultas(filtradas);
       return {
@@ -166,7 +178,7 @@ export const consultasService = {
   async eliminarConsulta(id: string): Promise<void> {
     const consultas = await this.getConsultas();
     const objetivo = consultas.find((c) => c.id === id);
-    liberarAudiosConsulta(objetivo);
+    await liberarAudiosConsulta(objetivo);
     const filtradas = consultas.filter((c) => c.id !== id);
     await this.saveConsultas(filtradas);
   }

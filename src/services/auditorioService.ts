@@ -1,6 +1,7 @@
 import { ReservaAuditorio, BloqueoFecha, TimeSlot } from '../types';
 import { INITIAL_RESERVAS, INITIAL_BLOQUEOS, INITIAL_FECHAS_HABILITADAS, TIME_SLOTS, formatDateISO } from '../data/mockAuditorio';
 import { storageService } from './storageService';
+import { driveApiService } from './driveApiService';
 
 const RESERVAS_KEY = 'unt_industrial_reservas';
 const BLOQUEOS_KEY = 'unt_industrial_bloqueos';
@@ -15,6 +16,7 @@ export const auditorioService = {
 
   async saveReservas(reservas: ReservaAuditorio[]): Promise<void> {
     storageService.set(RESERVAS_KEY, reservas);
+    await driveApiService.saveCollection('reservas', reservas);
   },
 
   async getBloqueos(): Promise<BloqueoFecha[]> {
@@ -23,6 +25,7 @@ export const auditorioService = {
 
   async saveBloqueos(bloqueos: BloqueoFecha[]): Promise<void> {
     storageService.set(BLOQUEOS_KEY, bloqueos);
+    await driveApiService.saveCollection('bloqueos', bloqueos);
   },
 
   // Gestión de días habilitados por Secretaría (por defecto todo inhabilitado)
@@ -32,6 +35,7 @@ export const auditorioService = {
 
   async saveFechasHabilitadas(fechas: string[]): Promise<void> {
     storageService.set(FECHAS_HABILITADAS_KEY, fechas);
+    await driveApiService.saveCollection('fechasHabilitadas', fechas);
   },
 
   // Utilidad para ordenar bloques horarios cronológicamente según la hora de inicio
@@ -59,6 +63,7 @@ export const auditorioService = {
   async saveDefaultSlots(slots: string[]): Promise<string[]> {
     const ordenados = this.ordenarBloquesHorarios(slots);
     storageService.set(SLOTS_DEFAULT_KEY, ordenados);
+    await driveApiService.saveCollection('defaultSlots', ordenados);
     return ordenados;
   },
 
@@ -66,6 +71,7 @@ export const auditorioService = {
     const mapa = await this.getSlotsByDate();
     mapa[fecha] = this.ordenarBloquesHorarios(slots);
     storageService.set(SLOTS_BY_DATE_KEY, mapa);
+    await driveApiService.saveCollection('slotsPorFecha', mapa);
     return mapa;
   },
 
@@ -73,6 +79,7 @@ export const auditorioService = {
     const mapa = await this.getSlotsByDate();
     delete mapa[fecha];
     storageService.set(SLOTS_BY_DATE_KEY, mapa);
+    await driveApiService.saveCollection('slotsPorFecha', mapa);
     return mapa;
   },
 

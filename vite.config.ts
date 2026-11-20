@@ -6,7 +6,13 @@ import { handleApiRequest } from './server/index.mjs'
 function untRepositorioApiPlugin(): Plugin {
   const attachMiddleware = (middlewares: any) => {
     middlewares.use(async (req: any, res: any, next: any) => {
-      if (req.url && req.url.startsWith('/api/repositorio/')) {
+      if (
+        req.url &&
+        (req.url.startsWith('/api/repositorio/') ||
+          req.url.startsWith('/api/drive/') ||
+          req.url.startsWith('/api/db/') ||
+          req.url.startsWith('/api/files/'))
+      ) {
         try {
           const handled = await handleApiRequest(req, res);
           if (handled) return;

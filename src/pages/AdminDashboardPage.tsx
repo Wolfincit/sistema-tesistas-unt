@@ -7,10 +7,11 @@ import { DocumentReviewTable } from '../components/admin/DocumentReviewTable';
 import { ConsultasSecretaria } from '../components/admin/ConsultasSecretaria';
 import { FormatosManager } from '../components/admin/FormatosManager';
 import { ControlAccesos } from '../components/admin/ControlAccesos';
+import { GoogleDriveManager } from '../components/admin/GoogleDriveManager';
 import { PreguntasFrecuentesPage } from './PreguntasFrecuentesPage';
 
 interface AdminDashboardPageProps {
-  subPestanaInicial?: 'auditorio' | 'documentos' | 'consultas' | 'formatos' | 'accesos' | 'faqs' | 'kpis';
+  subPestanaInicial?: 'auditorio' | 'documentos' | 'consultas' | 'formatos' | 'accesos' | 'faqs' | 'drive' | 'kpis';
   onCambiarPestana?: (pestana: string) => void;
 }
 
@@ -104,6 +105,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       {pestanaActiva === 'faqs' && (
         <div className="space-y-5">
           <PreguntasFrecuentesPage />
+        </div>
+      )}
+
+      {/* Módulo 7: Almacenamiento y Base de Datos en Google Drive */}
+      {pestanaActiva === 'drive' && (
+        <div className="space-y-5">
+          <GoogleDriveManager />
         </div>
       )}
     </div>

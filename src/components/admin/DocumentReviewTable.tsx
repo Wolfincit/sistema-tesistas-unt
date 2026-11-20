@@ -18,7 +18,10 @@ import {
   BookOpen,
   GraduationCap,
   Sparkles,
-  X
+  X,
+  Trash2,
+  FolderOpen,
+  ExternalLink
 } from 'lucide-react';
 import { Badge } from '../common/Badge';
 import { ObservationModal } from './ObservationModal';
@@ -50,12 +53,14 @@ export const DocumentReviewTable: React.FC<DocumentReviewTableProps> = ({
   documentos,
   tesistaInicialId = null
 }) => {
-  const { revisarDocumento, reservas, agregarToast } = useApp();
+  const { revisarDocumento, eliminarExpedienteTesistaCompleto, reservas, agregarToast } = useApp();
   const [filtroEstado, setFiltroEstado] = useState<'En revisión' | 'Observados' | 'Aptos para Sustentar' | 'TODOS'>('En revisión');
   const [busqueda, setBusqueda] = useState<string>('');
   const [tesistaSeleccionadoId, setTesistaSeleccionadoId] = useState<string | null>(tesistaInicialId);
   const [docAObservar, setDocAObservar] = useState<DocumentoExpediente | null>(null);
   const [docAPrevisualizar, setDocAPrevisualizar] = useState<DocumentoExpediente | null>(null);
+  const [tesistaAEliminarDrive, setTesistaAEliminarDrive] = useState<TesistaResumen | null>(null);
+  const [eliminandoDrive, setEliminandoDrive] = useState<boolean>(false);
 
   React.useEffect(() => {
     if (tesistaInicialId) {
@@ -193,7 +198,7 @@ export const DocumentReviewTable: React.FC<DocumentReviewTableProps> = ({
   if (tesistaActivo) {
     return (
       <div className="space-y-5 animate-in fade-in duration-200">
-        {/* Barra Superior con botón para volver */}
+        {/* Barra Superior con botón para volver + Carpeta Drive + Borrar al Titularse */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <button
             type="button"
@@ -204,16 +209,41 @@ export const DocumentReviewTable: React.FC<DocumentReviewTableProps> = ({
             <span>Volver a Lista de Tesistas</span>
           </button>
 
-          {!tesistaActivo.esAptoParaSustentar && tesistaActivo.documentos.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {tesistaActivo.documentos.find((d) => d.driveFolderUrl)?.driveFolderUrl && (
+              <a
+                href={tesistaActivo.documentos.find((d) => d.driveFolderUrl)?.driveFolderUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-unt-blue bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl shadow-2xs transition-colors"
+              >
+                <FolderOpen className="w-4 h-4 text-amber-500" />
+                <span>Carpeta en Drive</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+
+            {!tesistaActivo.esAptoParaSustentar && tesistaActivo.documentos.length > 0 && (
+              <button
+                type="button"
+                onClick={() => handleAprobarTodoElExpediente(tesistaActivo)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-2xs transition-colors cursor-pointer w-fit"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Aprobar Todos (5/5)</span>
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={() => handleAprobarTodoElExpediente(tesistaActivo)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-2xs transition-colors cursor-pointer w-fit"
+              onClick={() => setTesistaAEliminarDrive(tesistaActivo)}
+              title="Cuando el tesista ya se tituló: elimina su carpeta individual y todos sus PDFs de Google Drive para liberar espacio"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl shadow-2xs transition-colors cursor-pointer w-fit"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Aprobar Todos los Requisitos (Expediente Conforme)</span>
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Titulado · Borrar del Drive</span>
             </button>
-          )}
+          </div>
         </div>
 
         {/* Ficha Institucional del Tesista */}
@@ -433,20 +463,31 @@ export const DocumentReviewTable: React.FC<DocumentReviewTableProps> = ({
                             <span>Ver PDF</span>
                           </button>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              agregarToast(
-                                'success',
-                                'Descargando Archivo',
-                                `Descargando copia de "${doc.nombreArchivo}".`
-                              );
-                            }}
-                            className="p-1.5 border border-slate-200 hover:border-slate-300 bg-white text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs hover:bg-slate-50"
-                            title={`Descargar archivo individual: ${doc.nombreArchivo}`}
-                          >
-                            <Download className="w-3.5 h-3.5 text-unt-blue" />
-                          </button>
+                          {doc.archivoUrl ? (
+                            <a
+                              href={`${doc.archivoUrl}?download=1&name=${encodeURIComponent(doc.nombreArchivo || 'documento.pdf')}`}
+                              download={doc.nombreArchivo || 'documento.pdf'}
+                              className="p-1.5 border border-slate-200 hover:border-slate-300 bg-white text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs hover:bg-slate-50"
+                              title={`Descargar archivo real: ${doc.nombreArchivo}`}
+                            >
+                              <Download className="w-3.5 h-3.5 text-unt-blue" />
+                            </a>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                agregarToast(
+                                  'info',
+                                  'Sin PDF binario adjunto',
+                                  `Este registro antiguo solo contiene metadatos ("${doc.nombreArchivo}"). Los nuevos PDFs subidos se descargan directo desde Drive.`
+                                );
+                              }}
+                              className="p-1.5 border border-slate-200 hover:border-slate-300 bg-white text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs hover:bg-slate-50"
+                              title={`Descargar archivo individual: ${doc.nombreArchivo}`}
+                            >
+                              <Download className="w-3.5 h-3.5 text-unt-blue" />
+                            </button>
+                          )}
                         </>
                       )}
 
@@ -496,6 +537,76 @@ export const DocumentReviewTable: React.FC<DocumentReviewTableProps> = ({
           documento={docAObservar}
           onConfirmar={handleConfirmarObservacion}
         />
+
+        {/* Modal Confirmación: Eliminar Expediente y Carpeta Completa de Google Drive (Alumno Titulado) */}
+        {tesistaAEliminarDrive && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xs animate-in fade-in"
+            onClick={() => !eliminandoDrive && setTesistaAEliminarDrive(null)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-4 bg-rose-700 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Trash2 className="w-4 h-4 text-rose-200" />
+                  <h3 className="text-sm font-bold">Eliminar Expediente y Carpeta de Drive</h3>
+                </div>
+                <button
+                  type="button"
+                  disabled={eliminandoDrive}
+                  onClick={() => setTesistaAEliminarDrive(null)}
+                  className="p-1 text-white/80 hover:text-white cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-5 space-y-4 text-xs text-slate-700">
+                <p className="leading-relaxed">
+                  ¿Confirma que <strong>{tesistaAEliminarDrive.tesistaNombre}</strong> (Cód:{' '}
+                  <span className="font-mono">{tesistaAEliminarDrive.tesistaCodigo}</span>) ya se tituló o desea eliminar todo su expediente?
+                </p>
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 space-y-1 leading-relaxed">
+                  <span className="font-bold block">Esta acción eliminará definitivamente:</span>
+                  <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
+                    <li>La carpeta individual del alumno en <strong>Google Drive</strong> y todos sus PDFs subidos.</li>
+                    <li>Su registro de documentos en revisión y su turno en el calendario del auditorio.</li>
+                  </ul>
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    disabled={eliminandoDrive}
+                    onClick={() => setTesistaAEliminarDrive(null)}
+                    className="px-3.5 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={eliminandoDrive}
+                    onClick={async () => {
+                      setEliminandoDrive(true);
+                      await eliminarExpedienteTesistaCompleto({
+                        tesistaId: tesistaAEliminarDrive.tesistaId,
+                        tesistaNombre: tesistaAEliminarDrive.tesistaNombre,
+                        tesistaCodigo: tesistaAEliminarDrive.tesistaCodigo
+                      });
+                      setEliminandoDrive(false);
+                      setTesistaAEliminarDrive(null);
+                      setTesistaSeleccionadoId(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-2xs cursor-pointer disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{eliminandoDrive ? 'Eliminando de Drive...' : 'Sí, borrar todo y del Drive'}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Modal Visualizador PDF */}
         {docAPrevisualizar && (
@@ -818,76 +929,86 @@ const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({
           </button>
         </div>
 
-        {/* Contenido Visual del Documento PDF Simulado con Sellos Oficiales */}
-        <div className="p-6 overflow-y-auto space-y-4 bg-slate-100 flex-1">
-          <div className="bg-white p-8 rounded-xl shadow-xs border border-slate-200 max-w-2xl mx-auto space-y-6 relative overflow-hidden min-h-[500px]">
-            {/* Marca de Agua UNT */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5">
-              <span className="text-8xl font-black text-unt-blue -rotate-45">UNT</span>
-            </div>
-
-            {/* Membrete Oficial UNT */}
-            <div className="border-b-2 border-unt-blue pb-4 flex items-center justify-between text-left">
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-unt-blue">
-                  Universidad Nacional de Trujillo
-                </h4>
-                <p className="text-[11px] font-semibold text-slate-700">
-                  Facultad de Ingeniería · Escuela Profesional de Ingeniería Industrial
-                </p>
-                <p className="text-[10px] text-slate-500 font-mono">
-                  Unidad de Grados y Títulos · Trámite de Sustentación 2026
-                </p>
+        {/* Contenido Visual: PDF Real desde Google Drive / Servidor (o ficha de respaldo si es registro antiguo) */}
+        <div className="p-4 sm:p-5 overflow-y-auto bg-slate-100 flex-1">
+          {documento.archivoUrl ? (
+            <div className="space-y-3 h-full flex flex-col">
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-white px-3.5 py-2 rounded-xl border border-slate-200 text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText className="w-4 h-4 text-unt-blue shrink-0" />
+                  <span className="font-bold text-slate-800 truncate">{documento.nombreArchivo}</span>
+                  <span className="text-[11px] text-slate-400 shrink-0">({documento.archivoTamano || 'PDF'})</span>
+                  {documento.almacenamiento === 'google-drive' && (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold shrink-0">
+                      Google Drive
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {documento.driveFileUrl && (
+                    <a
+                      href={documento.driveFileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-unt-blue font-bold text-[11px]"
+                    >
+                      <span>Abrir en Drive</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                  <a
+                    href={`${documento.archivoUrl}?download=1&name=${encodeURIComponent(documento.nombreArchivo || 'documento.pdf')}`}
+                    download={documento.nombreArchivo || 'documento.pdf'}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px]"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Descargar PDF</span>
+                  </a>
+                </div>
               </div>
-              <div className="text-right">
+
+              <iframe
+                src={documento.archivoUrl}
+                title={documento.nombreArchivo || documento.nombreDocumento}
+                className="w-full h-[60vh] min-h-[460px] rounded-xl border border-slate-300 bg-white shadow-inner"
+              />
+            </div>
+          ) : (
+            <div className="bg-white p-8 rounded-xl shadow-xs border border-slate-200 max-w-2xl mx-auto space-y-6 relative overflow-hidden min-h-[420px]">
+              <div className="border-b-2 border-unt-blue pb-4 flex items-center justify-between text-left">
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-unt-blue">
+                    Universidad Nacional de Trujillo
+                  </h4>
+                  <p className="text-[11px] font-semibold text-slate-700">
+                    Facultad de Ingeniería · Escuela Profesional de Ingeniería Industrial
+                  </p>
+                </div>
                 <span className="text-[10px] font-mono px-2 py-1 rounded bg-slate-100 text-slate-600 font-bold border border-slate-200">
                   EXP-2026-{documento.tesistaCodigo.slice(-4)}
                 </span>
               </div>
-            </div>
 
-            {/* Cuerpo del Documento */}
-            <div className="space-y-4 text-xs text-slate-700 leading-relaxed">
-              <div className="text-center py-2">
-                <span className="font-bold uppercase tracking-wide text-slate-900 text-sm">
-                  {documento.nombreDocumento}
-                </span>
-              </div>
-
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-[11px] space-y-1">
-                <div><span className="font-bold">Archivo:</span> {documento.nombreArchivo || 'documento_valido.pdf'}</div>
-                <div><span className="font-bold">Fecha de Presentación:</span> {documento.fechaSubida}</div>
-                <div><span className="font-bold">Tamaño de Archivo:</span> {documento.archivoTamano || '1.8 MB'}</div>
-                <div><span className="font-bold">Estado Actual:</span> {documento.estado}</div>
-              </div>
-
-              <p>
-                Por medio del presente documento oficial, se deja constancia del cumplimiento de los requisitos
-                técnico-académicos exigidos por el Reglamento General de Grados y Títulos de la Universidad Nacional de Trujillo
-                para optar el Título Profesional de Ingeniero Industrial.
-              </p>
-
-              {documento.tipoId === 'turnitin' && (
-                <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-[11px] space-y-1">
-                  <div className="font-bold text-unt-blue">Índice de Similitud Turnitin: 14% (Reglamentario &lt; 20%)</div>
-                  <div className="text-slate-600">Base de datos: RENATI, ALICIA CONCYTEC y fuentes académicas internacionales.</div>
-                </div>
-              )}
-
-              {/* Sello de Secretaría */}
-              <div className="pt-8 flex items-center justify-between text-[10px] text-slate-500">
-                <div className="text-center border-t border-slate-300 pt-2 w-44">
-                  <div className="font-bold text-slate-800">Docente Asesor</div>
-                  <div>Firma y Posfirma Digital</div>
+              <div className="space-y-4 text-xs text-slate-700 leading-relaxed">
+                <div className="text-center py-2">
+                  <span className="font-bold uppercase tracking-wide text-slate-900 text-sm">
+                    {documento.nombreDocumento}
+                  </span>
                 </div>
 
-                <div className="text-center border-t border-slate-300 pt-2 w-44">
-                  <div className="font-bold text-unt-blue">Mesa de Partes Virtual</div>
-                  <div>Secretaría Académica UNT</div>
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-[11px] space-y-1">
+                  <div><span className="font-bold">Archivo:</span> {documento.nombreArchivo || 'documento_valido.pdf'}</div>
+                  <div><span className="font-bold">Fecha de Presentación:</span> {documento.fechaSubida}</div>
+                  <div><span className="font-bold">Tamaño de Archivo:</span> {documento.archivoTamano || '1.8 MB'}</div>
+                  <div><span className="font-bold">Estado Actual:</span> {documento.estado}</div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px]">
+                  Este registro fue cargado sin archivo PDF real adjunto. Cuando el tesista sube un archivo PDF real desde su equipo, aquí se visualiza el documento PDF completo directamente desde Google Drive.
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Barra de Acciones del Modal */}

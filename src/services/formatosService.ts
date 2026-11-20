@@ -1,6 +1,7 @@
 import { FormatoInstitucional } from '../types';
 import { INITIAL_FORMATOS } from '../data/mockFormatos';
 import { storageService } from './storageService';
+import { driveApiService } from './driveApiService';
 
 const FORMATOS_KEY = 'unt_industrial_formatos_oficiales';
 
@@ -11,6 +12,7 @@ export const formatosService = {
 
   async saveFormatos(formatos: FormatoInstitucional[]): Promise<void> {
     storageService.set(FORMATOS_KEY, formatos);
+    await driveApiService.saveCollection('formatos', formatos);
   },
 
   async subirFormato(datos: {

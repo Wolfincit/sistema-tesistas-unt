@@ -36,6 +36,7 @@ export const ConsultasSecretaria: React.FC = () => {
   const [grabandoAudio, setGrabandoAudio] = useState<boolean>(false);
   const [audioGrabadoDuracion, setAudioGrabadoDuracion] = useState<string | null>(null);
   const [audioGrabadoUrl, setAudioGrabadoUrl] = useState<string | null>(null);
+  const [audioGrabadoBlob, setAudioGrabadoBlob] = useState<Blob | null>(null);
   const [segundosGrabacion, setSegundosGrabacion] = useState<number>(0);
   const grabacionRef = useRef<{ stop: () => Promise<{ blob: Blob | null; url: string; duracionStr: string }> } | null>(null);
   const intervalGrabacionRef = useRef<any>(null);
@@ -52,6 +53,7 @@ export const ConsultasSecretaria: React.FC = () => {
   const [comunicadoMensaje, setComunicadoMensaje] = useState<string>('');
   const [grabandoComunicado, setGrabandoComunicado] = useState<boolean>(false);
   const [comunicadoAudioUrl, setComunicadoAudioUrl] = useState<string | null>(null);
+  const [comunicadoAudioBlob, setComunicadoAudioBlob] = useState<Blob | null>(null);
   const [comunicadoAudioDuracion, setComunicadoAudioDuracion] = useState<string | null>(null);
   const [comunicadoSegundos, setComunicadoSegundos] = useState<number>(0);
   const grabacionComunicadoRef = useRef<{ stop: () => Promise<{ blob: Blob | null; url: string; duracionStr: string }> } | null>(null);
@@ -73,6 +75,7 @@ export const ConsultasSecretaria: React.FC = () => {
         try {
           const res = await grabacionRef.current.stop();
           setAudioGrabadoUrl(res.url);
+          setAudioGrabadoBlob(res.blob);
           setAudioGrabadoDuracion(res.duracionStr);
         } catch (err) {
           console.error('Error al detener grabación:', err);
@@ -82,6 +85,7 @@ export const ConsultasSecretaria: React.FC = () => {
       setGrabandoAudio(false);
     } else {
       setAudioGrabadoUrl(null);
+      setAudioGrabadoBlob(null);
       setAudioGrabadoDuracion(null);
       setSegundosGrabacion(0);
       setGrabandoAudio(true);
@@ -139,12 +143,14 @@ export const ConsultasSecretaria: React.FC = () => {
       id: consultaActiva.id,
       respuestaTexto: respuestaTexto.trim(),
       respuestaAudioDuracion: audioGrabadoDuracion || undefined,
-      respuestaAudioUrl: audioGrabadoUrl || undefined
+      respuestaAudioUrl: audioGrabadoUrl || undefined,
+      audioBlob: audioGrabadoBlob
     });
     setEnviando(false);
     setRespuestaTexto('');
     setAudioGrabadoDuracion(null);
     setAudioGrabadoUrl(null);
+    setAudioGrabadoBlob(null);
     setSegundosGrabacion(0);
   };
 
@@ -155,12 +161,14 @@ export const ConsultasSecretaria: React.FC = () => {
       if (grabacionComunicadoRef.current) {
         const res = await grabacionComunicadoRef.current.stop();
         setComunicadoAudioUrl(res.url);
+        setComunicadoAudioBlob(res.blob);
         setComunicadoAudioDuracion(res.duracionStr);
         grabacionComunicadoRef.current = null;
       }
       setGrabandoComunicado(false);
     } else {
       setComunicadoAudioUrl(null);
+      setComunicadoAudioBlob(null);
       setComunicadoAudioDuracion(null);
       setComunicadoSegundos(0);
       setGrabandoComunicado(true);
@@ -188,13 +196,15 @@ export const ConsultasSecretaria: React.FC = () => {
       titulo: comunicadoTitulo.trim(),
       mensaje: comunicadoMensaje.trim(),
       audioUrl: comunicadoAudioUrl || undefined,
-      audioDuracion: comunicadoAudioDuracion || '0:30'
+      audioDuracion: comunicadoAudioDuracion || '0:30',
+      audioBlob: comunicadoAudioBlob
     });
 
     setModalComunicadoAbierto(false);
     setComunicadoTitulo('');
     setComunicadoMensaje('');
     setComunicadoAudioUrl(null);
+    setComunicadoAudioBlob(null);
     setComunicadoAudioDuracion(null);
     setComunicadoSegundos(0);
   };
