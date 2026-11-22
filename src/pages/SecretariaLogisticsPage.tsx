@@ -45,103 +45,6 @@ interface SecretariaLogisticsPageProps {
   onCambiarPestana?: (p: 'seguimiento' | 'despacho' | 'calendario' | 'faqs') => void;
 }
 
-// Generador en Canvas de Flyer Institucional UNT para Sustentaciones de los Jueves 11:00 a.m. - 1:00 p.m.
-function generarFlyerSustentacionCanvas(datos: {
-  tesistaNombre: string;
-  tituloTesis: string;
-  fecha: string;
-  horario: string;
-  presidente: string;
-  secretario: string;
-  vocal: string;
-  asesor: string;
-}): string {
-  const canvas = document.createElement('canvas');
-  canvas.width = 900;
-  canvas.height = 620;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return '';
-
-  // Fondo institucional Azul Marino UNT
-  const grad = ctx.createLinearGradient(0, 0, 900, 620);
-  grad.addColorStop(0, '#082F64');
-  grad.addColorStop(1, '#051D3F');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 900, 620);
-
-  // Marco dorado
-  ctx.strokeStyle = '#FBBF24';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(22, 22, 856, 576);
-
-  // Encabezado
-  ctx.fillStyle = '#FDE68A';
-  ctx.font = 'bold 16px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('UNIVERSIDAD NACIONAL DE TRUJILLO · FACULTAD DE INGENIERÍA', 450, 62);
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 24px serif';
-  ctx.fillText('ESCUELA PROFESIONAL DE INGENIERÍA INDUSTRIAL', 450, 95);
-
-  // Etiqueta central
-  ctx.fillStyle = '#FBBF24';
-  ctx.fillRect(260, 115, 380, 34);
-  ctx.fillStyle = '#082F64';
-  ctx.font = 'bold 16px sans-serif';
-  ctx.fillText('SUSTENTACIÓN PÚBLICA DE TESIS', 450, 138);
-
-  // Tesista
-  ctx.fillStyle = '#93C5FD';
-  ctx.font = 'bold 14px sans-serif';
-  ctx.fillText('TESISTA GRADUANDO:', 450, 185);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 24px sans-serif';
-  ctx.fillText(datos.tesistaNombre.toUpperCase(), 450, 215);
-
-  // Título de tesis (envuelto en líneas)
-  ctx.fillStyle = '#E2E8F0';
-  ctx.font = 'italic 16px serif';
-  const words = `"${datos.tituloTesis}"`.split(' ');
-  let line = '';
-  let y = 255;
-  for (const w of words) {
-    const test = line ? `${line} ${w}` : w;
-    if (ctx.measureText(test).width > 760) {
-      ctx.fillText(line, 450, y);
-      line = w;
-      y += 24;
-    } else {
-      line = test;
-    }
-  }
-  if (line) ctx.fillText(line, 450, y);
-
-  // Caja de Fecha y Hora (Jueves 11:00 a.m. - 1:00 p.m.)
-  ctx.fillStyle = 'rgba(255,255,255,0.1)';
-  ctx.fillRect(110, 340, 680, 62);
-  ctx.fillStyle = '#FDE68A';
-  ctx.font = 'bold 20px sans-serif';
-  ctx.fillText(`FECHA: JUEVES ${datos.fecha}   |   HORA: ${datos.horario}`, 450, 378);
-
-  // Jurado Evaluador
-  ctx.fillStyle = '#93C5FD';
-  ctx.font = 'bold 15px sans-serif';
-  ctx.fillText('JURADO EVALUADOR DESIGNADO:', 450, 435);
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '15px sans-serif';
-  ctx.fillText(`Presidente: ${datos.presidente}`, 450, 465);
-  ctx.fillText(`Secretario: ${datos.secretario}`, 450, 492);
-  ctx.fillText(`Vocal: ${datos.vocal}   ·   Asesor: ${datos.asesor}`, 450, 519);
-
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = '12px sans-serif';
-  ctx.fillText('Auditorio de la Escuela Profesional de Ingeniería Industrial — Ciudad Universitaria UNT', 450, 570);
-
-  return canvas.toDataURL('image/png');
-}
-
 export const SecretariaLogisticsPage: React.FC<SecretariaLogisticsPageProps> = ({
   pestanaActiva = 'seguimiento',
   onCambiarPestana
@@ -386,30 +289,16 @@ export const SecretariaLogisticsPage: React.FC<SecretariaLogisticsPageProps> = (
     reader.readAsDataURL(file);
   };
 
+  // Preparar anuncio en el chat marcando automáticamente el check [✓] del tesista y sus 3 jurados
   const prepararDespachoParaTesistaYJurado = (seg: SeguimientoTesisItem, fechaJueves?: string) => {
     const fechaStr = fechaJueves || seg.fechaSustentacionProgramada || 'Próximo Jueves';
     setAsuntoChat(
-      `Citación Oficial a Sustentación de Tesis: ${seg.tesistaNombre} — Jueves ${fechaStr} (11:00 a.m. a 1:00 p.m.)`
+      `Sustentación de Tesis: ${seg.tesistaNombre} — Jueves ${fechaStr} (11:00 a.m. a 1:00 p.m.)`
     );
     setMensajeChat(
-      `Estimados Ingenieros miembros del Jurado Evaluador y Tesista ${seg.tesistaNombre}:\n\nPor medio del presente, la Secretaría de la Escuela Profesional de Ingeniería Industrial UNT cumple con notificar y adjuntar el Flyer Oficial para la Sustentación Pública de la tesis:\n"${seg.tituloTesis}"\n\n• Fecha: JUEVES ${fechaStr}\n• Hora exacta: 11:00 a.m. a 1:00 p.m.\n• Jurado Evaluador:\n  - Presidente: ${seg.juradoPresidente}\n  - Secretario: ${seg.juradoSecretario}\n  - Vocal: ${seg.juradoVocal}\n\nAtentamente,\nSrta. Celia — Secretaría Académica de Ingeniería Industrial UNT`
+      `Estimados miembros del Jurado Evaluador y Tesista ${seg.tesistaNombre}:\n\nSe comunica que la sustentación de la tesis "${seg.tituloTesis}" se encuentra programada para el día JUEVES ${fechaStr} de 11:00 a.m. a 1:00 p.m.\n\nJurado Evaluador:\n- Presidente: ${seg.juradoPresidente}\n- Secretario: ${seg.juradoSecretario}\n- Vocal: ${seg.juradoVocal}\n\nAtentamente,\nSrta. Celia — Secretaría de Escuela de Ingeniería Industrial UNT`
     );
 
-    // Generar flyer automático en Canvas
-    const autoFlyer = generarFlyerSustentacionCanvas({
-      tesistaNombre: seg.tesistaNombre,
-      tituloTesis: seg.tituloTesis,
-      fecha: fechaStr,
-      horario: '11:00 a.m. - 01:00 p.m.',
-      presidente: seg.juradoPresidente,
-      secretario: seg.juradoSecretario,
-      vocal: seg.juradoVocal,
-      asesor: seg.asesor
-    });
-    setFlyerPreview(autoFlyer);
-    setFlyerNombre(`Flyer_${seg.codigoMatricula}_${fechaStr}.png`);
-
-    // Marcar automáticamente el check [✓] del tesista y los checks [✓] de sus 3 ingenieros del jurado
     if (seg.tesistaCorreo) {
       setTesistasChecks([seg.tesistaCorreo.toLowerCase()]);
     }
@@ -430,8 +319,8 @@ export const SecretariaLogisticsPage: React.FC<SecretariaLogisticsPageProps> = (
     cambiarTab('despacho');
     agregarToast(
       'success',
-      'Flyer y Destinatarios Preparados',
-      `Se marcaron con check [✓] el correo del tesista y los ${correosJuradoMatch.length} ingenieros de su jurado.`
+      'Destinatarios Seleccionados',
+      `Se marcaron con check [✓] el tesista y sus ${correosJuradoMatch.length} ingenieros del jurado.`
     );
   };
 
@@ -1138,50 +1027,24 @@ export const SecretariaLogisticsPage: React.FC<SecretariaLogisticsPageProps> = (
                   />
                 </div>
 
-                {/* Zona para Subir Imagen/Flyer o Autogenerar Flyer UNT */}
+                {/* Zona para Subir Imagen / Flyer desde la PC de la Srta. Celia */}
                 <div className="p-3.5 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-bold text-slate-700 flex items-center gap-1.5">
                       <ImageIcon className="w-4 h-4 text-unt-blue" />
-                      <span>Flyer / Imagen Adjunta:</span>
+                      <span>Subir Imagen / Flyer de Sustentación:</span>
                     </span>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:border-unt-blue text-unt-blue font-bold text-[11px] cursor-pointer shadow-2xs">
-                        <ImageIcon className="w-3.5 h-3.5" />
-                        <span>Subir Imagen / Flyer desde PC</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleSubirFlyerImagen}
-                          className="hidden"
-                        />
-                      </label>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const seg = seguimientos[0];
-                          if (!seg) return;
-                          const url = generarFlyerSustentacionCanvas({
-                            tesistaNombre: seg.tesistaNombre,
-                            tituloTesis: seg.tituloTesis,
-                            fecha: seg.fechaSustentacionProgramada || '2026-11-26',
-                            horario: '11:00 a.m. - 01:00 p.m.',
-                            presidente: seg.juradoPresidente,
-                            secretario: seg.juradoSecretario,
-                            vocal: seg.juradoVocal,
-                            asesor: seg.asesor
-                          });
-                          setFlyerPreview(url);
-                          setFlyerNombre(`Flyer_${seg.codigoMatricula}.png`);
-                        }}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#082F64] text-amber-300 font-bold text-[11px] cursor-pointer"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Autogenerar Flyer Oficial UNT</span>
-                      </button>
-                    </div>
+                    <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#082F64] hover:bg-[#0C4D96] text-white font-bold text-xs cursor-pointer shadow-2xs">
+                      <ImageIcon className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Seleccionar Imagen / Flyer (PNG, JPG)</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleSubirFlyerImagen}
+                        className="hidden"
+                      />
+                    </label>
                   </div>
 
                   {flyerPreview && (
