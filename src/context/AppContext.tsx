@@ -175,9 +175,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Asegurar estado limpio de producción si el navegador conserva datos de pruebas anteriores
   storageService.ensureCleanProductionSchema();
 
-  // Por defecto inicia en Modo Público Abierto (usuario = null -> Solo Repositorio de Tesis público)
+  // Por defecto inicia en Modo Público Abierto (solo la Secretaria tiene inicio de sesión exclusivo)
   const [usuario, setUsuario] = useState<UserProfile | null>(() => {
-    return storageService.get<UserProfile | null>(USER_SESSION_KEY, null);
+    const saved = storageService.get<UserProfile | null>(USER_SESSION_KEY, null);
+    if (saved && saved.rol !== 'secretaria') {
+      storageService.remove(USER_SESSION_KEY);
+      return null;
+    }
+    return saved;
   });
   const [reservas, setReservas] = useState<ReservaAuditorio[]>([]);
   const [bloqueos, setBloqueos] = useState<BloqueoFecha[]>([]);
@@ -414,45 +419,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return true;
     }
 
-    // CONTROL DE ACCESO INDEPENDIENTE PARA MÚLTIPLES SECRETARIAS (@unitru.edu.pe)
+    // CONTROL DE ACCESO EXCLUSIVO PARA SECRETARÍA (@unitru.edu.pe)
     if (!emailNormalizado.endsWith('@unitru.edu.pe')) {
       agregarToast('error', 'Acceso denegado', 'Secretaría Académica requiere correo institucional @unitru.edu.pe');
       return false;
     }
-    if (!registroSecretaria) {
-      agregarToast(
-        'error',
-        'Cuenta de Secretaría no registrada',
-        'Ese correo no figura en el personal autorizado de Secretaría Académica.'
-      );
-      return false;
-    }
-    if (!registroSecretaria.activo) {
-      agregarToast(
-        'warning',
-        'Cuenta Suspendida',
-        'Esta cuenta de Secretaría se encuentra suspendida temporalmente.'
-      );
-      return false;
-    }
-    if (!accesosService.verificarPasswordSecretariaRegistro(registroSecretaria, pwdLimpia)) {
-      agregarToast('error', 'Contraseña Incorrecta', 'La contraseña de esta cuenta de Secretaría no es válida.');
-      return false;
+
+    // Permitir tanto cuentas registradas en cuentasSecretaria como cualquier correo @unitru.edu.pe de la Secretaria con la clave institucional
+    if (registroSecretaria) {
+      if (!registroSecretaria.activo) {
+        agregarToast('warning', 'Cuenta Suspendida', 'Esta cuenta de Secretaría se encuentra suspendida temporalmente.');
+        return false;
+      }
+      if (!accesosService.verificarPasswordSecretariaRegistro(registroSecretaria, pwdLimpia)) {
+        agregarToast('error', 'Contraseña Incorrecta', 'La contraseña de Secretaría no es válida.');
+        return false;
+      }
+    } else {
+      if (!accesosService.verificarSecretariaPassword(pwdLimpia)) {
+        agregarToast('error', 'Contraseña Incorrecta', 'La contraseña exclusiva de Secretaría Académica no es válida.');
+        return false;
+      }
     }
 
     const secUser: UserProfile = {
-      id: registroSecretaria.id,
-      email: registroSecretaria.correo,
-      nombre: registroSecretaria.nombre,
+      id: registroSecretaria ? registroSecretaria.id : 'sec-unt-celia',
+      email: emailNormalizado,
+      nombre: registroSecretaria ? registroSecretaria.nombre : 'Srta. Celia — Secretaría Académica',
       rol: 'secretaria',
       codigoMatricula: 'SEC-UNT',
-      departamento: registroSecretaria.cargo,
+      departamento: registroSecretaria ? registroSecretaria.cargo : 'Secretaría de Escuela — Ingeniería Industrial',
       facultad: 'Facultad de Ingeniería (UNT)'
     };
     setUsuario(secUser);
     setUltimaSecretariaActiva(secUser);
     storageService.set(USER_SESSION_KEY, secUser);
-    agregarToast('success', 'Panel de Secretaría Académica', `Bienvenida(o), ${secUser.nombre}`);
+    agregarToast('success', 'Panel de Secretaría Académica', `Bienvenida, ${secUser.nombre}`);
     return true;
   };
 
@@ -460,14 +462,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!usuario) return false;
     try {
       if (usuario.rol === 'secretaria') {
-        const actualizada = await accesosService.cambiarPasswordSecretariaPorCorreo(
-          usuario.email,
-          passwordActual,
-          nuevaPassword
+        const existeEnLista = cuentasSecretaria.some(
+          (s) => s.correo.toLowerCase() === usuario.email.toLowerCase()
         );
-        setCuentasSecretaria((prev) =>
-          prev.map((s) => (s.id === actualizada.id ? actualizada : s))
-        );
+        if (existeEnLista) {
+          const actualizada = await accesosService.cambiarPasswordSecretariaPorCorreo(
+            usuario.email,
+            passwordActual,
+            nuevaPassword
+          );
+          setCuentasSecretaria((prev) =>
+            prev.map((s) => (s.id === actualizada.id ? actualizada : s))
+          );
+        }
+        try {
+          accesosService.cambiarSecretariaPassword(passwordActual, nuevaPassword);
+        } catch (err) {
+          if (!existeEnLista) throw err;
+        }
       } else {
         const actualizado = await accesosService.cambiarPasswordTesista(
           usuario.email,

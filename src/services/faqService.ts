@@ -2,36 +2,36 @@ import { FaqItem } from '../types';
 import { storageService } from './storageService';
 import { driveApiService } from './driveApiService';
 
-const FAQ_STORAGE_KEY = 'unt_industrial_faqs_v1';
+const FAQ_STORAGE_KEY = 'unt_industrial_faqs_v2';
 
 const INITIAL_FAQS: FaqItem[] = [
   {
     id: 'faq-1',
-    pregunta: '¿Qué necesito para habilitar la reserva del auditorio?',
-    respuesta: 'Debes subir primero tus 5 documentos obligatorios en la pestaña Gestión Documentaria. Una vez cargados los 5 archivos, el calendario de reservas se habilita automáticamente.',
-    categoria: 'Auditorio',
-    fechaActualizacion: '2026-11-19'
+    pregunta: '¿Qué parte del trámite de sustentación es física y qué parte es virtual?',
+    respuesta: 'La entrega inicial del expediente (FUT, voucher TUPA, reporte Turnitin < 20% firmado por el asesor, constancia de prácticas, resolución de proyecto y 3 ejemplares de tesis) se realiza en FÍSICO en la Secretaría de Escuela (Srta. Celia). El seguimiento logístico del expediente puedes consultarlo virtualmente en la pestaña "Instrucciones y Seguimiento", y tras sustentar, la Carpeta de Titulación se sube virtualmente en tramites-uraa.unitru.edu.pe.',
+    categoria: 'Trámite Físico y Virtual',
+    fechaActualizacion: '2026-11-22'
   },
   {
     id: 'faq-2',
-    pregunta: '¿Cuál es el porcentaje máximo de similitud permitido en Turnitin?',
-    respuesta: 'El reporte oficial de Turnitin debe registrar un porcentaje de similitud menor al 20% y contar con la firma de conformidad de tu docente asesor.',
-    categoria: 'Requisitos',
-    fechaActualizacion: '2026-11-19'
+    pregunta: '¿Qué días y en qué horario se realizan las sustentaciones de tesis en Ingeniería Industrial?',
+    respuesta: 'Las sustentaciones de tesis en la Escuela Profesional de Ingeniería Industrial UNT se programan exclusivamente los días JUEVES de 11:00 a.m. a 1:00 p.m., una vez que los 3 miembros del Jurado Evaluador (Presidente, Secretario y Vocal) han firmado el dictamen favorable.',
+    categoria: 'Sustentación (Jueves 11-1 PM)',
+    fechaActualizacion: '2026-11-22'
   },
   {
     id: 'faq-3',
-    pregunta: '¿Qué ocurre con mi reserva si Secretaría observa uno de mis documentos?',
-    respuesta: 'Si alguno de tus 5 documentos es observado, el turno pre-reservado se libera hasta que subsanes el documento observado y vuelvas a contar con los 5 requisitos en regla.',
-    categoria: 'Expediente',
-    fechaActualizacion: '2026-11-19'
+    pregunta: '¿Por qué puede demorar mi trámite si ya entregué mi folder físico en Secretaría de Escuela?',
+    respuesta: 'En la Secretaría de Escuela (Srta. Celia) el expediente se procesa y deriva en 24 a 48 horas. Los cuellos de botella ocurren en instancias externas a la Escuela: (1) Emisión y firma de Resolución de Jurado en Decanato de Facultad, o (2) Plazo de revisión de los 3 ejemplares por los miembros del Jurado Evaluador (15 a 30 días). Puedes verificar en qué estación exacta está tu trámite con tu Código de Matrícula.',
+    categoria: 'Logística y Cuellos de Botella',
+    fechaActualizacion: '2026-11-22'
   },
   {
     id: 'faq-4',
-    pregunta: '¿Dónde descargo las plantillas oficiales (FUT y declaraciones)?',
-    respuesta: 'En la pestaña Gestión Documentaria encontrarás en la parte superior todos los formatos oficiales subidos por Secretaría listos para descargar.',
-    categoria: 'Formatos',
-    fechaActualizacion: '2026-11-19'
+    pregunta: '¿Cuál es el porcentaje máximo de similitud permitido en Turnitin?',
+    respuesta: 'El reporte oficial de originalidad Turnitin debe registrar un porcentaje de similitud menor al 20% y contar con la firma física de conformidad de tu docente asesor.',
+    categoria: 'Requisitos',
+    fechaActualizacion: '2026-11-22'
   }
 ];
 

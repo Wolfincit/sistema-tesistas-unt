@@ -31,10 +31,10 @@ function generarCodigoCaptcha(longitud = 5): string {
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onClose }) => {
   const { iniciarSesion } = useApp();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState('secretaria.industrial@unitru.edu.pe');
   const [password, setPassword] = useState('');
   const [mostrarPassword, setMostrarPassword] = useState(false);
-  const [rolElegido, setRolElegido] = useState<UserRole>('tesista');
+  const [rolElegido] = useState<UserRole>('secretaria');
   const [error, setError] = useState<string | null>(null);
 
   // CAPTCHA Visual renderizado en Canvas HTML5 (0 texto plano en el DOM -> resistente a DOM scraping)
@@ -231,58 +231,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose }) => {
             />
             <div className="pl-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 block">
-                Acceso Privado • Titulación UNT
+                Acceso Exclusivo • Ingeniería Industrial UNT
               </span>
               <h2 className="text-base font-extrabold text-white leading-tight">
-                Módulo de Tesistas y Secretaría
+                Secretaría Académica (Srta. Celia)
               </h2>
             </div>
           </div>
         </div>
 
-        {/* Cuerpo del Modal (Privado — Sin exponer padrón ni correos habilitados) */}
+        {/* Cuerpo del Modal (Exclusivo para Secretaría Académica) */}
         <div className="p-5 sm:p-6 space-y-4">
-          {/* Selector de Rol */}
-          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-xl text-xs">
-            <button
-              type="button"
-              onClick={() => {
-                setRolElegido('tesista');
-                setError(null);
-                regenerarCaptcha();
-              }}
-              className={`py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer ${
-                rolElegido === 'tesista'
-                  ? 'bg-[#082F64] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Tesista Habilitado
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setRolElegido('secretaria');
-                setError(null);
-                regenerarCaptcha();
-              }}
-              className={`py-2 px-3 rounded-lg font-semibold transition-all cursor-pointer ${
-                rolElegido === 'secretaria'
-                  ? 'bg-[#082F64] text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Secretaría Académica
-            </button>
-          </div>
-
           <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-100 text-[11px] text-slate-600 leading-relaxed flex items-start gap-2">
             <Lock className="w-4 h-4 text-[#082F64] shrink-0 mt-0.5" />
             <span>
-              {rolElegido === 'tesista'
-                ? 'Acceso exclusivo para tesistas de último ciclo acreditados por Secretaría. Su contraseña inicial es su Número de Matrícula (podrá cambiarla al ingresar).'
-                : 'Acceso administrativo restringido para Secretaría Académica de Ingeniería Industrial.'}
+              Acceso exclusivo para la Secretaría Académica de Ingeniería Industrial con correo institucional <strong>@unitru.edu.pe</strong> y su contraseña exclusiva (modificable desde el botón <em>Clave</em> al ingresar).
             </span>
           </div>
 

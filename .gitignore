@@ -6,5 +6,6 @@ dist/
 .DS_Store
 Thumbs.db
 server/.drive-config.json
+server/.email-config.json
 server/.local-db.json
 server/.local-uploads/

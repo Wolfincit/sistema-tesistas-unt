@@ -22,6 +22,11 @@ import {
   abrirStreamPdfReal
 } from './repositorioEngine.mjs';
 import {
+  getEmailStatus,
+  saveEmailConfig,
+  dispatchAnnouncementEmail
+} from './emailEngine.mjs';
+import {
   saveOAuthCredentials,
   buildOAuthAuthUrl,
   handleOAuthCallback,
@@ -506,6 +511,40 @@ export async function handleApiRequest(req, res) {
     return true;
   }
 
+  // ======================================================
+  // API DESPACHO DE CORREOS Y FLYERS (TESISTAS Y JURADO)
+  // ======================================================
+  if (urlObj.pathname === '/api/correo/status' && req.method === 'GET') {
+    try {
+      sendJson(res, 200, getEmailStatus());
+    } catch (err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/correo/config' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const out = saveEmailConfig(body);
+      sendJson(res, 200, out);
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/correo/enviar' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req, 12 * 1024 * 1024);
+      const out = await dispatchAnnouncementEmail(body);
+      sendJson(res, 200, out);
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
   return false;
 }
 
@@ -524,7 +563,8 @@ if (isDirectRun) {
       (req.url.startsWith('/api/repositorio/') ||
         req.url.startsWith('/api/drive/') ||
         req.url.startsWith('/api/db/') ||
-        req.url.startsWith('/api/files/'))
+        req.url.startsWith('/api/files/') ||
+        req.url.startsWith('/api/correo/'))
     ) {
       const handled = await handleApiRequest(req, res);
       if (handled) return;

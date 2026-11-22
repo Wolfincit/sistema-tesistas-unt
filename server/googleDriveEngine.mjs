@@ -1014,7 +1014,11 @@ export async function saveDbCollection(collectionName, value) {
     'formatos',
     'consultas',
     'comunicados',
-    'faqs'
+    'faqs',
+    'seguimientoLogistico',
+    'directorioJurado',
+    'historialDespachos',
+    'sustentacionesJueves'
   ]);
   if (!allowed.has(collectionName)) {
     throw new Error(`Colección no permitida: ${collectionName}`);
