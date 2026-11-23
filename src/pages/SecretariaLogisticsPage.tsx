@@ -1694,8 +1694,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 className="text-[11px] text-unt-blue font-semibold hover:underline cursor-pointer"
               >
                 {mostrarOpcionesAvanzadasSmtp
-                  ? 'Ocultar opción avanzada SMTP'
-                  : '¿Tienes clave de aplicación SMTP? (Opcional)'}
+                  ? 'Ocultar clave SMTP'
+                  : 'Usar clave de aplicación SMTP'}
               </button>
 
               {mostrarOpcionesAvanzadasSmtp && (
@@ -1704,7 +1704,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                     type="password"
                     value={cfgPassInput}
                     onChange={(e) => setCfgPassInput(e.target.value)}
-                    placeholder="Clave de 16 letras (opcional)"
+                    placeholder="Clave de 16 letras"
                     className="w-full p-2 rounded-xl border border-slate-300 font-mono"
                   />
                 </div>

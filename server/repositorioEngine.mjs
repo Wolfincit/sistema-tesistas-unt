@@ -105,15 +105,49 @@ function normalizar(str) {
 }
 
 function clasificarArea(titulo, resumen, keywords) {
+  const t = normalizar(titulo);
   const txt = normalizar(`${titulo} ${resumen} ${(keywords || []).join(' ')}`);
-  if (/(logist|almacen|inventari|cadena de suministro|supply chain|cadena de frio|picking|cross.?dock|abastecim|transporte|ruteo|distribucion urbana|mrp|compras|despacho)/.test(txt)) {
+
+  if (
+    /(seguridad y salud|salud ocupacional|seguridad ocupacional|seguridad industrial|seguridad laboral|programa de seguridad en el trabajo|\bsst\b|ohsas 18001|oshas 18001|iso 45001|ley 29783|\biperc\b|peligros y evaluacion de riesgos|peligros y riesgos ocupacionales|ergonom|disergonom|\breba\b|\bowas\b|\brula\b|\bniosh\b|equipos de proteccion|riesgos laborales|riesgos operacionales|red contraincendios|accidentabilidad|accidentes de trabajo|seguridad vial|lesiones musculoesqueleticas|gestion de seguridad)/.test(t) &&
+    !/iso 9001/.test(t)
+  ) {
+    return 'Seguridad y Salud Ocupacional';
+  }
+  if (
+    /(gestion de la calidad|gestion de calidad|sistema de gestion de calidad|modelo de gestion de calidad|control de calidad|control estadistico de calidad|calidad de servicio|calidad del servicio|herramientas de calidad|iso 9001|\bhaccp\b|peligros y puntos criticos de control|fssc 22000|\bbpm\b|\bservqual\b|servuccion|satisfaccion del cliente|satisfaccion de los clientes|estandares de acreditacion|certificar las microformas|evaluacion de la calidad|auditorias internas)/.test(t)
+  ) {
+    return 'Gestión de la Calidad';
+  }
+  if (
+    /(mantenimiento preventivo|mantenimiento predictivo|mantenimiento centrado|gestion de mantenimiento|plan de mantenimiento|plan de mp|\btpm\b|fiabilidad para la mejora efectiva de activos|redistribucion de planta|distribucion de planta|celulas de manufactura|celda de soldadura|proceso de fabricacion|balance de linea|estudio de tiempos|metodos de trabajo|ingenieria de metodos|tiempos muertos|inyeccion de plasticos|mejora continua para disminuir|gestion de operaciones|linea de procesamiento|proceso de produccion|sistema productivo|tratamiento de aguas residuales industriales|optimizacion de procesos run to target)/.test(t)
+  ) {
+    return 'Producción y Operaciones';
+  }
+  if (
+    /(logistic|almacen|inventari|gestion de stocks|gestion de suministros|cadena de suministro|cadena de suministros|cadena de abastecimiento|supply chain|abastecim|aprovisionamiento|proceso de compras|gestion de compras|area de compras|adquisicion de materiales|cross.?docking|picking|despacho|ruteo de|distribucion de productos|distribucion de bebidas|centro de distribucion|costo de transporte de mineral|ordenes de requerimiento)/.test(t)
+  ) {
     return 'Logística y Cadena de Suministro';
   }
-  if (/(seguridad|salud ocupacional|sst|iso 45001|ohsas|iperc|ergonom|accident|riesgo laboral|higiene industrial|reba|owas|niosh)/.test(txt)) {
+  if (
+    /(lean manufacturing|manufactura esbelta|\bkaizen\b|\bkaisen\b|\b5s\b|\bsmed\b|\boee\b|lean six sigma|modelo lean|indice de productividad|aumentar la productividad|incrementar la productividad|mejora de procesos para reducir los costos operativos|mejora en el area tecnica)/.test(t)
+  ) {
+    return 'Producción y Operaciones';
+  }
+  if (
+    /(gestion de proyectos|\bpmbok\b|enfoque pmi|factibilidad|pre.?factibilidad|pre factibilidad|estudio tecnico economico|viabilidad|plan de negocio|planta piloto|proyecto de ampliacion|valoracion de proyectos|sistema de costos|contabilidad de costos|costeo por procesos|costos abc|estructura de costos|costos de produccion|costo de produccion|gestion financiera|planeamiento estrategico|plan estrategico|balanced scorecard|cuadro de mando integral|control interno|coso iii|comercio electronico|e-commerce|transformacion digital|sistema de informacion|diseno de una planta para la produccion|consorcio empresarial)/.test(t)
+  ) {
+    return 'Gestión de Proyectos';
+  }
+
+  if (/(seguridad y salud|salud ocupacional|sst|iso 45001|ohsas|iperc|ergonom|accident|riesgo laboral|higiene industrial|reba|owas|niosh)/.test(txt)) {
     return 'Seguridad y Salud Ocupacional';
   }
   if (/(calidad|iso 9001|six sigma|dmaic|control estadistico|defect|merma|deming|phva|haccp|bpm|servqual)/.test(txt)) {
     return 'Gestión de la Calidad';
+  }
+  if (/(logist|almacen|inventari|cadena de suministro|supply chain|cadena de frio|picking|cross.?dock|abastecim|transporte|ruteo|distribucion urbana|mrp|compras|despacho)/.test(txt)) {
+    return 'Logística y Cadena de Suministro';
   }
   if (/(proyecto|pmbok|factibilidad|viabilidad|plan de negocio|rentabilidad|inversion|evaluacion economica|van|tir|costos|presupuesto|reingenieria|erp|transformacion digital)/.test(txt)) {
     return 'Gestión de Proyectos';
@@ -405,85 +439,17 @@ async function queryAliciaUnt(queryText, size = 24) {
 const STRICT_INDUSTRIAL_RE = /(industrial|productividad|producci[oó]n|log[ií]stic|almac[eé]n|inventari|calidad|mantenimiento|seguridad y salud|salud ocupacional|sst|iperc|ergonom|lean|5s|six sigma|dmaic|tpm|kaizen|cadena de suministro|supply chain|costos|procesos|planta|manufactur|operaciones|abastecim|distribuci[oó]n|transporte|merma|tiempos|balance de l[ií]nea|layout|pmbok|viabilidad|factibilidad|iso 9001|iso 45001|ohsas|haccp|bpm|simulaci[oó]n|pron[oó]stico|mrp|erp|agroindustr|metalmec[aá]nic)/i;
 
 async function queryUntOpenAire(queryText, size = 14) {
-  const q = queryText.trim() || 'productividad';
   try {
-    const [aliciaRes, openAlexResponse] = await Promise.all([
-      queryAliciaUnt(queryText, size),
-      fetchWithTimeout(
-        `https://api.openalex.org/works?filter=institutions.id:https://openalex.org/I4210091554,has_pdf_url:true&search=${encodeURIComponent(q)}&per-page=${size}`,
-        7000
-      ).catch(() => null)
-    ]);
-
+    const aliciaRes = await queryAliciaUnt(queryText, size * 2);
     const seen = new Set();
     const combined = [];
 
     for (const item of aliciaRes.items) {
+      if (!STRICT_INDUSTRIAL_RE.test(`${item.titulo} ${item.resumen}`)) continue;
       const key = normalizar(item.titulo).slice(0, 75);
       if (seen.has(key)) continue;
       seen.add(key);
       combined.push(item);
-    }
-
-    let oaTotal = 0;
-    if (openAlexResponse && openAlexResponse.ok) {
-      const json = await openAlexResponse.json();
-      oaTotal = json.meta?.count || 0;
-      for (const w of json.results || []) {
-        let pdfUrl =
-          w.primary_location?.pdf_url ||
-          w.best_oa_location?.pdf_url ||
-          w.open_access?.oa_url ||
-          '';
-        if (!pdfUrl || !pdfUrl.includes('revistas.unitru.edu.pe')) continue;
-        pdfUrl = pdfUrl.replace(/^http:\/\/(www\.)?revistas\.unitru\.edu\.pe/i, 'https://revistas.unitru.edu.pe');
-        pdfUrl = pdfUrl.replace(/^https:\/\/www\.revistas\.unitru\.edu\.pe/i, 'https://revistas.unitru.edu.pe');
-
-        const titulo = (w.title || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-        if (!titulo || titulo.length < 18 || EXCLUDE_NON_INDUSTRIAL_UNT_RE.test(titulo)) continue;
-
-        const abstractText = reconstructOpenAlexAbstract(w.abstract_inverted_index);
-        if (!STRICT_INDUSTRIAL_RE.test(`${titulo} ${abstractText}`)) continue;
-
-        const key = normalizar(titulo).slice(0, 75);
-        if (seen.has(key)) continue;
-        seen.add(key);
-
-        const authors = (w.authorships || []).map((a) => a.author?.display_name).filter(Boolean);
-        const keywords = (w.concepts || [])
-          .filter((c) => c.display_name && c.level >= 1)
-          .slice(0, 4)
-          .map((c) => c.display_name);
-        const anio = w.publication_year || 2023;
-        const area = clasificarArea(titulo, abstractText, keywords);
-        const landingUrl = w.primary_location?.landing_page_url || pdfUrl;
-
-        combined.push({
-          id: `unt-paper-${w.id.replace('https://openalex.org/', '').toLowerCase()}`,
-          titulo,
-          autor: authors.slice(0, 2).join('; ') || 'Investigador Ing. Industrial UNT',
-          asesor: authors[1] || authors[0] || 'Docente Investigador — Ing. Industrial UNT',
-          anio,
-          area,
-          resumen:
-            abstractText.length > 50
-              ? abstractText.slice(0, 1200)
-              : `Artículo de investigación científica en Ingeniería Industrial (UNT): ${titulo}.`,
-          palabrasClave: keywords.length > 0 ? keywords : [area, 'Investigación UNT', 'Ingeniería Industrial'],
-          urlRepositorio: landingUrl,
-          urlPdf: pdfUrl,
-          pesoPdf: 'Artículo PDF UNT',
-          universidad: 'Universidad Nacional de Trujillo',
-          universidadId: 'UNT',
-          handleUri: landingUrl,
-          vistas: 140 + (titulo.length * 5) % 300,
-          descargas: 48 + (titulo.length * 3) % 110,
-          licencia: 'Acceso Abierto — Revistas Científicas UNT',
-          tipoDocumento: 'Artículo Científico',
-          enVivo: true,
-          enVivoQuery: queryText.trim()
-        });
-      }
     }
 
     const finalItems = combined.slice(0, size * 2);

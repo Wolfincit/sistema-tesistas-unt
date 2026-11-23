@@ -742,7 +742,7 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
-                    Nombre del Link (Opcional):
+                    Nombre del Link:
                   </label>
                   <input
                     type="text"
@@ -754,7 +754,7 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                 </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
-                    URL del Link (Opcional):
+                    URL del Link:
                   </label>
                   <input
                     type="url"
@@ -768,7 +768,7 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div className="p-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 space-y-2">
-                  <span className="font-bold text-slate-700 block">Imagen (Opcional):</span>
+                  <span className="font-bold text-slate-700 block">Imagen:</span>
                   <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-unt-blue font-bold cursor-pointer">
                     <ImageIcon className="w-3.5 h-3.5" />
                     <span>Subir imagen</span>
@@ -794,7 +794,7 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                 </div>
 
                 <div className="p-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 space-y-2">
-                  <span className="font-bold text-slate-700 block">Documento (Opcional):</span>
+                  <span className="font-bold text-slate-700 block">Documento:</span>
                   <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-unt-blue font-bold cursor-pointer">
                     <Upload className="w-3.5 h-3.5" />
                     <span>Subir documento</span>

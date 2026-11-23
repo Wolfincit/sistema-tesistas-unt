@@ -79,11 +79,11 @@ export const TesisRepositoryPage: React.FC = () => {
   const [inputAsesor, setInputAsesor] = useState<string>('');
   const [mostrarDropdownAsesor, setMostrarDropdownAsesor] = useState<boolean>(false);
 
-  // Control de Universidades: UNT SIEMPRE FIJA + Referencias Nacionales seleccionables (Ranking Perú)
-  const [referenciasActivas, setReferenciasActivas] = useState<boolean>(true);
+  // Control de Universidades: UNT SIEMPRE FIJA; otras universidades desmarcadas por defecto
+  const [referenciasActivas, setReferenciasActivas] = useState<boolean>(false);
   const [panelRankingAbierto, setPanelRankingAbierto] = useState<boolean>(false);
   const [unisNacionalesSeleccionadas, setUnisNacionalesSeleccionadas] = useState<UniversidadId[]>(
-    UNIS_NACIONALES_IDS
+    []
   );
 
   // Ordenamiento y Paginación
@@ -141,7 +141,7 @@ export const TesisRepositoryPage: React.FC = () => {
 
   // Lista efectiva de universidades activas (UNT SIEMPRE FIJA)
   const universidadesActivas = useMemo<UniversidadId[]>(() => {
-    if (!referenciasActivas) return ['UNT'];
+    if (!referenciasActivas || unisNacionalesSeleccionadas.length === 0) return ['UNT'];
     return ['UNT', ...unisNacionalesSeleccionadas];
   }, [referenciasActivas, unisNacionalesSeleccionadas]);
 
@@ -254,6 +254,7 @@ export const TesisRepositoryPage: React.FC = () => {
     const setUnis = new Set(universidadesActivas);
     todasLasTesis.forEach((t) => {
       if (!setUnis.has(t.universidadId || 'UNT')) return;
+      if (tipoDocSeleccionado !== 'TODOS' && (t.tipoDocumento || 'Tesis') !== tipoDocSeleccionado) return;
       if (t.asesor && !t.asesor.startsWith('Docente Asesor') && !t.asesor.startsWith('Docente Investigador')) {
         if (!mapa[t.asesor]) {
           mapa[t.asesor] = { total: 0, areas: {} };
@@ -270,7 +271,7 @@ export const TesisRepositoryPage: React.FC = () => {
         return { nombre, total: info.total, especialidad };
       })
       .sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre));
-  }, [todasLasTesis, universidadesActivas]);
+  }, [todasLasTesis, universidadesActivas, tipoDocSeleccionado]);
 
   const coincidenciasAsesores = useMemo(() => {
     const qTokens = normalizarTexto(inputAsesor).split(/\s+/).filter(Boolean);
@@ -283,7 +284,7 @@ export const TesisRepositoryPage: React.FC = () => {
       .slice(0, 12);
   }, [todosLosAsesores, inputAsesor]);
 
-  // Filtrado completo insensible a tildes y ordenamiento
+  // Filtrado completo insensible a tildes y ordenamiento (priorizando siempre Tesis sobre Artículos)
   const tesisFiltradas = useMemo(() => {
     const filtradas = tesisService.filtrarLocal(todasLasTesis, {
       query: busqueda,
@@ -295,16 +296,25 @@ export const TesisRepositoryPage: React.FC = () => {
     });
 
     if (ordenamiento === 'reciente') {
-      return [...filtradas].sort((a, b) => b.anio - a.anio);
+      return [...filtradas].sort((a, b) => {
+        const diffAnio = b.anio - a.anio;
+        if (diffAnio !== 0) return diffAnio;
+        const aTesis = (a.tipoDocumento || 'Tesis') === 'Tesis' ? 0 : 1;
+        const bTesis = (b.tipoDocumento || 'Tesis') === 'Tesis' ? 0 : 1;
+        return aTesis - bTesis;
+      });
     }
     if (ordenamiento === 'titulo') {
       return [...filtradas].sort((a, b) => a.titulo.localeCompare(b.titulo));
     }
     if (!busqueda.trim()) {
       return [...filtradas].sort((a, b) => {
-        const aUnt = a.universidadId === 'UNT' ? 1 : 0;
-        const bUnt = b.universidadId === 'UNT' ? 1 : 0;
-        if (aUnt !== bUnt && !referenciasActivas) return bUnt - aUnt;
+        const aUnt = (a.universidadId || 'UNT') === 'UNT' ? 0 : 1;
+        const bUnt = (b.universidadId || 'UNT') === 'UNT' ? 0 : 1;
+        if (aUnt !== bUnt) return aUnt - bUnt;
+        const aTesis = (a.tipoDocumento || 'Tesis') === 'Tesis' ? 0 : 1;
+        const bTesis = (b.tipoDocumento || 'Tesis') === 'Tesis' ? 0 : 1;
+        if (aTesis !== bTesis) return aTesis - bTesis;
         return b.anio - a.anio;
       });
     }
@@ -322,15 +332,18 @@ export const TesisRepositoryPage: React.FC = () => {
     referenciasActivas
   ]);
 
-  // Conteo por universidad para las fichas del selector
+  // Conteo por universidad sincronizado con el filtro de tipo de documento
   const conteoPorUni = useMemo(() => {
     const mapa: Record<string, number> = {};
     todasLasTesis.forEach((t) => {
+      if (tipoDocSeleccionado !== 'TODOS' && (t.tipoDocumento || 'Tesis') !== tipoDocSeleccionado) {
+        return;
+      }
       const uid = t.universidadId || 'UNT';
       mapa[uid] = (mapa[uid] || 0) + 1;
     });
     return mapa;
-  }, [todasLasTesis]);
+  }, [todasLasTesis, tipoDocSeleccionado]);
 
   const totalPaginas = Math.max(1, Math.ceil(tesisFiltradas.length / ITEMS_POR_PAGINA));
   const paginaSegura = Math.min(paginaActual, totalPaginas);
@@ -467,6 +480,9 @@ export const TesisRepositoryPage: React.FC = () => {
     setAsesorSeleccionado('TODOS');
     setInputAsesor('');
     setMostrarDropdownAsesor(false);
+    setReferenciasActivas(false);
+    setUnisNacionalesSeleccionadas([]);
+    setPanelRankingAbierto(false);
     setResultadosEnVivo([]);
     setFuentesEnVivo([]);
     setTotalRemoto(0);
@@ -589,19 +605,6 @@ export const TesisRepositoryPage: React.FC = () => {
             </div>
 
             <select
-              value={tipoDocSeleccionado}
-              onChange={(e) => {
-                setTipoDocSeleccionado(e.target.value as 'TODOS' | 'Tesis' | 'Artículo Científico');
-                setPaginaActual(1);
-              }}
-              className="py-2 px-3 rounded-lg border border-slate-200 sm:border-transparent bg-white sm:bg-transparent text-xs font-bold text-[#082F64] focus:outline-hidden cursor-pointer"
-            >
-              <option value="TODOS">Todo (Tesis + Papers)</option>
-              <option value="Tesis">Solo Tesis</option>
-              <option value="Artículo Científico">Artículos / Papers</option>
-            </select>
-
-            <select
               value={areaSeleccionada}
               onChange={(e) => {
                 setAreaSeleccionada(e.target.value as AreaIngenieria | 'TODAS');
@@ -671,39 +674,37 @@ export const TesisRepositoryPage: React.FC = () => {
                 </span>
               </div>
 
-              {/* 2. REFERENCIAS NACIONALES (Sin nombres de universidades en el botón) */}
+              {/* 2. REFERENCIAS NACIONALES (Sin marcar por defecto y sin textos redundantes) */}
               <button
                 type="button"
                 id="btn-referencias-nacionales"
                 onClick={handleToggleReferencias}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
-                  referenciasActivas
+                  referenciasActivas && unisNacionalesSeleccionadas.length > 0
                     ? 'bg-[#1765B5] text-white border-[#1765B5] shadow-2xs'
                     : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
                 }`}
-                title="Activar o desactivar búsqueda en las mejores universidades del Perú según Ranking Nacional"
               >
-                <Globe className={`w-3.5 h-3.5 ${referenciasActivas ? 'text-amber-300' : 'text-slate-500'}`} />
-                <span>Referencias Nacionales</span>
-                <span
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${
-                    referenciasActivas ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
+                <Globe
+                  className={`w-3.5 h-3.5 ${
+                    referenciasActivas && unisNacionalesSeleccionadas.length > 0
+                      ? 'text-amber-300'
+                      : 'text-slate-500'
                   }`}
-                >
-                  {referenciasActivas
-                    ? `${unisNacionalesSeleccionadas.length}/${UNIS_NACIONALES_IDS.length} · +${totalNacionalesCargadas}`
-                    : 'Desactivado'}
-                </span>
+                />
+                <span>Referencias Nacionales</span>
+                {referenciasActivas && unisNacionalesSeleccionadas.length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/20 text-white">
+                    {unisNacionalesSeleccionadas.length}/{UNIS_NACIONALES_IDS.length} · +{totalNacionalesCargadas}
+                  </span>
+                )}
               </button>
 
               {/* Botón para desplegar/ocultar selección de otras universidades */}
               <button
                 type="button"
                 id="btn-elegir-universidades"
-                onClick={() => {
-                  if (!referenciasActivas) setReferenciasActivas(true);
-                  setPanelRankingAbierto((v) => !v);
-                }}
+                onClick={() => setPanelRankingAbierto((v) => !v)}
                 className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
               >
                 <span>Elegir otra universidad</span>
@@ -800,7 +801,12 @@ export const TesisRepositoryPage: React.FC = () => {
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs font-bold text-slate-900 block">{u.sigla}</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-slate-900 block">{u.sigla}</span>
+                          <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[10px] font-bold">
+                            {conteoPorUni[u.id] || 0}
+                          </span>
+                        </div>
                         <p className="text-[11px] text-slate-600 truncate mt-0.5">{u.nombre}</p>
                       </div>
                     </button>
