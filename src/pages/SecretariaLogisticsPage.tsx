@@ -169,11 +169,20 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
   const handleGuardarSeguimiento = async (e: React.FormEvent) => {
     e.preventDefault();
+    const matriculaDigits = formCodigo.replace(/\D/g, '');
+    if (matriculaDigits.length !== 10) {
+      agregarToast(
+        'warning',
+        'Matrícula de 10 dígitos',
+        'El número de matrícula debe tener exactamente 10 dígitos (ej. 1511300223).'
+      );
+      return;
+    }
     if (!formNombre.trim() || !formCorreo.trim()) return;
 
     const nuevo: SeguimientoTesisItem = {
       id: editandoSeg ? editandoSeg.id : `seg-${Date.now()}`,
-      codigoMatricula: formCodigo.trim() || `1021${Math.floor(100000 + Math.random() * 900000)}`,
+      codigoMatricula: matriculaDigits,
       tesistaNombre: formNombre.trim(),
       tesistaCorreo: formCorreo.trim().toLowerCase(),
       tituloTesis: formTitulo.trim() || 'Tesis en seguimiento',
@@ -1515,7 +1524,22 @@ export const SecretariaLogisticsPage: React.FC = () => {
             </div>
 
             <form onSubmit={handleGuardarSeguimiento} className="p-5 space-y-3 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">
+                    N° Matrícula (10 dígitos):
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={10}
+                    required
+                    value={formCodigo}
+                    onChange={(e) => setFormCodigo(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="1511300223"
+                    className="w-full p-2 rounded-xl border border-slate-300 font-mono font-bold"
+                  />
+                </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Nombre del Tesista:</label>
                   <input

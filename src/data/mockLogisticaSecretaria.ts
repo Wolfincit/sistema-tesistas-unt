@@ -278,7 +278,7 @@ export const INITIAL_DIRECTORIO_JURADO: IngenieroJuradoItem[] = [
 export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
   {
     id: 'seg-001',
-    codigoMatricula: '1021400219',
+    codigoMatricula: '1511300223',
     tesistaNombre: 'Carlos Eduardo Mendoza Villanueva',
     tesistaCorreo: 'tesista.industrial@unitru.edu.pe',
     tesistaTelefono: '948123456',
@@ -293,7 +293,7 @@ export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
     fechaInicioTramite: '2026-10-15',
     ubicacionFisica: 'Archivo de Escuela (Srta. Celia) — Listo para Sustentación',
     esCuelloBotellaExterno: false,
-    notasSecretaria: 'Expediente físico completo (FUT, Turnitin 14%, 3 ejemplares revisados con dictamen favorable). Programado para sustentar el jueves de 11:00 a.m. a 1:00 p.m.',
+    notasSecretaria: 'Expediente físico completo. Programado para sustentar el jueves de 11:00 a.m. a 1:00 p.m.',
     fechaSustentacionProgramada: '2026-11-26',
     requisitosFisicos: {
       futFisico: true,
@@ -306,7 +306,7 @@ export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
   },
   {
     id: 'seg-002',
-    codigoMatricula: '1021400315',
+    codigoMatricula: '1511300315',
     tesistaNombre: 'Melina Nayhely Quiñones Mostacero',
     tesistaCorreo: 'mquinones@unitru.edu.pe',
     tesistaTelefono: '944987321',
@@ -319,9 +319,9 @@ export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
     estacionActual: 3,
     fechaIngresoEstacion: '2026-10-20',
     fechaInicioTramite: '2026-10-08',
-    ubicacionFisica: 'En poder del Jurado Evaluador (Falta firma de dictamen del Secretario)',
+    ubicacionFisica: 'En poder del Jurado Evaluador',
     esCuelloBotellaExterno: true,
-    motivoRetrasoExterno: 'Demora externa en revisión de Jurado (33 días en Estación 3; SLA máximo: 21 días).',
+    motivoRetrasoExterno: 'En revisión del Jurado Evaluador.',
     notasSecretaria: 'La Escuela entregó los 3 ejemplares físicos el 20/10. Presidente y Vocal ya dieron visto bueno; falta dictamen de un miembro del jurado para agendar jueves.',
     requisitosFisicos: {
       futFisico: true,
@@ -334,7 +334,7 @@ export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
   },
   {
     id: 'seg-003',
-    codigoMatricula: '1021400342',
+    codigoMatricula: '1511300342',
     tesistaNombre: 'Neiser Michel Salas Ríos',
     tesistaCorreo: 'nsalas@unitru.edu.pe',
     tesistaTelefono: '949555812',
@@ -347,10 +347,10 @@ export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
     estacionActual: 2,
     fechaIngresoEstacion: '2026-11-08',
     fechaInicioTramite: '2026-11-07',
-    ubicacionFisica: 'Derivado a Decanato de Facultad de Ingeniería (Oficio N° 214-2026-EII)',
+    ubicacionFisica: 'Derivado a Decanato de Facultad de Ingeniería',
     esCuelloBotellaExterno: true,
-    motivoRetrasoExterno: 'Retenido en Decanato de Facultad (14 días esperando firma de Resolución de Jurado; SLA: 7 días).',
-    notasSecretaria: 'En Escuela se procesó en 24 horas (07/11) y se envió físico a Decanato el 08/11. El cuello de botella se encuentra en firma externa de Facultad.',
+    motivoRetrasoExterno: 'En Decanato esperando Resolución de Jurado.',
+    notasSecretaria: 'Se derivó oficio a Decanato el 08/11 para emisión de resolución de jurado.',
     requisitosFisicos: {
       futFisico: true,
       voucherTupa: true,
@@ -362,7 +362,7 @@ export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
   },
   {
     id: 'seg-004',
-    codigoMatricula: '1021400418',
+    codigoMatricula: '1511300418',
     tesistaNombre: 'Diego Alonso Carranza Vásquez',
     tesistaCorreo: 'dcarranza@unitru.edu.pe',
     tesistaTelefono: '942311709',
@@ -377,7 +377,7 @@ export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
     fechaInicioTramite: '2026-11-21',
     ubicacionFisica: 'Mesa de Secretaría de Escuela (Srta. Celia)',
     esCuelloBotellaExterno: false,
-    notasSecretaria: 'Presentó folder físico hoy. Falta adjuntar copia fedateada de Constancia de Prácticas Preprofesionales para derivar a Decanato.',
+    notasSecretaria: 'Presentó folder físico en Secretaría de Escuela.',
     requisitosFisicos: {
       futFisico: true,
       voucherTupa: true,
@@ -396,7 +396,7 @@ export const INITIAL_SUSTENTACIONES_JUEVES: SustentacionJuevesItem[] = [
     horario: '11:00 a.m. - 01:00 p.m.',
     tesistaId: 'seg-001',
     tesistaNombre: 'Carlos Eduardo Mendoza Villanueva',
-    tesistaCodigo: '1021400219',
+    tesistaCodigo: '1511300223',
     tesistaCorreo: 'tesista.industrial@unitru.edu.pe',
     tituloTesis: 'Propuesta de mejora en la gestión logística de almacenes mediante Lean Warehousing para reducir costos operativos en una empresa agroindustrial de La Libertad, 2026',
     asesor: 'Dr. Ing. Joe Alexis González Vásquez',
@@ -413,7 +413,7 @@ export const INITIAL_SUSTENTACIONES_JUEVES: SustentacionJuevesItem[] = [
     horario: '11:00 a.m. - 01:00 p.m.',
     tesistaId: 'seg-002',
     tesistaNombre: 'Melina Nayhely Quiñones Mostacero',
-    tesistaCodigo: '1021400315',
+    tesistaCodigo: '1511300315',
     tesistaCorreo: 'mquinones@unitru.edu.pe',
     tituloTesis: 'Implementación de la metodología Lean Manufacturing en el proceso de arándano para aumentar la productividad de la empresa Agrícola Cerro Prieto S.A.',
     asesor: 'Dr. Ing. Ángel Hernández Molina',
@@ -422,7 +422,7 @@ export const INITIAL_SUSTENTACIONES_JUEVES: SustentacionJuevesItem[] = [
     juradoVocal: 'Dr. Ing. Ángel Hernández Molina',
     aulaOAuditorio: 'Auditorio de Ingeniería Industrial UNT',
     estado: 'Programada',
-    observacion: 'Tentativa sujeta a entrega de última firma del Secretario de Jurado.'
+    observacion: 'Programada para jueves 11:00 a.m. - 1:00 p.m.'
   }
 ];
 

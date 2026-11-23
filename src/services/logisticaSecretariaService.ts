@@ -13,9 +13,9 @@ import {
 import { storageService } from './storageService';
 import { driveApiService } from './driveApiService';
 
-const SEGUIMIENTO_KEY = 'unt_industrial_seguimiento_logistico_v1';
-const JURADO_KEY = 'unt_industrial_directorio_jurado_v1';
-const SUSTENTACIONES_JUEVES_KEY = 'unt_industrial_sustentaciones_jueves_v1';
+const SEGUIMIENTO_KEY = 'unt_industrial_seguimiento_logistico_v2';
+const JURADO_KEY = 'unt_industrial_directorio_jurado_v2';
+const SUSTENTACIONES_JUEVES_KEY = 'unt_industrial_sustentaciones_jueves_v2';
 const HISTORIAL_DESPACHOS_KEY = 'unt_industrial_historial_despachos_v1';
 const INSTRUCCIONES_PASOS_KEY = 'unt_industrial_instrucciones_pasos_v1';
 const TITULO_SUSTENTACIONES_KEY = 'unt_industrial_titulo_sustentaciones_v1';

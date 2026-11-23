@@ -75,17 +75,14 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
     logisticaSecretariaService.getTituloSustentaciones()
   );
 
-  // Rastreador Tipo Olva Courier (solo se muestra en la Interfaz Principal para el Tesista)
+  // Rastreador Tipo Olva Courier: exige el código de matrícula completo de 10 dígitos (ej. 1511300223)
   const [busquedaCourier, setBusquedaCourier] = useState<string>('');
+  const codigoLimpio = busquedaCourier.replace(/\D/g, '').slice(0, 10);
+
   const resultadosCourier = useMemo(() => {
-    const q = busquedaCourier.trim().toLowerCase();
-    if (!q) return [];
-    return seguimientos.filter(
-      (s) =>
-        s.codigoMatricula.toLowerCase().includes(q) ||
-        s.tesistaNombre.toLowerCase().includes(q)
-    );
-  }, [busquedaCourier, seguimientos]);
+    if (codigoLimpio.length !== 10) return [];
+    return seguimientos.filter((s) => s.codigoMatricula.trim() === codigoLimpio);
+  }, [codigoLimpio, seguimientos]);
 
   // Modal para crear / editar una Instrucción (Exclusivo Secretaría)
   const [modalPasoAbierto, setModalPasoAbierto] = useState<boolean>(false);
@@ -307,9 +304,13 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                   Rastrea el estado de tu Tesis
                 </h2>
                 <p className="text-xs text-blue-200">
-                  Escribe tu código de matrícula o tu apellido para ver en qué paso va tu trámite
+                  Ingresa tu número de matrícula completo de 10 dígitos (ej. 1511300223)
                 </p>
               </div>
+            </div>
+
+            <div className="text-[11px] font-mono text-amber-300 bg-white/10 px-3 py-1 rounded-lg">
+              {codigoLimpio.length}/10 dígitos
             </div>
           </div>
 
@@ -317,14 +318,22 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              value={busquedaCourier}
-              onChange={(e) => setBusquedaCourier(e.target.value)}
-              placeholder="Ejemplo: 1021400219 o Mendoza..."
-              className="w-full pl-10 pr-4 py-3 rounded-xl bg-white text-slate-900 text-xs sm:text-sm font-semibold focus:outline-hidden shadow-xs"
+              inputMode="numeric"
+              maxLength={10}
+              value={codigoLimpio}
+              onChange={(e) => setBusquedaCourier(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              placeholder="Ingresa tus 10 dígitos de matrícula (ej. 1511300223)..."
+              className="w-full pl-10 pr-4 py-3 rounded-xl bg-white text-slate-900 text-xs sm:text-sm font-mono font-bold tracking-wider focus:outline-hidden shadow-xs"
             />
           </div>
 
-          {busquedaCourier.trim() !== '' && (
+          {codigoLimpio.length > 0 && codigoLimpio.length < 10 && (
+            <div className="p-3 rounded-xl bg-white/10 text-xs text-amber-200 font-semibold">
+              Completa los 10 dígitos de tu número de matrícula para consultar tu trámite ({codigoLimpio.length} de 10 dígitos ingresados).
+            </div>
+          )}
+
+          {codigoLimpio.length === 10 && (
             <div className="space-y-3">
               {resultadosCourier.length > 0 ? (
                 resultadosCourier.map((item) => {
@@ -336,10 +345,17 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
                         <div>
-                          <div className="text-sm font-black text-slate-900">
-                            {item.tesistaNombre}
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-black text-slate-900">
+                              {item.tesistaNombre}
+                            </span>
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-xs font-bold">
+                              Matrícula: {item.codigoMatricula}
+                            </span>
                           </div>
-                          <div className="text-xs text-slate-500 italic">"{item.tituloTesis}"</div>
+                          <div className="text-xs text-slate-500 italic mt-0.5">
+                            "{item.tituloTesis}"
+                          </div>
                         </div>
                         {item.fechaSustentacionProgramada && (
                           <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
