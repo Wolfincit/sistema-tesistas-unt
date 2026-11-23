@@ -3,10 +3,12 @@ import {
   IngenieroJuradoItem,
   SustentacionJuevesItem,
   DespachoChatAnuncioItem,
+  InstruccionPasoItem,
   INITIAL_SEGUIMIENTO_LOGISTICO,
   INITIAL_DIRECTORIO_JURADO,
   INITIAL_SUSTENTACIONES_JUEVES,
-  INITIAL_HISTORIAL_DESPACHOS
+  INITIAL_HISTORIAL_DESPACHOS,
+  INITIAL_INSTRUCCIONES_PASOS
 } from '../data/mockLogisticaSecretaria';
 import { storageService } from './storageService';
 import { driveApiService } from './driveApiService';
@@ -15,6 +17,8 @@ const SEGUIMIENTO_KEY = 'unt_industrial_seguimiento_logistico_v1';
 const JURADO_KEY = 'unt_industrial_directorio_jurado_v1';
 const SUSTENTACIONES_JUEVES_KEY = 'unt_industrial_sustentaciones_jueves_v1';
 const HISTORIAL_DESPACHOS_KEY = 'unt_industrial_historial_despachos_v1';
+const INSTRUCCIONES_PASOS_KEY = 'unt_industrial_instrucciones_pasos_v1';
+const TITULO_SUSTENTACIONES_KEY = 'unt_industrial_titulo_sustentaciones_v1';
 
 export interface EmailConfigStatus {
   configured: boolean;
@@ -58,6 +62,27 @@ export const logisticaSecretariaService = {
   async saveHistorialDespachos(items: DespachoChatAnuncioItem[]): Promise<void> {
     storageService.set(HISTORIAL_DESPACHOS_KEY, items);
     await driveApiService.saveCollection('historialDespachos', items);
+  },
+
+  getInstruccionesPasos(): InstruccionPasoItem[] {
+    return storageService.get<InstruccionPasoItem[]>(INSTRUCCIONES_PASOS_KEY, INITIAL_INSTRUCCIONES_PASOS);
+  },
+
+  async saveInstruccionesPasos(items: InstruccionPasoItem[]): Promise<void> {
+    storageService.set(INSTRUCCIONES_PASOS_KEY, items);
+    await driveApiService.saveCollection('instruccionesSustentacion', items);
+  },
+
+  getTituloSustentaciones(): { titulo: string; subtitulo: string; horario: string } {
+    return storageService.get(TITULO_SUSTENTACIONES_KEY, {
+      titulo: 'Sustentaciones Programadas',
+      subtitulo: 'Fechas agendadas por Secretaría de Escuela',
+      horario: 'Jueves de 11:00 a.m. a 1:00 p.m.'
+    });
+  },
+
+  saveTituloSustentaciones(datos: { titulo: string; subtitulo: string; horario: string }): void {
+    storageService.set(TITULO_SUSTENTACIONES_KEY, datos);
   },
 
   async getEmailStatus(): Promise<EmailConfigStatus> {

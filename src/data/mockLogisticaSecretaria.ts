@@ -136,6 +136,65 @@ export interface SustentacionJuevesItem {
   observacion?: string;
 }
 
+export interface InstruccionPasoItem {
+  id: string;
+  paso: string;
+  icono: 'clipboard' | 'users' | 'calendar' | 'mail' | 'award' | 'file' | 'check' | 'link';
+  titulo: string;
+  descripcion: string;
+  imagenDataUrl?: string;
+  linkTexto?: string;
+  linkUrl?: string;
+  documentoNombre?: string;
+  documentoDataUrl?: string;
+  documentoPeso?: string;
+}
+
+export const INITIAL_INSTRUCCIONES_PASOS: InstruccionPasoItem[] = [
+  {
+    id: 'inst-1',
+    paso: 'Paso 1',
+    icono: 'clipboard',
+    titulo: 'Presentación de Solicitud y Expediente en Secretaría de Escuela',
+    descripcion:
+      'Presentar en Secretaría de Escuela (Srta. Celia) el Formato Único de Trámite (FUT), recibo de pago correspondiente, informe Turnitin visado por el asesor y los ejemplares del borrador de tesis.',
+    documentoNombre: 'Plantilla_FUT_Sustentacion_UNT.txt',
+    documentoPeso: '12 KB'
+  },
+  {
+    id: 'inst-2',
+    paso: 'Paso 2',
+    icono: 'users',
+    titulo: 'Designación y Revisión del Jurado Evaluador',
+    descripcion:
+      'El Jurado Evaluador (Presidente, Secretario y Vocal) revisa el borrador de tesis. Una vez levantadas las observaciones, los tres miembros firman la conformidad para sustentar.'
+  },
+  {
+    id: 'inst-3',
+    paso: 'Paso 3',
+    icono: 'calendar',
+    titulo: 'Programación de Fecha de Sustentación (Jueves · 11:00 a.m. a 1:00 p.m.)',
+    descripcion:
+      'Con el visto bueno del jurado, Secretaría agenda tu fecha de sustentación en el calendario oficial de los días jueves (11:00 a.m. a 1:00 p.m.).'
+  },
+  {
+    id: 'inst-4',
+    paso: 'Paso 4',
+    icono: 'mail',
+    titulo: 'Envío de Citación y Flyer Oficial',
+    descripcion:
+      'Secretaría envía por correo electrónico el anuncio oficial y el flyer de la sustentación al tesista y a los ingenieros miembros del jurado.'
+  },
+  {
+    id: 'inst-5',
+    paso: 'Paso 5',
+    icono: 'award',
+    titulo: 'Sustentación Pública y Firma de Acta',
+    descripcion:
+      'Defensa de la tesis el día jueves programado de 11:00 a.m. a 1:00 p.m., deliberación del jurado y suscripción del Acta de Sustentación.'
+  }
+];
+
 export interface DespachoChatAnuncioItem {
   id: string;
   fechaHora: string;

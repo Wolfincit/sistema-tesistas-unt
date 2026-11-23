@@ -108,9 +108,9 @@ const VAULT_KEY_NAME = 'unt_industrial_drive_vault_v1';
 function deriveAesKey(passphrase) {
   const material = String(
     passphrase ||
-      process.env.UNT_VAULT_SECRET ||
-      process.env.GOOGLE_CLIENT_SECRET ||
-      'UNT-INDUSTRIAL-VAULT-DEFAULT-KEY'
+    process.env.UNT_VAULT_SECRET ||
+    process.env.GOOGLE_CLIENT_SECRET ||
+    'UNT-INDUSTRIAL-VAULT-DEFAULT-KEY'
   );
   return crypto.createHash('sha256').update(material).digest();
 }
@@ -231,7 +231,7 @@ function saveConfig(patch, { syncVault = true } = {}) {
   configCache = { ...current, ...patch };
   writeJsonSafe(DRIVE_CONFIG_PATH, configCache);
   if (syncVault && isRemoteVaultConfigured()) {
-    saveConfigToRemoteVault(configCache).catch(() => {});
+    saveConfigToRemoteVault(configCache).catch(() => { });
   }
   return configCache;
 }
@@ -1018,7 +1018,8 @@ export async function saveDbCollection(collectionName, value) {
     'seguimientoLogistico',
     'directorioJurado',
     'historialDespachos',
-    'sustentacionesJueves'
+    'sustentacionesJueves',
+    'instruccionesSustentacion'
   ]);
   if (!allowed.has(collectionName)) {
     throw new Error(`Colección no permitida: ${collectionName}`);
