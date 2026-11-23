@@ -111,20 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
                     }`}
                   >
                     <Layers className="w-3.5 h-3.5" />
-                    <span>Panel de Secretaría</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onCambiarVista('instrucciones')}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      vistaActual === 'instrucciones'
-                        ? 'bg-amber-400 text-slate-950 shadow-xs'
-                        : 'text-blue-100 hover:text-white hover:bg-white/10'
-                    }`}
-                  >
-                    <ClipboardList className="w-3.5 h-3.5" />
-                    <span>Editar Instrucciones</span>
+                    <span>Interfaz de Secretaría</span>
                   </button>
 
                   <button
@@ -137,7 +124,7 @@ export const Header: React.FC<HeaderProps> = ({
                     }`}
                   >
                     <HelpCircle className="w-3.5 h-3.5" />
-                    <span className="hidden md:inline">Preguntas Frecuentes</span>
+                    <span>Preguntas Frecuentes</span>
                   </button>
                 </>
               )}

@@ -10,6 +10,7 @@ import {
   logisticaSecretariaService,
   EmailConfigStatus
 } from '../services/logisticaSecretariaService';
+import { InstruccionesSustentacionPage } from './InstruccionesSustentacionPage';
 import { useApp } from '../context/AppContext';
 import {
   ClipboardList,
@@ -41,7 +42,7 @@ const ETAPAS_SIMPLES: { id: EstacionLogisticaId; nombre: string; color: string }
 
 export const SecretariaLogisticsPage: React.FC = () => {
   const { usuario, agregarToast } = useApp();
-  const [tab, setTab] = useState<'seguimiento' | 'despacho' | 'calendario'>('seguimiento');
+  const [tab, setTab] = useState<'seguimiento' | 'instrucciones' | 'despacho' | 'calendario'>('seguimiento');
 
   // Estados sincronizados en todo el sistema
   const [seguimientos, setSeguimientos] = useState<SeguimientoTesisItem[]>(() =>
@@ -504,7 +505,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
   return (
     <div className="space-y-5">
-      {/* Selector Simple y Limpio de las 3 Funciones de la Srta. Celia */}
+      {/* Selector Simple y Secuencial de las 4 Pestañas Exclusivas de la Srta. Celia */}
       <div className="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-2xs flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -516,7 +517,20 @@ export const SecretariaLogisticsPage: React.FC = () => {
           }`}
         >
           <ClipboardList className="w-4 h-4 text-amber-300" />
-          <span>1. Seguimiento de Tesis ({seguimientos.length})</span>
+          <span>1. Seguimiento ({seguimientos.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTab('instrucciones')}
+          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            tab === 'instrucciones'
+              ? 'bg-[#082F64] text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Edit3 className="w-4 h-4 text-amber-300" />
+          <span>2. Instrucciones (Editar y Publicar)</span>
         </button>
 
         <button
@@ -529,7 +543,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
           }`}
         >
           <Send className="w-4 h-4 text-amber-300" />
-          <span>2. Enviar Flyers y Correos</span>
+          <span>3. Flyers y Correos</span>
         </button>
 
         <button
@@ -542,9 +556,14 @@ export const SecretariaLogisticsPage: React.FC = () => {
           }`}
         >
           <Calendar className="w-4 h-4 text-amber-300" />
-          <span>3. Calendario (Jueves 11:00 - 1:00)</span>
+          <span>4. Calendario (Jueves 11:00 - 1:00)</span>
         </button>
       </div>
+
+      {/* =====================================================================
+          2. EDITOR EXCLUSIVO DE INSTRUCCIONES (SOLO PARA LA SECRETARÍA)
+         ===================================================================== */}
+      {tab === 'instrucciones' && <InstruccionesSustentacionPage modoEdicionSecretaria={true} />}
 
       {/* =====================================================================
           1. SEGUIMIENTO DE TESIS (LIMPIO, VISUAL Y CON APUNTES DIRECTOS)

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   SustentacionJuevesItem,
-  InstruccionPasoItem
+  InstruccionPasoItem,
+  SeguimientoTesisItem
 } from '../data/mockLogisticaSecretaria';
 import { logisticaSecretariaService } from '../services/logisticaSecretariaService';
 import { useApp } from '../context/AppContext';
@@ -21,7 +22,10 @@ import {
   Upload,
   Image as ImageIcon,
   ExternalLink,
-  X
+  X,
+  Search,
+  Package,
+  Building2
 } from 'lucide-react';
 
 const ICONOS_DISPONIBLES: {
@@ -39,9 +43,24 @@ const ICONOS_DISPONIBLES: {
   { id: 'link', label: 'Enlace', Icon: Link2 }
 ];
 
-export const InstruccionesSustentacionPage: React.FC = () => {
+const PASOS_COURIER = [
+  { id: 1, titulo: '1. Recibido', Icon: Package },
+  { id: 2, titulo: '2. En Decanato', Icon: Building2 },
+  { id: 3, titulo: '3. En Jurado', Icon: Users },
+  { id: 4, titulo: '4. Listo Jueves', Icon: Award }
+];
+
+interface InstruccionesSustentacionPageProps {
+  /** Solo true cuando se abre desde la pestaña 2 exclusiva del panel de Secretaría */
+  modoEdicionSecretaria?: boolean;
+}
+
+export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPageProps> = ({
+  modoEdicionSecretaria = false
+}) => {
   const { usuario, agregarToast } = useApp();
-  const esSecretaria = Boolean(usuario && usuario.rol === 'secretaria');
+  // ESTRICTO: Solo permite editar si está autenticada la Secretaria Y está en su pestaña exclusiva de edición
+  const puedeEditar = Boolean(usuario && usuario.rol === 'secretaria' && modoEdicionSecretaria);
 
   const [pasos, setPasos] = useState<InstruccionPasoItem[]>(() =>
     logisticaSecretariaService.getInstruccionesPasos()
@@ -49,11 +68,26 @@ export const InstruccionesSustentacionPage: React.FC = () => {
   const [sustentaciones, setSustentaciones] = useState<SustentacionJuevesItem[]>(() =>
     logisticaSecretariaService.getSustentacionesJueves()
   );
+  const [seguimientos] = useState<SeguimientoTesisItem[]>(() =>
+    logisticaSecretariaService.getSeguimientos()
+  );
   const [configSust, setConfigSust] = useState(() =>
     logisticaSecretariaService.getTituloSustentaciones()
   );
 
-  // Modal para crear / editar una Instrucción (Texto, Ícono, Imagen opcional, Link opcional, Documento opcional)
+  // Rastreador Tipo Olva Courier (solo se muestra en la Interfaz Principal para el Tesista)
+  const [busquedaCourier, setBusquedaCourier] = useState<string>('');
+  const resultadosCourier = useMemo(() => {
+    const q = busquedaCourier.trim().toLowerCase();
+    if (!q) return [];
+    return seguimientos.filter(
+      (s) =>
+        s.codigoMatricula.toLowerCase().includes(q) ||
+        s.tesistaNombre.toLowerCase().includes(q)
+    );
+  }, [busquedaCourier, seguimientos]);
+
+  // Modal para crear / editar una Instrucción (Exclusivo Secretaría)
   const [modalPasoAbierto, setModalPasoAbierto] = useState<boolean>(false);
   const [editandoPaso, setEditandoPaso] = useState<InstruccionPasoItem | null>(null);
   const [pPaso, setPPaso] = useState<string>('Paso 1');
@@ -67,7 +101,7 @@ export const InstruccionesSustentacionPage: React.FC = () => {
   const [pDocDataUrl, setPDocDataUrl] = useState<string>('');
   const [pDocPeso, setPDocPeso] = useState<string>('');
 
-  // Modal para crear / editar una Sustentación Programada directamente aquí
+  // Modal para crear / editar una Sustentación Programada (Exclusivo Secretaría)
   const [modalSustAbierto, setModalSustAbierto] = useState<boolean>(false);
   const [editandoSust, setEditandoSust] = useState<SustentacionJuevesItem | null>(null);
   const [sFecha, setSFecha] = useState<string>('2026-11-26');
@@ -80,6 +114,7 @@ export const InstruccionesSustentacionPage: React.FC = () => {
   const [editandoCabeceraSust, setEditandoCabeceraSust] = useState<boolean>(false);
 
   const abrirEditorPaso = (item?: InstruccionPasoItem) => {
+    if (!puedeEditar) return;
     if (item) {
       setEditandoPaso(item);
       setPPaso(item.paso);
@@ -112,9 +147,7 @@ export const InstruccionesSustentacionPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
-      setPImagenUrl(String(reader.result || ''));
-    };
+    reader.onload = () => setPImagenUrl(String(reader.result || ''));
     reader.readAsDataURL(file);
   };
 
@@ -136,7 +169,7 @@ export const InstruccionesSustentacionPage: React.FC = () => {
 
   const handleGuardarPaso = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pTitulo.trim()) return;
+    if (!puedeEditar || !pTitulo.trim()) return;
 
     const nuevo: InstruccionPasoItem = {
       id: editandoPaso ? editandoPaso.id : `inst-${Date.now()}`,
@@ -159,15 +192,16 @@ export const InstruccionesSustentacionPage: React.FC = () => {
     setPasos(actualizados);
     await logisticaSecretariaService.saveInstruccionesPasos(actualizados);
     setModalPasoAbierto(false);
-    agregarToast('success', 'Instrucción Guardada', 'Se actualizaron las instrucciones para los tesistas.');
+    agregarToast('success', 'Publicado en Interfaz Principal', 'El paso quedó publicado para los tesistas.');
   };
 
   const handleEliminarPaso = async (id: string, titulo: string) => {
-    if (!confirm(`¿Eliminar la instrucción "${titulo}"?`)) return;
+    if (!puedeEditar) return;
+    if (!confirm(`¿Eliminar "${titulo}"?`)) return;
     const actualizados = pasos.filter((x) => x.id !== id);
     setPasos(actualizados);
     await logisticaSecretariaService.saveInstruccionesPasos(actualizados);
-    agregarToast('info', 'Instrucción Eliminada', 'Se quitó el paso seleccionado.');
+    agregarToast('info', 'Eliminado', 'Se actualizó la interfaz principal.');
   };
 
   const handleDescargarDocPaso = (paso: InstruccionPasoItem) => {
@@ -191,10 +225,11 @@ export const InstruccionesSustentacionPage: React.FC = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }
-    agregarToast('success', 'Descarga Iniciada', `Descargando "${paso.documentoNombre}".`);
+    agregarToast('success', 'Descargando', paso.documentoNombre);
   };
 
   const abrirEditorSustentacion = (item?: SustentacionJuevesItem) => {
+    if (!puedeEditar) return;
     if (item) {
       setEditandoSust(item);
       setSFecha(item.fecha);
@@ -219,7 +254,7 @@ export const InstruccionesSustentacionPage: React.FC = () => {
 
   const handleGuardarSustentacion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sTesista.trim()) return;
+    if (!puedeEditar || !sTesista.trim()) return;
 
     const nueva: SustentacionJuevesItem = {
       id: editandoSust ? editandoSust.id : `jue-${Date.now()}`,
@@ -244,34 +279,144 @@ export const InstruccionesSustentacionPage: React.FC = () => {
     setSustentaciones(actualizadas);
     await logisticaSecretariaService.saveSustentacionesJueves(actualizadas);
     setModalSustAbierto(false);
-    agregarToast('success', 'Sustentación Guardada', 'Se actualizó la lista de sustentaciones programadas.');
+    agregarToast('success', 'Publicado', 'Sustentación actualizada en la interfaz principal.');
   };
 
   const handleEliminarSustentacion = async (id: string, nombre: string) => {
-    if (!confirm(`¿Quitar la sustentación programada de ${nombre}?`)) return;
+    if (!puedeEditar) return;
+    if (!confirm(`¿Quitar la sustentación de ${nombre}?`)) return;
     const actualizadas = sustentaciones.filter((x) => x.id !== id);
     setSustentaciones(actualizadas);
     await logisticaSecretariaService.saveSustentacionesJueves(actualizadas);
-    agregarToast('info', 'Sustentación Retirada', 'Se actualizó la programación.');
   };
 
   return (
     <div className="space-y-6">
-      {/* Grid Principal: Instrucciones a la izquierda + Sustentaciones Programadas a la derecha */}
+      {/* =====================================================================
+          RASTREADOR VISUAL TIPO OLVA COURIER (EXCLUSIVO DE LA INTERFAZ PRINCIPAL PARA EL TESISTA)
+         ===================================================================== */}
+      {!puedeEditar && (
+        <div className="bg-gradient-to-r from-[#082F64] to-[#0C4D96] rounded-2xl p-5 sm:p-6 text-white shadow-md space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shrink-0">
+                <Package className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-white leading-tight">
+                  Rastrea el estado de tu Tesis
+                </h2>
+                <p className="text-xs text-blue-200">
+                  Escribe tu código de matrícula o tu apellido para ver en qué paso va tu trámite
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={busquedaCourier}
+              onChange={(e) => setBusquedaCourier(e.target.value)}
+              placeholder="Ejemplo: 1021400219 o Mendoza..."
+              className="w-full pl-10 pr-4 py-3 rounded-xl bg-white text-slate-900 text-xs sm:text-sm font-semibold focus:outline-hidden shadow-xs"
+            />
+          </div>
+
+          {busquedaCourier.trim() !== '' && (
+            <div className="space-y-3">
+              {resultadosCourier.length > 0 ? (
+                resultadosCourier.map((item) => {
+                  const pasoActual = item.estacionActual > 4 ? 4 : item.estacionActual;
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-white text-slate-800 rounded-2xl p-5 shadow-md space-y-4 animate-in fade-in"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                        <div>
+                          <div className="text-sm font-black text-slate-900">
+                            {item.tesistaNombre}
+                          </div>
+                          <div className="text-xs text-slate-500 italic">"{item.tituloTesis}"</div>
+                        </div>
+                        {item.fechaSustentacionProgramada && (
+                          <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
+                            📅 Jueves {item.fechaSustentacionProgramada} (11:00 a.m. - 1:00 p.m.)
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Barra Visual Secuencial Tipo Olva Courier (4 íconos grandes) */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                        {PASOS_COURIER.map(({ id, titulo, Icon }) => {
+                          const completado = pasoActual > id;
+                          const activo = pasoActual === id;
+                          return (
+                            <div
+                              key={id}
+                              className={`p-3 rounded-2xl border-2 flex flex-col items-center text-center gap-1.5 transition-all ${
+                                activo
+                                  ? 'border-[#082F64] bg-blue-50 text-[#082F64] font-black shadow-xs'
+                                  : completado
+                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-800 font-bold'
+                                  : 'border-slate-200 bg-slate-50 text-slate-400'
+                              }`}
+                            >
+                              <div
+                                className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                  activo
+                                    ? 'bg-[#082F64] text-amber-300'
+                                    : completado
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-slate-200 text-slate-400'
+                                }`}
+                              >
+                                {completado ? (
+                                  <CheckCircle2 className="w-5 h-5" />
+                                ) : (
+                                  <Icon className="w-5 h-5" />
+                                )}
+                              </div>
+                              <span className="text-xs">{titulo}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {item.notasSecretaria && (
+                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950">
+                          <strong>Nota de Secretaría:</strong> {item.notasSecretaria}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-3.5 rounded-xl bg-white/10 text-xs text-blue-100">
+                  No se encontró ese código o apellido en seguimiento.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =====================================================================
+          INSTRUCCIONES PASO A PASO + SUSTENTACIONES PROGRAMADAS
+         ===================================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* COLUMNA IZQUIERDA (7 cols): INSTRUCCIONES PASO A PASO */}
+        {/* COLUMNA IZQUIERDA (7 cols): PASOS DE INSTRUCCIONES */}
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            <div>
-              <h2 className="text-base sm:text-lg font-black text-slate-900">
-                Instrucciones para Sustentación de Tesis
-              </h2>
-              <p className="text-xs text-slate-500">
-                Pasos que debe seguir el tesista en la Escuela de Ingeniería Industrial UNT
-              </p>
-            </div>
+            <h2 className="text-base sm:text-lg font-black text-slate-900">
+              {puedeEditar
+                ? 'Editar Instrucciones (Se publican en la Interfaz Principal)'
+                : 'Pasos para Sustentación de Tesis'}
+            </h2>
 
-            {esSecretaria && (
+            {puedeEditar && (
               <button
                 type="button"
                 onClick={() => abrirEditorPaso()}
@@ -311,7 +456,7 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {esSecretaria && (
+                    {puedeEditar && (
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
@@ -344,7 +489,7 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Link opcional y/o Documento opcional (Solo se muestran si la Secretaria los subió en este paso) */}
+                  {/* Link opcional y/o Documento opcional */}
                   {(item.linkUrl || item.documentoNombre) && (
                     <div className="pl-13 flex flex-wrap items-center gap-2 pt-1">
                       {item.linkUrl && (
@@ -382,7 +527,7 @@ export const InstruccionesSustentacionPage: React.FC = () => {
           </div>
         </div>
 
-        {/* COLUMNA DERECHA (5 cols): SUSTENTACIONES PROGRAMADAS (100% EDITABLE POR SECRETARÍA) */}
+        {/* COLUMNA DERECHA (5 cols): SUSTENTACIONES PROGRAMADAS */}
         <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs space-y-4 h-fit">
           <div className="flex items-start justify-between gap-2 pb-3 border-b border-slate-100">
             <div>
@@ -391,17 +536,17 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                 <span>{configSust.titulo}</span>
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                {configSust.subtitulo} · <strong>{configSust.horario}</strong>
+                <strong>{configSust.horario}</strong>
               </p>
             </div>
 
-            {esSecretaria && (
+            {puedeEditar && (
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setEditandoCabeceraSust(!editandoCabeceraSust)}
                   className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 cursor-pointer"
-                  title="Editar título y horario"
+                  title="Editar título"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                 </button>
@@ -417,7 +562,7 @@ export const InstruccionesSustentacionPage: React.FC = () => {
             )}
           </div>
 
-          {esSecretaria && editandoCabeceraSust && (
+          {puedeEditar && editandoCabeceraSust && (
             <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
               <input
                 type="text"
@@ -427,7 +572,6 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                   setConfigSust(next);
                   logisticaSecretariaService.saveTituloSustentaciones(next);
                 }}
-                placeholder="Título del bloque"
                 className="w-full p-2 rounded-lg border border-slate-300 bg-white font-bold"
               />
               <input
@@ -438,7 +582,6 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                   setConfigSust(next);
                   logisticaSecretariaService.saveTituloSustentaciones(next);
                 }}
-                placeholder="Horario (ej. Jueves de 11:00 a.m. a 1:00 p.m.)"
                 className="w-full p-2 rounded-lg border border-slate-300 bg-white"
               />
             </div>
@@ -456,13 +599,12 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                       {s.fecha} · {s.horario}
                     </span>
 
-                    {esSecretaria ? (
+                    {puedeEditar && (
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
                           onClick={() => abrirEditorSustentacion(s)}
                           className="p-1 rounded bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
-                          title="Editar sustentación"
                         >
                           <Edit3 className="w-3 h-3" />
                         </button>
@@ -470,15 +612,10 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                           type="button"
                           onClick={() => handleEliminarSustentacion(s.id, s.tesistaNombre)}
                           className="p-1 rounded bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 cursor-pointer"
-                          title="Eliminar sustentación"
                         >
                           <Trash2 className="w-3 h-3" />
                         </button>
                       </div>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                        {s.estado}
-                      </span>
                     )}
                   </div>
 
@@ -507,8 +644,8 @@ export const InstruccionesSustentacionPage: React.FC = () => {
         </div>
       </div>
 
-      {/* MODAL PARA EDITAR / CREAR INSTRUCCIÓN (CON ÍCONOS, IMAGEN, LINK Y SUBIR DOCUMENTO OPCIONAL) */}
-      {modalPasoAbierto && (
+      {/* MODAL PARA EDITAR / CREAR INSTRUCCIÓN (EXCLUSIVO SECRETARÍA) */}
+      {puedeEditar && modalPasoAbierto && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
           onClick={() => setModalPasoAbierto(false)}
@@ -519,7 +656,7 @@ export const InstruccionesSustentacionPage: React.FC = () => {
           >
             <div className="p-4 bg-[#082F64] text-white flex items-center justify-between">
               <h3 className="text-sm font-bold">
-                {editandoPaso ? 'Editar Instrucción' : 'Nueva Instrucción para Tesistas'}
+                {editandoPaso ? 'Editar Instrucción' : 'Nueva Instrucción'}
               </h3>
               <button
                 type="button"
@@ -533,13 +670,12 @@ export const InstruccionesSustentacionPage: React.FC = () => {
             <form onSubmit={handleGuardarPaso} className="p-5 overflow-y-auto space-y-3.5 text-xs">
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">N° de Paso:</label>
+                  <label className="block font-bold text-slate-700 mb-1">Paso:</label>
                   <input
                     type="text"
                     required
                     value={pPaso}
                     onChange={(e) => setPPaso(e.target.value)}
-                    placeholder="Paso 1"
                     className="w-full p-2.5 rounded-xl border border-slate-300"
                   />
                 </div>
@@ -550,15 +686,13 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                     required
                     value={pTitulo}
                     onChange={(e) => setPTitulo(e.target.value)}
-                    placeholder="Título de la instrucción"
                     className="w-full p-2.5 rounded-xl border border-slate-300 font-bold"
                   />
                 </div>
               </div>
 
-              {/* Selector Visual de Ícono */}
               <div>
-                <label className="block font-bold text-slate-700 mb-1.5">Elegir Ícono:</label>
+                <label className="block font-bold text-slate-700 mb-1.5">Ícono:</label>
                 <div className="grid grid-cols-4 gap-1.5">
                   {ICONOS_DISPONIBLES.map(({ id, label, Icon }) => (
                     <button
@@ -579,28 +713,26 @@ export const InstruccionesSustentacionPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Explicación / Texto:</label>
+                <label className="block font-bold text-slate-700 mb-1">Texto:</label>
                 <textarea
                   rows={3}
                   required
                   value={pDescripcion}
                   onChange={(e) => setPDescripcion(e.target.value)}
-                  placeholder="Escriba los detalles de este paso..."
                   className="w-full p-2.5 rounded-xl border border-slate-300"
                 />
               </div>
 
-              {/* Link opcional */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">
-                    Texto del Link (Opcional):
+                    Nombre del Link (Opcional):
                   </label>
                   <input
                     type="text"
                     value={pLinkTexto}
                     onChange={(e) => setPLinkTexto(e.target.value)}
-                    placeholder="Ej: Ir a plataforma"
+                    placeholder="Ej: Abrir enlace"
                     className="w-full p-2 rounded-lg border border-slate-300 bg-white"
                   />
                 </div>
@@ -618,7 +750,6 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Subir Imagen Opcional y Subir Documento Opcional para esta instrucción */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div className="p-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 space-y-2">
                   <span className="font-bold text-slate-700 block">Imagen (Opcional):</span>
@@ -634,7 +765,7 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                   </label>
                   {pImagenUrl && (
                     <div className="flex items-center justify-between text-[11px] text-emerald-700 font-bold">
-                      <span>✓ Imagen cargada</span>
+                      <span>✓ Imagen lista</span>
                       <button
                         type="button"
                         onClick={() => setPImagenUrl('')}
@@ -647,9 +778,7 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                 </div>
 
                 <div className="p-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 space-y-2">
-                  <span className="font-bold text-slate-700 block">
-                    Documento / Formato (Opcional):
-                  </span>
+                  <span className="font-bold text-slate-700 block">Documento (Opcional):</span>
                   <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 text-unt-blue font-bold cursor-pointer">
                     <Upload className="w-3.5 h-3.5" />
                     <span>Subir documento</span>
@@ -684,9 +813,9 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#082F64] text-white font-bold cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer"
                 >
-                  Guardar
+                  Publicar en Interfaz Principal
                 </button>
               </div>
             </form>
@@ -694,8 +823,8 @@ export const InstruccionesSustentacionPage: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL PARA EDITAR / AGREGAR SUSTENTACIÓN PROGRAMADA */}
-      {modalSustAbierto && (
+      {/* MODAL PARA EDITAR / AGREGAR SUSTENTACIÓN PROGRAMADA (EXCLUSIVO SECRETARÍA) */}
+      {puedeEditar && modalSustAbierto && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
           onClick={() => setModalSustAbierto(false)}
@@ -706,7 +835,7 @@ export const InstruccionesSustentacionPage: React.FC = () => {
           >
             <div className="p-4 bg-[#082F64] text-white flex items-center justify-between">
               <h3 className="text-sm font-bold">
-                {editandoSust ? 'Editar Sustentación Programada' : 'Agregar Sustentación Programada'}
+                {editandoSust ? 'Editar Sustentación' : 'Agregar Sustentación'}
               </h3>
               <button
                 type="button"
@@ -748,13 +877,12 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                   required
                   value={sTesista}
                   onChange={(e) => setSTesista(e.target.value)}
-                  placeholder="Nombre completo del tesista"
                   className="w-full p-2 rounded-xl border border-slate-300"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Título de la Tesis:</label>
+                <label className="block font-bold text-slate-700 mb-1">Título de Tesis:</label>
                 <textarea
                   rows={2}
                   required
@@ -798,9 +926,9 @@ export const InstruccionesSustentacionPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#082F64] text-white font-bold cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-emerald-600 text-white font-bold cursor-pointer"
                 >
-                  Guardar
+                  Publicar
                 </button>
               </div>
             </form>
