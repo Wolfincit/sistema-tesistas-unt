@@ -153,45 +153,59 @@ export interface InstruccionPasoItem {
 export const INITIAL_INSTRUCCIONES_PASOS: InstruccionPasoItem[] = [
   {
     id: 'inst-1',
-    paso: 'Paso 1',
+    paso: 'Paso 1 · Proyecto de Tesis',
     icono: 'clipboard',
-    titulo: 'Presentación de Solicitud y Expediente en Secretaría de Escuela',
+    titulo: 'Nombramiento de Asesor, Inscripción y Aprobación de Proyecto de Tesis',
     descripcion:
-      'Presentar en Secretaría de Escuela (Srta. Celia) el Formato Único de Trámite (FUT), recibo de pago correspondiente, informe Turnitin visado por el asesor y los ejemplares del borrador de tesis.',
-    documentoNombre: 'Plantilla_FUT_Sustentacion_UNT.txt',
-    documentoPeso: '12 KB'
+      '1. Pagar en Interbank (Código 005-166-01 Administración Central, por tesista): S/ 15.00 (nombramiento de asesor) y S/ 30.00 (inscripción de proyecto).\n2. Unir en un solo PDF: FUT marcando la Opción 34 ("Revisión e inscripción de Proyecto de Tesis y nombramiento de asesor"), vouchers de pago, Carta de Compromiso del Asesor y Proyecto de Tesis (según Anexo N° 1 del Reglamento).\n3. Enviar el PDF único a: mesadepartes_ingenieria@unitru.edu.pe (si hay observaciones de formato, subsanar directo a industrial@unitru.edu.pe).',
+    linkTexto: 'Descargar FUT y Carta de Compromiso (Drive Oficial)',
+    linkUrl: 'https://drive.google.com/drive/folders/18YKeZlbUeDuhdnFWn8TpgbtatF6-hve5',
+    documentoNombre: 'Guia_09_Proyecto_Tesis_y_Asesor_UNT.txt',
+    documentoPeso: '15 KB'
   },
   {
     id: 'inst-2',
-    paso: 'Paso 2',
+    paso: 'Paso 2 · Solicitud de Jurado',
     icono: 'users',
-    titulo: 'Designación y Revisión del Jurado Evaluador',
+    titulo: 'Nombramiento de Jurado Evaluador y Revisión del Borrador (10 días)',
     descripcion:
-      'El Jurado Evaluador (Presidente, Secretario y Vocal) revisa el borrador de tesis. Una vez levantadas las observaciones, los tres miembros firman la conformidad para sustentar.'
+      '1. Pagar en Interbank (Código 005-166-01): S/ 30.00 (derecho de trámite por tesista) y S/ 87.60 (informe de originalidad Turnitin).\n2. Enviar tres (03) archivos PDF a mesadepartes_ingenieria@unitru.edu.pe:\n• Archivo 1 (Requisitos): FUT marcando Opción 29 ("Nomb. de Jurado, revisión y sust. de tesis"), voucher S/ 30.00, Reporte Turnitin y Recibo digital sin depósito firmados por el asesor, Constancia y Hoja de calificación de prácticas (solicitar a Sra. Celia Chau), Resolución de Proyecto de Tesis y Hoja de asesoría (Anexo N° 2).\n• Archivo 2 (APELLIDOS_NOMBRES.pdf): Borrador final firmado por el asesor.\n• Archivo 3 (APELLIDOS_NOMBRES.pdf): Recibo de S/ 87.60.\n3. El jurado (Presidente, Secretario y Vocal) cuenta con 10 días calendario (Art. 14°) para revisar el borrador.',
+    linkTexto: 'Ver Guía N° 10 — Nombramiento de Jurado (PDF Oficial)',
+    linkUrl: 'https://drive.google.com/file/d/132TLDEdbBulcduzKuHxcyOEM63PZ7hDi/view',
+    documentoNombre: 'Guia_10_Nombramiento_Jurado_y_Sustentacion_UNT.txt',
+    documentoPeso: '18 KB'
   },
   {
     id: 'inst-3',
-    paso: 'Paso 3',
+    paso: 'Paso 3 · Dictamen y Agenda Jueves',
     icono: 'calendar',
-    titulo: 'Programación de Fecha de Sustentación (Jueves · 11:00 a.m. a 1:00 p.m.)',
+    titulo: 'Entrega Física de Dictamen Firmado y Programación (Jueves · 11:00 a.m. a 1:00 p.m.)',
     descripcion:
-      'Con el visto bueno del jurado, Secretaría agenda tu fecha de sustentación en el calendario oficial de los días jueves (11:00 a.m. a 1:00 p.m.).'
+      '1. Con el borrador aprobado, solicitar en Secretaría de Escuela (Sra. Celia Chau) el formato de "Dictamen de aprobación para sustentación de tesis".\n2. Entregar presencialmente en Dirección de Escuela (mínimo 48 horas antes, preferentemente los días martes) el Dictamen firmado físicamente por el jurado junto con las evidencias de aprobación (correos o capturas impresas) y los ejemplares para el jurado.\n3. Los martes, Secretaría elabora el Flyer oficial, lo publica en Facebook de la Escuela, prepara la carpeta de Actas (SGC) y envía la citación formal al Jurado, Tesista, Elmo (Auditorio), Sra. Estela (Departamento) y Sra. Rosita.',
+    linkTexto: 'Consultar Tasas Educativas Interbank',
+    linkUrl: 'https://drive.google.com/file/d/1P85-Z6HTJK9HtBrUxTZpPxj6UkeGNKBV/view'
   },
   {
     id: 'inst-4',
-    paso: 'Paso 4',
-    icono: 'mail',
-    titulo: 'Envío de Citación y Flyer Oficial',
+    paso: 'Paso 4 · Sustentación Pública',
+    icono: 'award',
+    titulo: 'Acto Público de Sustentación (Jueves · 11:00 a.m. o 12:00 p.m.)',
     descripcion:
-      'Secretaría envía por correo electrónico el anuncio oficial y el flyer de la sustentación al tesista y a los ingenieros miembros del jurado.'
+      '1. Las sustentaciones se realizan los días jueves de 11:00 a.m. a 1:00 p.m. en el Auditorio de Ingeniería Industrial (sin costo de derecho de uso) o en el Aula II-4 en caso de turnos simultáneos.\n2. Presentarse 1 hora antes con vestimenta formal y diapositivas listas. Tras aprobar la defensa y firmarse el Acta de Sustentación, quedas habilitado para el Procedimiento de Colación Ordinaria.',
+    linkTexto: 'Ver Guía de Cambio de Título / Procedimientos (PDF)',
+    linkUrl: 'https://drive.google.com/file/d/1RhrFx6Nm4c3MB7E-fOtRO71-cxLn4FIZ/view'
   },
   {
     id: 'inst-5',
-    paso: 'Paso 5',
-    icono: 'award',
-    titulo: 'Sustentación Pública y Firma de Acta',
+    paso: 'Paso 5 · Ética, Repositorio y URA',
+    icono: 'check',
+    titulo: 'Colación Ordinaria: Comité de Ética, Repositorio (Ing. Valerio) y Sistema URA',
     descripcion:
-      'Defensa de la tesis el día jueves programado de 11:00 a.m. a 1:00 p.m., deliberación del jurado y suscripción del Acta de Sustentación.'
+      '1. Comité de Ética (2do Turnitin): El asesor pasa el Turnitin final con recibo de depósito. Subir al Sistema Web del Comité de Ética de la Facultad (link enviado por WhatsApp de Colación) la tesis, reporte Turnitin, recibo de S/ 87.60 y firma del asesor en JPG para obtener la Constancia de Originalidad.\n2. Repositorio Institucional: Unir al final del PDF de la tesis la Carta de Autorización, Declaración Jurada, Formato de Aprobación y Constancia de Originalidad, y enviarlo al Ing. Valerio Ynfantes (vynfantes@unitru.edu.pe) para generar el código URL y la Constancia de Repositorio.\n3. Sistema URA (tramites-uraa.unitru.edu.pe): Enviar la Constancia de Repositorio a cchau@unitru.edu.pe, pagar S/ 275.90 en Interbank (Código 005-166-17 Registro Técnico) y subir foto formal (sin lentes), DNI (ambos lados), Diploma de Bachiller (ambos lados) y Constancia de Originalidad.\n4. Empastados Finales: Entregar 1 empastado + CD en Biblioteca de Facultad (3er piso, Ing. Valerio) para la Constancia de No Tener Deuda, 1 empastado en Dirección de Escuela, y enviar el PDF final nombrado T004_DNI_T.pdf a cchau@unitru.edu.pe.',
+    linkTexto: 'Ingresar al Sistema URA (tramites-uraa.unitru.edu.pe)',
+    linkUrl: 'https://tramites-uraa.unitru.edu.pe/sign-in',
+    documentoNombre: 'Guia_06_Procedimiento_Colacion_Ordinaria_UNT.txt',
+    documentoPeso: '20 KB'
   }
 ];
 
