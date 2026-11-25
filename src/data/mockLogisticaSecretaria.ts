@@ -4,6 +4,7 @@
  */
 
 export type EstacionLogisticaId = 1 | 2 | 3 | 4 | 5 | 6;
+export type SemaforoEstadoId = 'operativo' | 'atencion' | 'incidencia';
 
 export interface EstacionLogisticaMeta {
   id: EstacionLogisticaId;
@@ -92,6 +93,7 @@ export interface SeguimientoTesisItem {
   juradoSecretario: string;
   juradoVocal: string;
   estacionActual: EstacionLogisticaId;
+  semaforo?: SemaforoEstadoId; // 'operativo' (Verde) | 'atencion' (Amarillo) | 'incidencia' (Rojo)
   fechaIngresoEstacion: string; // YYYY-MM-DD
   fechaInicioTramite: string;   // YYYY-MM-DD
   ubicacionFisica: string;
@@ -286,6 +288,30 @@ export const INITIAL_DIRECTORIO_JURADO: IngenieroJuradoItem[] = [
     especialidad: 'Automatización y Procesos Industriales',
     categoria: 'Docente Auxiliar',
     activo: true
+  },
+  {
+    id: 'adm-01',
+    nombre: 'Sr. Elmo (Encargado de Auditorio)',
+    correo: 'auditorio.industrial@unitru.edu.pe',
+    especialidad: 'Apertura de Auditorio Jueves 11:00 a.m.',
+    categoria: 'Copia Martes',
+    activo: true
+  },
+  {
+    id: 'adm-02',
+    nombre: 'Sra. Estela (Departamento Académico)',
+    correo: 'departamento.industrial@unitru.edu.pe',
+    especialidad: 'Difusión a Grupo de Docentes',
+    categoria: 'Copia Martes',
+    activo: true
+  },
+  {
+    id: 'adm-03',
+    nombre: 'Sra. Rosita (Coordinación Administrativa)',
+    correo: 'coordinacion.industrial@unitru.edu.pe',
+    especialidad: 'Conocimiento Administrativo',
+    categoria: 'Copia Martes',
+    activo: true
   }
 ];
 
@@ -296,18 +322,19 @@ export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
     tesistaNombre: 'Carlos Eduardo Mendoza Villanueva',
     tesistaCorreo: 'tesista.industrial@unitru.edu.pe',
     tesistaTelefono: '948123456',
-    tituloTesis: 'Propuesta de mejora en la gestión logística de almacenes mediante Lean Warehousing para reducir costos operativos en una empresa agroindustrial de La Libertad, 2026',
+    tituloTesis: 'Propuesta de mejora en la gestión de almacenes mediante Lean Warehousing para reducir costos operativos en una empresa agroindustrial de La Libertad, 2026',
     lineaInvestigacion: 'Logística y Cadena de Suministro',
     asesor: 'Dr. Ing. Joe Alexis González Vásquez',
     juradoPresidente: 'Dr. Ing. Ángel Hernández Molina',
     juradoSecretario: 'Mg. Ing. Carlos José Sandoval Reyes',
     juradoVocal: 'Dr. Ing. Joe Alexis González Vásquez',
     estacionActual: 4,
+    semaforo: 'operativo',
     fechaIngresoEstacion: '2026-11-18',
     fechaInicioTramite: '2026-10-15',
-    ubicacionFisica: 'Archivo de Escuela (Srta. Celia) — Listo para Sustentación',
+    ubicacionFisica: 'Auditorio Ing. Industrial',
     esCuelloBotellaExterno: false,
-    notasSecretaria: 'Expediente físico completo. Programado para sustentar el jueves de 11:00 a.m. a 1:00 p.m.',
+    notasSecretaria: 'Dictamen firmado y 4 empastados entregados. Programado Jueves 11:00 a.m. en Auditorio.',
     fechaSustentacionProgramada: '2026-11-26',
     requisitosFisicos: {
       futFisico: true,
@@ -331,12 +358,13 @@ export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
     juradoSecretario: 'Mg. Ing. Víctor Manuel Sirlopú Vera',
     juradoVocal: 'Dr. Ing. Ángel Hernández Molina',
     estacionActual: 3,
+    semaforo: 'atencion',
     fechaIngresoEstacion: '2026-10-20',
     fechaInicioTramite: '2026-10-08',
-    ubicacionFisica: 'En poder del Jurado Evaluador',
+    ubicacionFisica: 'En revisión del Jurado (Plazo 10 días)',
     esCuelloBotellaExterno: true,
     motivoRetrasoExterno: 'En revisión del Jurado Evaluador.',
-    notasSecretaria: 'La Escuela entregó los 3 ejemplares físicos el 20/10. Presidente y Vocal ya dieron visto bueno; falta dictamen de un miembro del jurado para agendar jueves.',
+    notasSecretaria: 'Presidente y Vocal aprobaron; falta firma de Secretario en el Dictamen físico.',
     requisitosFisicos: {
       futFisico: true,
       voucherTupa: true,
@@ -359,12 +387,13 @@ export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
     juradoSecretario: 'Mg. Ing. Marcos Gregorio Baca López',
     juradoVocal: 'Mg. Ing. Víctor Manuel Sirlopú Vera',
     estacionActual: 2,
+    semaforo: 'incidencia',
     fechaIngresoEstacion: '2026-11-08',
     fechaInicioTramite: '2026-11-07',
-    ubicacionFisica: 'Derivado a Decanato de Facultad de Ingeniería',
+    ubicacionFisica: 'Observado por Cambio de Título',
     esCuelloBotellaExterno: true,
-    motivoRetrasoExterno: 'En Decanato esperando Resolución de Jurado.',
-    notasSecretaria: 'Se derivó oficio a Decanato el 08/11 para emisión de resolución de jurado.',
+    motivoRetrasoExterno: 'Trámite de Cambio de Título en Decanato.',
+    notasSecretaria: 'Jurado observó el título. Debe ingresar FUT + S/ 5.00 + carta del jurado para nueva resolución antes de sustentar.',
     requisitosFisicos: {
       futFisico: true,
       voucherTupa: true,
@@ -387,11 +416,12 @@ export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
     juradoSecretario: 'Dr. Ing. Joe Alexis González Vásquez',
     juradoVocal: 'Mg. Ing. Carlos José Sandoval Reyes',
     estacionActual: 1,
+    semaforo: 'atencion',
     fechaIngresoEstacion: '2026-11-21',
     fechaInicioTramite: '2026-11-21',
-    ubicacionFisica: 'Mesa de Secretaría de Escuela (Srta. Celia)',
+    ubicacionFisica: 'Secretaría de Escuela',
     esCuelloBotellaExterno: false,
-    notasSecretaria: 'Presentó folder físico en Secretaría de Escuela.',
+    notasSecretaria: 'Ingresó 3 archivos PDF por Mesa de Partes (Opción 29 FUT). En emisión de proveído de jurado.',
     requisitosFisicos: {
       futFisico: true,
       voucherTupa: true,

@@ -338,6 +338,25 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
               {resultadosCourier.length > 0 ? (
                 resultadosCourier.map((item) => {
                   const pasoActual = item.estacionActual > 4 ? 4 : item.estacionActual;
+                  const sem = item.semaforo || (pasoActual >= 4 ? 'operativo' : 'atencion');
+                  const semBadge =
+                    sem === 'operativo'
+                      ? {
+                          texto: 'Listo para Sustentar',
+                          clase: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+                          notaClase: 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                        }
+                      : sem === 'incidencia'
+                      ? {
+                          texto: 'Observado — Revisar Nota',
+                          clase: 'bg-rose-100 text-rose-900 border-rose-300',
+                          notaClase: 'bg-rose-50 border-rose-200 text-rose-950'
+                        }
+                      : {
+                          texto: 'En Proceso',
+                          clase: 'bg-amber-100 text-amber-950 border-amber-300',
+                          notaClase: 'bg-amber-50 border-amber-200 text-amber-950'
+                        };
                   return (
                     <div
                       key={item.id}
@@ -345,12 +364,17 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <span className="text-sm font-black text-slate-900">
                               {item.tesistaNombre}
                             </span>
                             <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-xs font-bold">
                               Matrícula: {item.codigoMatricula}
+                            </span>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full border text-[11px] font-extrabold ${semBadge.clase}`}
+                            >
+                              {semBadge.texto}
                             </span>
                           </div>
                           <div className="text-xs text-slate-500 italic mt-0.5">
@@ -402,7 +426,7 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                       </div>
 
                       {item.notasSecretaria && (
-                        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950">
+                        <div className={`p-3 rounded-xl border text-xs ${semBadge.notaClase}`}>
                           <strong>Nota de Secretaría:</strong> {item.notasSecretaria}
                         </div>
                       )}

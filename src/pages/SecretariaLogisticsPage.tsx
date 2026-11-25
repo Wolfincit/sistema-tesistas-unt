@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   EstacionLogisticaId,
+  SemaforoEstadoId,
   SeguimientoTesisItem,
   IngenieroJuradoItem,
   SustentacionJuevesItem,
@@ -30,15 +31,49 @@ import {
   Settings,
   X,
   AlertTriangle,
-  Sparkles
+  LayoutGrid,
+  Table2
 } from 'lucide-react';
 
-const ETAPAS_SIMPLES: { id: EstacionLogisticaId; nombre: string; color: string }[] = [
-  { id: 1, nombre: '1. Trámite Recibido', color: 'bg-slate-700 text-white' },
-  { id: 2, nombre: '2. En Decanato / Jurado', color: 'bg-amber-500 text-slate-950' },
-  { id: 3, nombre: '3. En Revisión de Tesis', color: 'bg-blue-600 text-white' },
-  { id: 4, nombre: '4. Listo para Sustentar', color: 'bg-emerald-600 text-white' }
+const sanitizeText = (val: string): string =>
+  val.replace(/<[^>]*>?/gm, '').replace(/[<>]/g, '');
+
+const ETAPAS_SIMPLES: { id: EstacionLogisticaId; nombre: string; corto: string; color: string }[] = [
+  { id: 1, nombre: '1. Recibido', corto: '1. Recibido', color: 'bg-slate-800 text-white' },
+  { id: 2, nombre: '2. En Decanato', corto: '2. Decanato', color: 'bg-amber-500 text-slate-950' },
+  { id: 3, nombre: '3. En Jurado (10d)', corto: '3. Jurado', color: 'bg-blue-600 text-white' },
+  { id: 4, nombre: '4. Listo Jueves', corto: '4. Jueves', color: 'bg-emerald-600 text-white' }
 ];
+
+const SEMAFORO_META: Record<
+  SemaforoEstadoId,
+  { label: string; dot: string; badge: string; rowBorder: string }
+> = {
+  operativo: {
+    label: 'Listo',
+    dot: 'bg-emerald-500',
+    badge: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+    rowBorder: 'border-l-4 border-l-emerald-500'
+  },
+  atencion: {
+    label: 'En Revisión',
+    dot: 'bg-amber-500',
+    badge: 'bg-amber-100 text-amber-950 border-amber-300',
+    rowBorder: 'border-l-4 border-l-amber-500'
+  },
+  incidencia: {
+    label: 'Observado',
+    dot: 'bg-rose-600',
+    badge: 'bg-rose-100 text-rose-900 border-rose-300',
+    rowBorder: 'border-l-4 border-l-rose-600'
+  }
+};
+
+export const resolverSemaforo = (item: SeguimientoTesisItem): SemaforoEstadoId => {
+  if (item.semaforo) return item.semaforo;
+  if (item.estacionActual >= 4) return 'operativo';
+  return 'atencion';
+};
 
 export const SecretariaLogisticsPage: React.FC = () => {
   const { usuario, agregarToast } = useApp();
@@ -121,9 +156,12 @@ export const SecretariaLogisticsPage: React.FC = () => {
   };
 
   // =========================================================
-  // 1. SEGUIMIENTO LIMPIO Y VISUAL (BLOC DE APUNTES DE LA SRTA. CELIA)
+  // 1. MATRIZ DE TRABAJO INTERACTIVA (ZERO-LEARNING CURVE)
   // =========================================================
   const [busquedaSeg, setBusquedaSeg] = useState<string>('');
+  const [filtroSemaforo, setFiltroSemaforo] = useState<'todos' | SemaforoEstadoId>('todos');
+  const [modoVistaSeg, setModoVistaSeg] = useState<'matriz' | 'tarjetas'>('matriz');
+  const [guardadoRecienteId, setGuardadoRecienteId] = useState<string>('');
   const [modalSeguimientoAbierto, setModalSeguimientoAbierto] = useState<boolean>(false);
   const [editandoSeg, setEditandoSeg] = useState<SeguimientoTesisItem | null>(null);
 
@@ -136,7 +174,15 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [formSecretario, setFormSecretario] = useState<string>('');
   const [formVocal, setFormVocal] = useState<string>('');
   const [formEstacion, setFormEstacion] = useState<EstacionLogisticaId>(1);
+  const [formSemaforo, setFormSemaforo] = useState<SemaforoEstadoId>('atencion');
   const [formNotas, setFormNotas] = useState<string>('');
+
+  const marcarFeedbackGuardado = (id: string) => {
+    setGuardadoRecienteId(id);
+    setTimeout(() => {
+      setGuardadoRecienteId((prev) => (prev === id ? '' : prev));
+    }, 1500);
+  };
 
   const abrirModalSeguimiento = (item?: SeguimientoTesisItem) => {
     if (item) {
@@ -150,6 +196,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setFormSecretario(item.juradoSecretario);
       setFormVocal(item.juradoVocal);
       setFormEstacion((item.estacionActual > 4 ? 4 : item.estacionActual) as EstacionLogisticaId);
+      setFormSemaforo(resolverSemaforo(item));
       setFormNotas(item.notasSecretaria);
     } else {
       setEditandoSeg(null);
@@ -162,6 +209,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setFormSecretario(directorioJurado[1]?.nombre || '');
       setFormVocal(directorioJurado[2]?.nombre || '');
       setFormEstacion(1);
+      setFormSemaforo('atencion');
       setFormNotas('');
     }
     setModalSeguimientoAbierto(true);
@@ -183,20 +231,21 @@ export const SecretariaLogisticsPage: React.FC = () => {
     const nuevo: SeguimientoTesisItem = {
       id: editandoSeg ? editandoSeg.id : `seg-${Date.now()}`,
       codigoMatricula: matriculaDigits,
-      tesistaNombre: formNombre.trim(),
-      tesistaCorreo: formCorreo.trim().toLowerCase(),
-      tituloTesis: formTitulo.trim() || 'Tesis en seguimiento',
+      tesistaNombre: sanitizeText(formNombre.trim()),
+      tesistaCorreo: sanitizeText(formCorreo.trim().toLowerCase()),
+      tituloTesis: sanitizeText(formTitulo.trim() || 'Tesis en seguimiento'),
       lineaInvestigacion: editandoSeg?.lineaInvestigacion || 'Ingeniería Industrial',
-      asesor: formAsesor.trim(),
-      juradoPresidente: formPresidente.trim(),
-      juradoSecretario: formSecretario.trim(),
-      juradoVocal: formVocal.trim(),
+      asesor: sanitizeText(formAsesor.trim()),
+      juradoPresidente: sanitizeText(formPresidente.trim()),
+      juradoSecretario: sanitizeText(formSecretario.trim()),
+      juradoVocal: sanitizeText(formVocal.trim()),
       estacionActual: formEstacion,
+      semaforo: formSemaforo,
       fechaIngresoEstacion: new Date().toISOString().slice(0, 10),
       fechaInicioTramite: editandoSeg?.fechaInicioTramite || new Date().toISOString().slice(0, 10),
       ubicacionFisica: 'En seguimiento',
-      esCuelloBotellaExterno: false,
-      notasSecretaria: formNotas.trim(),
+      esCuelloBotellaExterno: formSemaforo === 'incidencia',
+      notasSecretaria: sanitizeText(formNotas.trim()),
       fechaSustentacionProgramada: editandoSeg?.fechaSustentacionProgramada,
       requisitosFisicos: editandoSeg?.requisitosFisicos || {
         futFisico: true,
@@ -215,26 +264,44 @@ export const SecretariaLogisticsPage: React.FC = () => {
     setSeguimientos(actualizados);
     await logisticaSecretariaService.saveSeguimientos(actualizados);
     setModalSeguimientoAbierto(false);
+    marcarFeedbackGuardado(nuevo.id);
     agregarToast(
       'success',
       editandoSeg ? 'Guardado' : 'Tesista Agregado',
-      `${nuevo.tesistaNombre} quedó actualizado en Seguimiento y en la lista de Correos.`
+      `${nuevo.tesistaNombre} quedó actualizado en la Matriz y en Correos.`
     );
   };
 
   const handleCambiarEtapaDirecto = async (id: string, nuevaEtapa: EstacionLogisticaId) => {
+    const actualizados = seguimientos.map((s) => {
+      if (s.id !== id) return s;
+      const nuevoSemaforo: SemaforoEstadoId =
+        nuevaEtapa === 4 ? 'operativo' : s.semaforo === 'incidencia' ? 'incidencia' : 'atencion';
+      return { ...s, estacionActual: nuevaEtapa, semaforo: nuevoSemaforo };
+    });
+    setSeguimientos(actualizados);
+    marcarFeedbackGuardado(id);
+    await logisticaSecretariaService.saveSeguimientos(actualizados);
+  };
+
+  const handleCambiarSemaforoDirecto = async (id: string, nuevoSemaforo: SemaforoEstadoId) => {
     const actualizados = seguimientos.map((s) =>
-      s.id === id ? { ...s, estacionActual: nuevaEtapa } : s
+      s.id === id
+        ? { ...s, semaforo: nuevoSemaforo, esCuelloBotellaExterno: nuevoSemaforo === 'incidencia' }
+        : s
     );
     setSeguimientos(actualizados);
+    marcarFeedbackGuardado(id);
     await logisticaSecretariaService.saveSeguimientos(actualizados);
   };
 
   const handleActualizarNotaDirecto = async (id: string, nuevaNota: string) => {
+    const limpia = sanitizeText(nuevaNota);
     const actualizados = seguimientos.map((s) =>
-      s.id === id ? { ...s, notasSecretaria: nuevaNota } : s
+      s.id === id ? { ...s, notasSecretaria: limpia } : s
     );
     setSeguimientos(actualizados);
+    marcarFeedbackGuardado(id);
     await logisticaSecretariaService.saveSeguimientos(actualizados);
   };
 
@@ -286,12 +353,14 @@ export const SecretariaLogisticsPage: React.FC = () => {
       .map((n) => n.toLowerCase())
       .filter(Boolean);
     const correosJuradoMatch = directorioJurado
-      .filter((ing) =>
-        nombresJurado.some(
-          (nj) =>
-            ing.nombre.toLowerCase().includes(nj) ||
-            nj.includes(ing.nombre.toLowerCase().replace(/^dr\.\s*|^mg\.\s*|^ing\.\s*/g, '').trim())
-        )
+      .filter(
+        (ing) =>
+          ing.categoria === 'Copia Martes' ||
+          nombresJurado.some(
+            (nj) =>
+              ing.nombre.toLowerCase().includes(nj) ||
+              nj.includes(ing.nombre.toLowerCase().replace(/^dr\.\s*|^mg\.\s*|^ing\.\s*/g, '').trim())
+          )
       )
       .map((ing) => ing.correo.toLowerCase());
     setJuradoChecks(correosJuradoMatch);
@@ -480,16 +549,29 @@ export const SecretariaLogisticsPage: React.FC = () => {
     agregarToast('info', 'Fecha Liberada', `Se quitó la sustentación del ${fechaIso}.`);
   };
 
+  const conteosSemaforo = useMemo(() => {
+    const c = { todos: seguimientos.length, operativo: 0, atencion: 0, incidencia: 0 };
+    seguimientos.forEach((s) => {
+      const sem = resolverSemaforo(s);
+      c[sem] += 1;
+    });
+    return c;
+  }, [seguimientos]);
+
   const seguimientosFiltrados = useMemo(() => {
-    if (!busquedaSeg.trim()) return seguimientos;
-    const q = busquedaSeg.toLowerCase();
-    return seguimientos.filter(
-      (s) =>
+    return seguimientos.filter((s) => {
+      const sem = resolverSemaforo(s);
+      if (filtroSemaforo !== 'todos' && sem !== filtroSemaforo) return false;
+      if (!busquedaSeg.trim()) return true;
+      const q = busquedaSeg.toLowerCase();
+      return (
         s.tesistaNombre.toLowerCase().includes(q) ||
         s.codigoMatricula.toLowerCase().includes(q) ||
-        s.tituloTesis.toLowerCase().includes(q)
-    );
-  }, [seguimientos, busquedaSeg]);
+        s.tituloTesis.toLowerCase().includes(q) ||
+        s.asesor.toLowerCase().includes(q)
+      );
+    });
+  }, [seguimientos, busquedaSeg, filtroSemaforo]);
 
   const nombresMeses = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -575,167 +657,468 @@ export const SecretariaLogisticsPage: React.FC = () => {
       {tab === 'instrucciones' && <InstruccionesSustentacionPage modoEdicionSecretaria={true} />}
 
       {/* =====================================================================
-          1. SEGUIMIENTO DE TESIS (LIMPIO, VISUAL Y CON APUNTES DIRECTOS)
+          1. MATRIZ DE TRABAJO INTERACTIVA (ZERO-LEARNING CURVE · SEMÁFORO + 1 CLIC)
          ===================================================================== */}
       {tab === 'seguimiento' && (
         <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={busquedaSeg}
-                onChange={(e) => setBusquedaSeg(e.target.value)}
-                placeholder="Buscar tesista por nombre, código o título..."
-                className="w-full pl-10 pr-4 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white"
-              />
+          {/* Barra de Control Rápido: Buscador + Semáforos de Estado + Selector Matriz/Tarjetas + Nuevo */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2 flex-1">
+              <div className="relative min-w-[240px] flex-1 max-w-sm">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={busquedaSeg}
+                  onChange={(e) => setBusquedaSeg(e.target.value)}
+                  placeholder="Buscar matrícula (10 dígitos), tesista o título..."
+                  className="w-full pl-10 pr-8 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-[#082F64] focus:outline-hidden font-medium"
+                />
+                {busquedaSeg && (
+                  <button
+                    type="button"
+                    onClick={() => setBusquedaSeg('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Semáforos de Filtrado en 1 Clic (Verde / Amarillo / Rojo) */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setFiltroSemaforo('todos')}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    filtroSemaforo === 'todos'
+                      ? 'bg-[#082F64] text-white border-[#082F64]'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Todos ({conteosSemaforo.todos})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroSemaforo('operativo')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    filtroSemaforo === 'operativo'
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                      : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
+                  <span>Listo ({conteosSemaforo.operativo})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroSemaforo('atencion')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    filtroSemaforo === 'atencion'
+                      ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-2xs'
+                      : 'bg-amber-50 text-amber-950 border-amber-200 hover:bg-amber-100'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white" />
+                  <span>En Revisión ({conteosSemaforo.atencion})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroSemaforo('incidencia')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    filtroSemaforo === 'incidencia'
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
+                      : 'bg-rose-50 text-rose-900 border-rose-200 hover:bg-rose-100'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
+                  <span>Observado ({conteosSemaforo.incidencia})</span>
+                </button>
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => abrirModalSeguimiento()}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#082F64] hover:bg-[#0C4D96] text-white text-xs font-bold shadow-xs cursor-pointer w-fit"
-            >
-              <Plus className="w-4 h-4 text-amber-300" />
-              <span>+ Agregar Tesista</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Selector de Vista: Matriz (Tabla Interactiva) vs Tarjetas */}
+              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setModoVistaSeg('matriz')}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                    modoVistaSeg === 'matriz'
+                      ? 'bg-[#082F64] text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Table2 className="w-3.5 h-3.5" />
+                  <span>Matriz</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModoVistaSeg('tarjetas')}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                    modoVistaSeg === 'tarjetas'
+                      ? 'bg-[#082F64] text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>Tarjetas</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => abrirModalSeguimiento()}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#082F64] hover:bg-[#0C4D96] text-white text-xs font-bold shadow-xs cursor-pointer shrink-0"
+              >
+                <Plus className="w-4 h-4 text-amber-300" />
+                <span>Nuevo Tesista</span>
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {seguimientosFiltrados.map((item) => {
-              const etapaActual = item.estacionActual > 4 ? 4 : item.estacionActual;
-              return (
-                <div
-                  key={item.id}
-                  className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
-                >
-                  {/* Datos Principales del Tesista */}
-                  <div className="space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="text-sm font-black text-slate-900">{item.tesistaNombre}</h3>
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                          <span className="font-mono font-bold text-slate-700">
-                            {item.codigoMatricula}
-                          </span>
-                          <span>•</span>
-                          <span className="font-mono text-unt-blue">{item.tesistaCorreo}</span>
+          {/* VISTA 1: MATRIZ DE TRABAJO INTERACTIVA (EDICIÓN EN LÍNEA EN 1 CLIC) */}
+          {modoVistaSeg === 'matriz' ? (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#082F64] text-white text-[11px] uppercase tracking-wider">
+                      <th className="py-3 px-3.5 font-extrabold">Estado</th>
+                      <th className="py-3 px-3.5 font-extrabold">Tesista / Matrícula</th>
+                      <th className="py-3 px-3.5 font-extrabold min-w-[220px]">Tesis y Jurado</th>
+                      <th className="py-3 px-3.5 font-extrabold min-w-[270px]">Etapa (1 Clic)</th>
+                      <th className="py-3 px-3.5 font-extrabold min-w-[240px]">Apuntes / Observación</th>
+                      <th className="py-3 px-3.5 font-extrabold text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 text-xs">
+                    {seguimientosFiltrados.map((item) => {
+                      const etapaActual = (item.estacionActual > 4 ? 4 : item.estacionActual) as EstacionLogisticaId;
+                      const sem = resolverSemaforo(item);
+                      const semMeta = SEMAFORO_META[sem];
+                      const guardadoAhora = guardadoRecienteId === item.id;
+
+                      return (
+                        <tr
+                          key={item.id}
+                          className={`hover:bg-blue-50/30 transition-colors ${semMeta.rowBorder}`}
+                        >
+                          {/* Columna 1: Semáforo en 1 Clic */}
+                          <td className="py-3.5 px-3.5 align-top">
+                            <div className="flex flex-col gap-1.5">
+                              <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 w-fit">
+                                {(['operativo', 'atencion', 'incidencia'] as SemaforoEstadoId[]).map(
+                                  (estadoKey) => {
+                                    const activoSem = sem === estadoKey;
+                                    const dotColor =
+                                      estadoKey === 'operativo'
+                                        ? 'bg-emerald-500'
+                                        : estadoKey === 'atencion'
+                                        ? 'bg-amber-500'
+                                        : 'bg-rose-600';
+                                    return (
+                                      <button
+                                        key={estadoKey}
+                                        type="button"
+                                        onClick={() => handleCambiarSemaforoDirecto(item.id, estadoKey)}
+                                        title={SEMAFORO_META[estadoKey].label}
+                                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                                          activoSem
+                                            ? 'bg-white shadow-xs ring-2 ring-slate-400 scale-105'
+                                            : 'opacity-40 hover:opacity-90'
+                                        }`}
+                                      >
+                                        <span className={`w-3 h-3 rounded-full ${dotColor}`} />
+                                      </button>
+                                    );
+                                  }
+                                )}
+                              </div>
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold border w-fit ${semMeta.badge}`}
+                              >
+                                {semMeta.label}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Columna 2: Tesista + Matrícula 10 dígitos */}
+                          <td className="py-3.5 px-3.5 align-top">
+                            <div className="font-black text-slate-900 text-xs leading-snug">
+                              {item.tesistaNombre}
+                            </div>
+                            <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono font-bold text-[11px] text-[#082F64]">
+                              {item.codigoMatricula}
+                            </div>
+                            <div className="text-[11px] font-mono text-slate-500 truncate max-w-[170px] mt-0.5">
+                              {item.tesistaCorreo}
+                            </div>
+                          </td>
+
+                          {/* Columna 3: Título + Jurado compacto */}
+                          <td className="py-3.5 px-3.5 align-top max-w-xs">
+                            <p className="text-xs font-semibold text-slate-800 line-clamp-2 leading-snug">
+                              {item.tituloTesis}
+                            </p>
+                            <div className="mt-1.5 flex flex-wrap gap-1 text-[10px] text-slate-600">
+                              <span className="px-1.5 py-0.5 rounded bg-slate-100 truncate max-w-[130px]">
+                                <strong>P:</strong> {item.juradoPresidente}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-slate-100 truncate max-w-[130px]">
+                                <strong>S:</strong> {item.juradoSecretario}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded bg-slate-100 truncate max-w-[130px]">
+                                <strong>V:</strong> {item.juradoVocal}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Columna 4: Selector de Etapa en 1 Clic */}
+                          <td className="py-3.5 px-3.5 align-top">
+                            <div className="grid grid-cols-2 gap-1.5">
+                              {ETAPAS_SIMPLES.map((et) => {
+                                const activo = etapaActual === et.id;
+                                const completado = etapaActual > et.id;
+                                return (
+                                  <button
+                                    key={et.id}
+                                    type="button"
+                                    onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
+                                    className={`py-1.5 px-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer truncate ${
+                                      activo
+                                        ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
+                                        : completado
+                                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                    }`}
+                                  >
+                                    {et.corto}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </td>
+
+                          {/* Columna 5: Apuntes Directos en Línea (Offline-First) */}
+                          <td className="py-3.5 px-3.5 align-top">
+                            <div className="relative">
+                              <textarea
+                                rows={2}
+                                value={item.notasSecretaria}
+                                onChange={(e) => handleActualizarNotaDirecto(item.id, e.target.value)}
+                                placeholder="Apunte rápido..."
+                                className="w-full p-2 rounded-xl bg-amber-50/60 border border-amber-200 text-xs text-slate-800 focus:bg-white focus:border-[#082F64] focus:outline-hidden"
+                              />
+                              {guardadoAhora && (
+                                <span className="absolute right-2 bottom-2 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-bold">
+                                  ✓ Guardado
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Columna 6: Botones Grandes de Acción Rápida */}
+                          <td className="py-3.5 px-3.5 align-top text-right">
+                            <div className="flex flex-col gap-1.5 items-end">
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    cargarTesistaEnCalendario(item.id);
+                                    setTab('calendario');
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-bold cursor-pointer"
+                                  title="Programar Jueves 11:00 - 1:00"
+                                >
+                                  <Calendar className="w-3.5 h-3.5 text-[#082F64]" />
+                                  <span>{item.fechaSustentacionProgramada || 'Jueves'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => prepararDespachoParaTesistaYJurado(item)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] font-extrabold cursor-pointer"
+                                  title="Enviar Flyer al Jurado, Tesista y copias de los Martes"
+                                >
+                                  <Send className="w-3.5 h-3.5" />
+                                  <span>Flyer</span>
+                                </button>
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => abrirModalSeguimiento(item)}
+                                  className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 cursor-pointer"
+                                  title="Editar"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setConfirmarEliminar({
+                                      tipo: 'tesista',
+                                      id: item.id,
+                                      nombre: item.tesistaNombre,
+                                      correo: item.tesistaCorreo
+                                    })
+                                  }
+                                  className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 cursor-pointer"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            /* VISTA 2: TARJETAS VISUALES */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {seguimientosFiltrados.map((item) => {
+                const etapaActual = item.estacionActual > 4 ? 4 : item.estacionActual;
+                const sem = resolverSemaforo(item);
+                const semMeta = SEMAFORO_META[sem];
+                return (
+                  <div
+                    key={item.id}
+                    className={`bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 ${semMeta.rowBorder}`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-black text-slate-900">{item.tesistaNombre}</h3>
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${semMeta.badge}`}
+                            >
+                              {semMeta.label}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                            <span className="font-mono font-bold text-slate-700">
+                              {item.codigoMatricula}
+                            </span>
+                            <span>•</span>
+                            <span className="font-mono text-unt-blue">{item.tesistaCorreo}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => abrirModalSeguimiento(item)}
+                            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 cursor-pointer"
+                            title="Editar datos del tesista"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setConfirmarEliminar({
+                                tipo: 'tesista',
+                                id: item.id,
+                                nombre: item.tesistaNombre,
+                                correo: item.tesistaCorreo
+                              })
+                            }
+                            className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 cursor-pointer"
+                            title="Eliminar tesista"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => abrirModalSeguimiento(item)}
-                          className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 cursor-pointer"
-                          title="Editar datos del tesista"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setConfirmarEliminar({
-                              tipo: 'tesista',
-                              id: item.id,
-                              nombre: item.tesistaNombre,
-                              correo: item.tesistaCorreo
-                            })
-                          }
-                          className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 cursor-pointer"
-                          title="Eliminar tesista"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      <p className="text-xs text-slate-700 italic line-clamp-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                        "{item.tituloTesis}"
+                      </p>
+
+                      <div className="text-[11px] text-slate-600 grid grid-cols-1 sm:grid-cols-3 gap-1 pt-1">
+                        <div className="truncate">
+                          <strong>Pres.:</strong> {item.juradoPresidente}
+                        </div>
+                        <div className="truncate">
+                          <strong>Sec.:</strong> {item.juradoSecretario}
+                        </div>
+                        <div className="truncate">
+                          <strong>Vocal:</strong> {item.juradoVocal}
+                        </div>
                       </div>
                     </div>
 
-                    <p className="text-xs text-slate-700 italic line-clamp-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                      "{item.tituloTesis}"
-                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      {ETAPAS_SIMPLES.map((et) => {
+                        const activo = etapaActual === et.id;
+                        const completado = etapaActual > et.id;
+                        return (
+                          <button
+                            key={et.id}
+                            type="button"
+                            onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
+                            className={`py-1.5 px-2 rounded-xl text-[11px] font-bold transition-all cursor-pointer truncate ${
+                              activo
+                                ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
+                                : completado
+                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                            }`}
+                          >
+                            {et.nombre}
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                    <div className="text-[11px] text-slate-600 grid grid-cols-1 sm:grid-cols-3 gap-1 pt-1">
-                      <div className="truncate">
-                        <strong>Pres.:</strong> {item.juradoPresidente}
-                      </div>
-                      <div className="truncate">
-                        <strong>Sec.:</strong> {item.juradoSecretario}
-                      </div>
-                      <div className="truncate">
-                        <strong>Vocal:</strong> {item.juradoVocal}
-                      </div>
+                    <div>
+                      <textarea
+                        rows={2}
+                        value={item.notasSecretaria}
+                        onChange={(e) => handleActualizarNotaDirecto(item.id, e.target.value)}
+                        placeholder="Apuntes..."
+                        className="w-full p-2.5 rounded-xl bg-amber-50/60 border border-amber-200/80 text-xs text-slate-800 focus:bg-white focus:outline-hidden"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          cargarTesistaEnCalendario(item.id);
+                          setTab('calendario');
+                        }}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold cursor-pointer"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-unt-blue" />
+                        <span>
+                          {item.fechaSustentacionProgramada
+                            ? `Jueves ${item.fechaSustentacionProgramada}`
+                            : 'Agendar Jueves'}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => prepararDespachoParaTesistaYJurado(item)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-extrabold cursor-pointer"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Enviar Flyer</span>
+                      </button>
                     </div>
                   </div>
-
-                  {/* Barra de Etapa en 1 Clic (4 pasos simples) */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                    {ETAPAS_SIMPLES.map((et) => {
-                      const activo = etapaActual === et.id;
-                      const completado = etapaActual > et.id;
-                      return (
-                        <button
-                          key={et.id}
-                          type="button"
-                          onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
-                          className={`py-1.5 px-2 rounded-xl text-[11px] font-bold transition-all cursor-pointer truncate ${
-                            activo
-                              ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
-                              : completado
-                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                          }`}
-                        >
-                          {et.nombre}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Cuadro de Apuntes Directos de la Srta. Celia */}
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-500 block mb-1">
-                      Apuntes de seguimiento:
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={item.notasSecretaria}
-                      onChange={(e) => handleActualizarNotaDirecto(item.id, e.target.value)}
-                      placeholder="Escribe aquí tus apuntes sobre cómo va esta tesis..."
-                      className="w-full p-2.5 rounded-xl bg-amber-50/60 border border-amber-200/80 text-xs text-slate-800 focus:bg-white focus:outline-hidden"
-                    />
-                  </div>
-
-                  {/* Botones Rápidos hacia Calendario o Flyers */}
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        cargarTesistaEnCalendario(item.id);
-                        setTab('calendario');
-                      }}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold cursor-pointer"
-                    >
-                      <Calendar className="w-3.5 h-3.5 text-unt-blue" />
-                      <span>
-                        {item.fechaSustentacionProgramada
-                          ? `Jueves ${item.fechaSustentacionProgramada}`
-                          : 'Agendar Jueves'}
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => prepararDespachoParaTesistaYJurado(item)}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-extrabold cursor-pointer"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Enviar Flyer</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
