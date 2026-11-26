@@ -14,7 +14,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sendGoogleOAuthMail } from './googleDriveEngine.mjs';
+import {
+  sendGoogleOAuthMail,
+  getGoogleOAuthMailStatus,
+  hydrateOAuthFromTurso
+} from './googleDriveEngine.mjs';
 
 const DEFAULT_UNT_EMAIL = 'cchau@unitru.edu.pe';
 
@@ -78,6 +82,7 @@ function readEmailConfig() {
 
 export function getEmailStatus() {
   const cfg = readEmailConfig();
+  const oauth = getGoogleOAuthMailStatus();
   const hasCloudApi = Boolean(
     cfg.brevoApiKey ||
       cfg.resendApiKey ||
@@ -85,14 +90,28 @@ export function getEmailStatus() {
   );
   const hasSmtp = Boolean((cfg.senderEmail || process.env.UNT_SMTP_EMAIL) && cfg.appPassword);
   return {
-    configured: Boolean(cfg.senderEmail),
-    serverTransportReady: Boolean(hasCloudApi || hasSmtp),
-    mode: hasCloudApi ? 'cloud-https' : hasSmtp ? 'smtp' : 'unitru-prelinked',
-    senderEmail: cfg.senderEmail || DEFAULT_UNT_EMAIL,
+    configured: Boolean(oauth.email || cfg.senderEmail),
+    serverTransportReady: Boolean(oauth.connected || hasCloudApi || hasSmtp),
+    mode: oauth.connected
+      ? 'google-oauth'
+      : hasCloudApi
+      ? 'cloud-https'
+      : hasSmtp
+      ? 'smtp'
+      : 'unitru-prelinked',
+    oauthConfigured: oauth.configured,
+    oauthConnected: oauth.connected,
+    oauthEmail: oauth.email,
+    senderEmail: oauth.email || cfg.senderEmail || DEFAULT_UNT_EMAIL,
     senderName:
       cfg.senderName || 'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
     smtpHost: cfg.smtpHost || 'smtp.gmail.com'
   };
+}
+
+export async function getEmailStatusHydrated() {
+  await hydrateOAuthFromTurso(false);
+  return getEmailStatus();
 }
 
 export function saveEmailConfig({

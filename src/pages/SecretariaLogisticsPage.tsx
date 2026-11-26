@@ -140,6 +140,46 @@ export const SecretariaLogisticsPage: React.FC = () => {
   });
   const [modalCorreoAbierto, setModalCorreoAbierto] = useState<boolean>(false);
   const [cfgEmailInput, setCfgEmailInput] = useState<string>('cchau@unitru.edu.pe');
+  const [conectandoGoogleMail, setConectandoGoogleMail] = useState<boolean>(false);
+
+  const handleAutorizarCorreoGoogle = async () => {
+    setConectandoGoogleMail(true);
+    try {
+      const { authUrl } = await logisticaSecretariaService.getMailOAuthUrl();
+      const popup = window.open(
+        authUrl,
+        'unt_mail_oauth',
+        'width=520,height=640,noopener=false'
+      );
+      if (!popup) {
+        window.location.href = authUrl;
+      }
+    } catch (err: any) {
+      agregarToast('warning', 'Falta activar acceso en servidor', err?.message || 'No se pudo iniciar la autorización.');
+    } finally {
+      setConectandoGoogleMail(false);
+    }
+  };
+
+  useEffect(() => {
+    const onMsg = async (ev: MessageEvent) => {
+      if (ev.data?.type === 'UNT_MAIL_CONNECTED' || ev.data?.type === 'UNT_DRIVE_CONNECTED') {
+        const st = await logisticaSecretariaService.getEmailStatus();
+        setEmailStatus(st);
+        setCfgEmailInput(st.senderEmail);
+        setModalCorreoAbierto(false);
+        agregarToast(
+          'success',
+          'Correo autorizado para siempre',
+          `Listo: ya puedes enviar directamente desde ${st.senderEmail} sin abrir Gmail.`
+        );
+      } else if (ev.data?.type === 'UNT_DRIVE_ERROR') {
+        agregarToast('error', 'No se pudo autorizar', ev.data?.error || 'Google canceló o bloqueó el permiso.');
+      }
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
   const [cfgNameInput, setCfgNameInput] = useState<string>('Srta. Celia — Secretaría Ing. Industrial UNT');
 
   useEffect(() => {
@@ -1497,9 +1537,31 @@ export const SecretariaLogisticsPage: React.FC = () => {
             </div>
           </div>
 
-          {!emailStatus.serverTransportReady && (
-            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950">
-              <strong>Nota:</strong> los avisos al celular del tesista y el registro del sistema funcionan de inmediato; la salida externa de correos quedará activa al conectar el servicio de correo en el servidor.
+          {!emailStatus.oauthConnected && (
+            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <strong>
+                  {emailStatus.serverTransportReady
+                    ? `Envío listo (respaldo activo) · Remitente institucional: ${emailStatus.senderEmail}`
+                    : 'Activa tu correo @unitru.edu.pe una sola vez:'}
+                </strong>{' '}
+                <span>
+                  {emailStatus.oauthConfigured
+                    ? 'Pulsa el botón para dar permiso a tu cuenta @unitru.edu.pe y enviar directo desde aquí sin abrir Gmail.'
+                    : 'Los avisos al celular ya funcionan; para enviar directo desde @unitru.edu.pe, falta cargar las credenciales de Google en el servidor.'}
+                </span>
+              </div>
+              {emailStatus.oauthConfigured && (
+                <button
+                  type="button"
+                  disabled={conectandoGoogleMail}
+                  onClick={handleAutorizarCorreoGoogle}
+                  className="px-3.5 py-2 rounded-xl bg-[#082F64] hover:bg-[#0C4D96] disabled:opacity-50 text-white font-bold inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <Mail className="w-3.5 h-3.5 text-amber-300" />
+                  <span>{conectandoGoogleMail ? 'Abriendo...' : 'Autorizar mi @unitru.edu.pe (1 clic)'}</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -2473,6 +2535,43 @@ export const SecretariaLogisticsPage: React.FC = () => {
               }}
               className="p-5 space-y-4 text-xs"
             >
+              {/* Autorización oficial en 1 clic con cuenta @unitru.edu.pe */}
+              <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 space-y-2.5">
+                <div className="font-bold text-[#082F64]">
+                  {emailStatus.oauthConnected
+                    ? `✓ Autorizado directo con ${emailStatus.oauthEmail || emailStatus.senderEmail}`
+                    : 'Autorización directa sin contraseñas'}
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  {emailStatus.oauthConnected
+                    ? 'Tus correos salen directamente desde tu cuenta institucional sin abrir Gmail.'
+                    : 'Pulsa el botón para dar permiso una única vez con tu cuenta @unitru.edu.pe. Después todo saldrá directo desde aquí.'}
+                </p>
+                {emailStatus.oauthConnected ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const st = await logisticaSecretariaService.disconnectMailOAuth();
+                      setEmailStatus(st);
+                      agregarToast('info', 'Cuenta desconectada', 'Puedes autorizar otra cuenta @unitru.edu.pe cuando desees.');
+                    }}
+                    className="w-full py-2 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 font-bold cursor-pointer"
+                  >
+                    Cambiar cuenta autorizada
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={conectandoGoogleMail}
+                    onClick={handleAutorizarCorreoGoogle}
+                    className="w-full py-2.5 rounded-xl bg-[#082F64] hover:bg-[#0C4D96] disabled:opacity-50 text-white font-bold inline-flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Mail className="w-4 h-4 text-amber-300" />
+                    <span>{conectandoGoogleMail ? 'Abriendo Google...' : 'Autorizar mi @unitru.edu.pe (1 clic)'}</span>
+                  </button>
+                )}
+              </div>
+
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   Correo Institucional (@unitru.edu.pe):
@@ -2493,13 +2592,13 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   onClick={() => setModalCorreoAbierto(false)}
                   className="px-3.5 py-2 rounded-xl border border-slate-200 text-slate-600 font-semibold cursor-pointer"
                 >
-                  Cancelar
+                  Cerrar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#082F64] text-white font-bold cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold cursor-pointer"
                 >
-                  Vincular en 1 Clic
+                  Guardar correo
                 </button>
               </div>
             </form>

@@ -35,7 +35,10 @@ const DEFAULT_CONFIG_COLACION: ConfigColacion = {
 export interface EmailConfigStatus {
   configured: boolean;
   serverTransportReady?: boolean;
-  mode?: 'cloud-https' | 'smtp' | 'unitru-prelinked';
+  mode?: 'google-oauth' | 'cloud-https' | 'smtp' | 'unitru-prelinked';
+  oauthConfigured?: boolean;
+  oauthConnected?: boolean;
+  oauthEmail?: string;
   senderEmail: string;
   senderName: string;
   smtpHost: string;
@@ -188,6 +191,20 @@ export const logisticaSecretariaService = {
         smtpHost: 'smtp.gmail.com'
       };
     }
+  },
+
+  async getMailOAuthUrl(): Promise<{ authUrl: string; redirectUri: string }> {
+    const res = await fetch('/api/correo/oauth-url');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Falta activar GOOGLE_CLIENT_ID en el servidor.');
+    return data;
+  },
+
+  async disconnectMailOAuth(): Promise<EmailConfigStatus> {
+    const res = await fetch('/api/correo/oauth-disconnect', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'No se pudo desconectar la cuenta.');
+    return data;
   },
 
   async saveEmailConfig(params: {

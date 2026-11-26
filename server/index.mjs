@@ -23,6 +23,7 @@ import {
 } from './repositorioEngine.mjs';
 import {
   getEmailStatus,
+  getEmailStatusHydrated,
   saveEmailConfig,
   dispatchAnnouncementEmail
 } from './emailEngine.mjs';
@@ -42,6 +43,7 @@ import { getTursoConfigInfo } from './tursoEngine.mjs';
 import {
   saveOAuthCredentials,
   buildOAuthAuthUrl,
+  buildMailOAuthUrl,
   handleOAuthCallback,
   disconnectDrive,
   getDriveStatus,
@@ -314,12 +316,13 @@ export async function handleApiRequest(req, res) {
       const info = await handleOAuthCallback({ code, state, origin: getRequestOrigin(req) });
       res.statusCode = 200;
       res.end(`<!doctype html><html lang="es"><body style="font-family:system-ui;padding:32px;text-align:center;background:#082F64;color:#fff">
-        <h2 style="margin-bottom:8px;">✅ Google Drive conectado correctamente</h2>
-        <p style="color:#bfdbfe;font-size:14px;">Cuenta: <strong>${info.accountEmail || 'Google Drive'}</strong></p>
+        <h2 style="margin-bottom:8px;">✅ Correo institucional conectado correctamente</h2>
+        <p style="color:#bfdbfe;font-size:14px;">Cuenta: <strong>${info.accountEmail || 'Cuenta Google'}</strong></p>
         <p style="font-size:12px;color:#fde68a;">Esta ventana se cerrará automáticamente...</p>
         <script>
           if (window.opener) {
             window.opener.postMessage({ type: 'UNT_DRIVE_CONNECTED', email: ${JSON.stringify(info.accountEmail || '')}, name: ${JSON.stringify(info.accountName || '')} }, '*');
+            window.opener.postMessage({ type: 'UNT_MAIL_CONNECTED', email: ${JSON.stringify(info.accountEmail || '')}, name: ${JSON.stringify(info.accountName || '')} }, '*');
           }
           setTimeout(() => window.close(), 900);
         </script>
@@ -530,9 +533,28 @@ export async function handleApiRequest(req, res) {
   // ======================================================
   if (urlObj.pathname === '/api/correo/status' && req.method === 'GET') {
     try {
-      sendJson(res, 200, getEmailStatus());
+      sendJson(res, 200, await getEmailStatusHydrated());
     } catch (err) {
       sendJson(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/correo/oauth-url' && req.method === 'GET') {
+    try {
+      sendJson(res, 200, buildMailOAuthUrl(getRequestOrigin(req)));
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/correo/oauth-disconnect' && req.method === 'POST') {
+    try {
+      await disconnectDrive();
+      sendJson(res, 200, await getEmailStatusHydrated());
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
     }
     return true;
   }

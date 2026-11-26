@@ -5,7 +5,7 @@
 
 import { handleApiRequest } from '../server/index.mjs';
 import { getTursoConfigInfo } from '../server/tursoEngine.mjs';
-import { getEmailStatus } from '../server/emailEngine.mjs';
+import { getEmailStatusHydrated } from '../server/emailEngine.mjs';
 
 export const config = {
   api: {
@@ -17,6 +17,7 @@ export default async function handler(req, res) {
   const url = String(req.url || '/');
 
   if (url === '/healthz' || url.startsWith('/healthz?')) {
+    const mailSt = await getEmailStatusHydrated();
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.end(
@@ -25,7 +26,8 @@ export default async function handler(req, res) {
         runtime: 'vercel-serverless',
         service: 'sistema-tesistas-unt',
         turso: getTursoConfigInfo(),
-        emailReady: Boolean(getEmailStatus().serverTransportReady)
+        emailReady: Boolean(mailSt.serverTransportReady),
+        emailMode: mailSt.mode
       })
     );
     return;

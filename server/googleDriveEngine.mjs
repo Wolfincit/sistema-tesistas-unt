@@ -459,6 +459,76 @@ export function saveOAuthCredentials({ clientId, clientSecret }) {
   return { ok: true };
 }
 
+const MAIL_ONLY_SCOPES = [
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile'
+].join(' ');
+
+let lastOAuthTursoHydrateAt = 0;
+
+export async function hydrateOAuthFromTurso(force = false) {
+  if (!isTursoConfigured()) return false;
+  if (!force && Date.now() - lastOAuthTursoHydrateAt < 10000 && configCache?.refreshToken) {
+    return true;
+  }
+  lastOAuthTursoHydrateAt = Date.now();
+  try {
+    const saved = await tursoGetJson('google_oauth_config');
+    if (saved && typeof saved === 'object' && saved.refreshToken) {
+      saveConfig(
+        {
+          refreshToken: saved.refreshToken,
+          accountEmail: saved.accountEmail || '',
+          accountName: saved.accountName || '',
+          connectedAt: saved.connectedAt || ''
+        },
+        { syncVault: false }
+      );
+      return true;
+    }
+  } catch {
+    // Silencioso
+  }
+  return false;
+}
+
+export function getGoogleOAuthMailStatus() {
+  const cfg = loadConfig();
+  return {
+    configured: Boolean(cfg.clientId && cfg.clientSecret),
+    connected: Boolean(cfg.clientId && cfg.clientSecret && cfg.refreshToken),
+    email: cfg.accountEmail || '',
+    name: cfg.accountName || ''
+  };
+}
+
+export function buildMailOAuthUrl(origin) {
+  const cfg = loadConfig();
+  if (!cfg.clientId || !cfg.clientSecret) {
+    throw new Error('El administrador aún no ha cargado GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en el servidor.');
+  }
+  const state = crypto.randomBytes(16).toString('hex');
+  pendingOAuthStates.set(state, { origin, createdAt: Date.now() });
+
+  const redirectUri = `${origin.replace(/\/$/, '')}/api/drive/callback`;
+  const params = new URLSearchParams({
+    client_id: cfg.clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: MAIL_ONLY_SCOPES,
+    access_type: 'offline',
+    prompt: 'consent',
+    include_granted_scopes: 'true',
+    state
+  });
+
+  return {
+    authUrl: `${GOOGLE_OAUTH_URL}?${params.toString()}`,
+    redirectUri
+  };
+}
+
 export function buildOAuthAuthUrl(origin) {
   const cfg = loadConfig();
   if (!cfg.clientId || !cfg.clientSecret) {
@@ -542,17 +612,28 @@ export async function handleOAuthCallback({ code, state, origin }) {
     // non-fatal
   }
 
+  const connectedAt = new Date().toISOString();
   saveConfig({
     refreshToken,
     accountEmail,
     accountName,
-    connectedAt: new Date().toISOString()
+    connectedAt
   });
+
+  if (isTursoConfigured()) {
+    await tursoSetJson('google_oauth_config', {
+      refreshToken,
+      accountEmail,
+      accountName,
+      connectedAt
+    });
+  }
 
   return { accountEmail, accountName };
 }
 
 export async function sendGoogleOAuthMail({ rawMimeBase64Url }) {
+  await hydrateOAuthFromTurso(false);
   if (!isDriveConnected()) {
     return { sent: false, reason: 'OAuth @unitru no conectado' };
   }
@@ -587,6 +668,9 @@ export async function disconnectDrive() {
     dbFileId: '',
     connectedAt: ''
   });
+  if (isTursoConfigured()) {
+    await tursoSetJson('google_oauth_config', { refreshToken: '', accountEmail: '', accountName: '' });
+  }
   return { ok: true };
 }
 
