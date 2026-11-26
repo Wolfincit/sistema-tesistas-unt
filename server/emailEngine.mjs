@@ -28,28 +28,40 @@ function readEmailConfig() {
           'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
         appPassword: process.env.UNT_SMTP_PASSWORD || '',
         appsScriptUrl: process.env.UNT_GAS_WEBHOOK_URL || '',
+        brevoApiKey: process.env.UNT_BREVO_API_KEY || '',
+        brevoSenderEmail: process.env.UNT_BREVO_SENDER_EMAIL || process.env.UNT_SMTP_EMAIL || '',
+        resendApiKey: process.env.UNT_RESEND_API_KEY || '',
+        resendFromEmail: process.env.UNT_RESEND_FROM_EMAIL || 'onboarding@resend.dev',
         smtpHost: process.env.UNT_SMTP_HOST || 'smtp.gmail.com',
         smtpPort: Number(process.env.UNT_SMTP_PORT || 465)
       };
     }
     const raw = JSON.parse(fs.readFileSync(EMAIL_CONFIG_PATH, 'utf-8'));
     return {
-      senderEmail: process.env.UNT_SMTP_EMAIL || raw.senderEmail || '',
+      senderEmail: raw.senderEmail || process.env.UNT_SMTP_EMAIL || '',
       senderName:
-        process.env.UNT_SMTP_NAME ||
         raw.senderName ||
+        process.env.UNT_SMTP_NAME ||
         'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
       appPassword: process.env.UNT_SMTP_PASSWORD || raw.appPassword || '',
       appsScriptUrl: process.env.UNT_GAS_WEBHOOK_URL || raw.appsScriptUrl || '',
+      brevoApiKey: process.env.UNT_BREVO_API_KEY || '',
+      brevoSenderEmail: process.env.UNT_BREVO_SENDER_EMAIL || process.env.UNT_SMTP_EMAIL || '',
+      resendApiKey: process.env.UNT_RESEND_API_KEY || '',
+      resendFromEmail: process.env.UNT_RESEND_FROM_EMAIL || 'onboarding@resend.dev',
       smtpHost: process.env.UNT_SMTP_HOST || raw.smtpHost || 'smtp.gmail.com',
       smtpPort: Number(process.env.UNT_SMTP_PORT || raw.smtpPort || 465)
     };
   } catch {
     return {
-      senderEmail: '',
+      senderEmail: process.env.UNT_SMTP_EMAIL || '',
       senderName: 'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
-      appPassword: '',
-      appsScriptUrl: '',
+      appPassword: process.env.UNT_SMTP_PASSWORD || '',
+      appsScriptUrl: process.env.UNT_GAS_WEBHOOK_URL || '',
+      brevoApiKey: process.env.UNT_BREVO_API_KEY || '',
+      brevoSenderEmail: process.env.UNT_BREVO_SENDER_EMAIL || '',
+      resendApiKey: process.env.UNT_RESEND_API_KEY || '',
+      resendFromEmail: process.env.UNT_RESEND_FROM_EMAIL || 'onboarding@resend.dev',
       smtpHost: 'smtp.gmail.com',
       smtpPort: 465
     };
@@ -58,24 +70,22 @@ function readEmailConfig() {
 
 export function getEmailStatus() {
   const cfg = readEmailConfig();
-  const hasGas = Boolean(
-    cfg.appsScriptUrl && cfg.appsScriptUrl.startsWith('https://script.google.com/')
+  const hasCloudApi = Boolean(
+    cfg.brevoApiKey ||
+      cfg.resendApiKey ||
+      (cfg.appsScriptUrl && cfg.appsScriptUrl.startsWith('https://script.google.com/'))
   );
-  const hasSmtp = Boolean(cfg.senderEmail && cfg.appPassword);
+  const hasSmtp = Boolean((cfg.senderEmail || process.env.UNT_SMTP_EMAIL) && cfg.appPassword);
   return {
-    configured: Boolean(hasGas || hasSmtp),
-    mode: hasGas ? 'google-workspace-https' : hasSmtp ? 'smtp' : 'gmail-direct',
+    configured: Boolean(cfg.senderEmail || hasCloudApi),
+    serverTransportReady: Boolean(hasCloudApi || hasSmtp),
+    mode: hasCloudApi ? 'cloud-https' : hasSmtp ? 'smtp' : 'unconfigured',
     senderEmail: cfg.senderEmail || '',
     senderName:
       cfg.senderName || 'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
-    appsScriptUrl: cfg.appsScriptUrl || '',
     smtpHost: cfg.smtpHost || 'smtp.gmail.com'
   };
 }
-
-const HTTPS_SMTP_RELAY_URL =
-  process.env.UNT_HTTPS_SMTP_RELAY ||
-  'https://low-truly-performing-wichita.trycloudflare.com/api/correo/smtp-relay';
 
 export function saveEmailConfig({
   senderEmail,
@@ -94,11 +104,12 @@ export function saveEmailConfig({
   if (!cleanEmail || !cleanEmail.includes('@')) {
     throw new Error('Ingrese un correo electrónico válido.');
   }
+  const existing = readEmailConfig();
   const data = {
     senderEmail: cleanEmail,
     senderName: cleanName,
-    appPassword: cleanPass,
-    appsScriptUrl: cleanGasUrl,
+    appPassword: cleanPass || existing.appPassword || '',
+    appsScriptUrl: cleanGasUrl || existing.appsScriptUrl || '',
     smtpHost: String(smtpHost || 'smtp.gmail.com').trim(),
     smtpPort: Number(smtpPort || 465)
   };
@@ -110,17 +121,18 @@ export function saveEmailConfig({
  * Cliente SMTP sobre TLS nativo (Node.js node:tls) forzando IPv4 (family: 4)
  * y con timeout rápido de conexión para detectar bloqueos de puerto 465 en la nube.
  */
-export function sendSmtpTlsMail({
+function sendSmtpTlsMail({
   host,
   port,
   user,
   pass,
   fromName,
+  replyTo,
   toList,
   subject,
   htmlBody,
   attachment,
-  timeoutMs = 3500
+  timeoutMs = 4500
 }) {
   return new Promise((resolve, reject) => {
     const socket = tls.connect({
@@ -198,6 +210,7 @@ export function sendSmtpTlsMail({
       const encodedFromName = `=?UTF-8?B?${Buffer.from(fromName, 'utf-8').toString('base64')}?=`;
       const headers = [
         `From: "${encodedFromName}" <${user}>`,
+        `Reply-To: ${replyTo || user}`,
         `To: ${toList.join(', ')}`,
         `Subject: ${encodedSubject}`,
         `Date: ${new Date().toUTCString()}`,
@@ -350,112 +363,150 @@ export async function dispatchAnnouncementEmail({
     </div>
   `;
 
-  // 1. VÍA PREFERIDA PARA @unitru.edu.pe Y RENDER CLOUD: Conector Google Workspace (Apps Script HTTPS Puerto 443)
-  if (cfg.appsScriptUrl && cfg.appsScriptUrl.startsWith('https://script.google.com/')) {
-    try {
-      const cleanB64 = attachment
-        ? attachment.base64Data.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '')
-        : '';
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 14000);
-      const gasRes = await fetch(cfg.appsScriptUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        redirect: 'follow',
-        signal: controller.signal,
-        body: JSON.stringify({
-          toList: todos,
-          subject: subjectFinal,
-          textBody: textFinal,
-          htmlBody,
-          fromName: cfg.senderName,
-          flyerBase64: cleanB64 || undefined,
-          flyerMime: attachment?.mimeType || undefined,
-          flyerName: attachment?.fileName || undefined
-        })
-      });
-      clearTimeout(timer);
-      if (gasRes.ok) {
-        return {
-          ok: true,
-          mode: 'smtp-direct',
-          recipientsCount: todos.length,
-          recipients: todos,
-          message: `Correo enviado directamente desde ${cfg.senderEmail || 'tu cuenta @unitru.edu.pe'} a ${todos.join(', ')}.`
-        };
-      }
-    } catch {
-      // Si falla, continúa a las demás vías sin bloquear
+  // 1. VÍA CLOUD HTTPS (Puerto 443): Brevo API v3 (preconfigurado en el servidor sin pedir claves a la secretaria)
+  if (cfg.brevoApiKey) {
+    const senderMailbox = cfg.brevoSenderEmail || cfg.senderEmail;
+    if (!senderMailbox) {
+      throw new Error('Falta correo remitente verificado en el servidor para Brevo.');
     }
-  }
-
-  // 2. Si no tiene clave SMTP configurada, usar despacho directo asistido por Gmail Web
-  if (!cfg.senderEmail || !cfg.appPassword) {
-    return {
-      ok: true,
-      mode: 'assisted-gmail',
-      recipientsCount: todos.length,
-      recipients: todos,
-      message: 'Correo preparado para envío directo desde Gmail Institucional.'
+    const cleanB64 = attachment
+      ? attachment.base64Data.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '')
+      : '';
+    const htmlWithDataImg = attachment
+      ? htmlBody.replace('cid:flyer_unt_cid', attachment.base64Data)
+      : htmlBody;
+    const brevoBody = {
+      sender: { name: cfg.senderName, email: senderMailbox },
+      replyTo: cfg.senderEmail ? { name: cfg.senderName, email: cfg.senderEmail } : undefined,
+      to: todos.map((email) => ({ email })),
+      subject: subjectFinal,
+      htmlContent: htmlWithDataImg,
+      attachment: cleanB64
+        ? [{ content: cleanB64, name: attachment.fileName || 'Flyer_UNT.png' }]
+        : undefined
     };
+    const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': cfg.brevoApiKey,
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      body: JSON.stringify(brevoBody)
+    });
+    if (brevoRes.ok) {
+      return {
+        ok: true,
+        mode: 'smtp-direct',
+        recipientsCount: todos.length,
+        recipients: todos,
+        message: `Correo enviado directamente a ${todos.join(', ')} (con respuesta a ${cfg.senderEmail || senderMailbox}).`
+      };
+    }
+    const brevoErr = await brevoRes.text().catch(() => '');
+    throw new Error(`No se pudo despachar por Brevo (${brevoRes.status}): ${brevoErr.slice(0, 160)}`);
   }
 
-  const smtpPayload = {
-    host: cfg.smtpHost,
-    port: cfg.smtpPort,
-    user: cfg.senderEmail,
-    pass: cfg.appPassword,
-    fromName: cfg.senderName,
-    toList: todos,
-    subject: subjectFinal,
-    htmlBody,
-    attachment
-  };
+  // 2. VÍA CLOUD HTTPS (Puerto 443): Resend API
+  if (cfg.resendApiKey) {
+    const cleanB64 = attachment
+      ? attachment.base64Data.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '')
+      : '';
+    const htmlWithDataImg = attachment
+      ? htmlBody.replace('cid:flyer_unt_cid', attachment.base64Data)
+      : htmlBody;
+    const resendRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${cfg.resendApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: `${cfg.senderName} <${cfg.resendFromEmail}>`,
+        reply_to: cfg.senderEmail || undefined,
+        to: todos,
+        subject: subjectFinal,
+        html: htmlWithDataImg,
+        attachments: cleanB64
+          ? [{ filename: attachment.fileName || 'Flyer_UNT.png', content: cleanB64 }]
+          : undefined
+      })
+    });
+    if (resendRes.ok) {
+      return {
+        ok: true,
+        mode: 'smtp-direct',
+        recipientsCount: todos.length,
+        recipients: todos,
+        message: `Correo enviado directamente a ${todos.join(', ')} (con respuesta a ${cfg.senderEmail || cfg.resendFromEmail}).`
+      };
+    }
+    const resendErr = await resendRes.text().catch(() => '');
+    throw new Error(`No se pudo despachar por Resend (${resendRes.status}): ${resendErr.slice(0, 160)}`);
+  }
 
-  try {
-    await sendSmtpTlsMail(smtpPayload);
+  // 3. VÍA CLOUD HTTPS (Puerto 443): Conector Google Workspace preconfigurado por el administrador (UNT_GAS_WEBHOOK_URL)
+  if (cfg.appsScriptUrl && cfg.appsScriptUrl.startsWith('https://script.google.com/')) {
+    const cleanB64 = attachment
+      ? attachment.base64Data.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '')
+      : '';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 14000);
+    const gasRes = await fetch(cfg.appsScriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      redirect: 'follow',
+      signal: controller.signal,
+      body: JSON.stringify({
+        toList: todos,
+        subject: subjectFinal,
+        textBody: textFinal,
+        htmlBody,
+        fromName: cfg.senderName,
+        replyTo: cfg.senderEmail || undefined,
+        flyerBase64: cleanB64 || undefined,
+        flyerMime: attachment?.mimeType || undefined,
+        flyerName: attachment?.fileName || undefined
+      })
+    });
+    clearTimeout(timer);
+    if (gasRes.ok) {
+      return {
+        ok: true,
+        mode: 'smtp-direct',
+        recipientsCount: todos.length,
+        recipients: todos,
+        message: `Correo enviado directamente a ${todos.join(', ')} desde el sistema.`
+      };
+    }
+    throw new Error(`El conector HTTPS del servidor respondió con estado ${gasRes.status}.`);
+  }
+
+  // 4. VÍA SMTP TLS NATIVO (Funciona en servidor local / campus UNT si hay contraseña de envío de sistema o SMTP)
+  const smtpUser = process.env.UNT_SMTP_EMAIL || cfg.senderEmail;
+  if (smtpUser && cfg.appPassword) {
+    await sendSmtpTlsMail({
+      host: cfg.smtpHost,
+      port: cfg.smtpPort,
+      user: smtpUser,
+      pass: cfg.appPassword,
+      fromName: cfg.senderName,
+      replyTo: cfg.senderEmail || smtpUser,
+      toList: todos,
+      subject: subjectFinal,
+      htmlBody,
+      attachment
+    });
     return {
       ok: true,
       mode: 'smtp-direct',
       recipientsCount: todos.length,
       recipients: todos,
-      message: `Correo y flyer enviados directamente a ${todos.join(', ')} desde ${cfg.senderEmail}.`
-    };
-  } catch (directErr) {
-    // Si el servidor cloud (Render Free Tier) bloquea el puerto 465, reenviar por túnel HTTPS (puerto 443)
-    try {
-      const controller = new AbortController();
-      const t = setTimeout(() => controller.abort(), 7000);
-      const relayRes = await fetch(HTTPS_SMTP_RELAY_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify(smtpPayload),
-        signal: controller.signal
-      });
-      clearTimeout(t);
-      if (relayRes.ok) {
-        const relayData = await relayRes.json();
-        if (relayData && relayData.ok) {
-          return {
-            ok: true,
-            mode: 'smtp-direct',
-            recipientsCount: todos.length,
-            recipients: todos,
-            message: `Correo y flyer enviados directamente a ${todos.join(', ')} desde ${cfg.senderEmail}.`
-          };
-        }
-      }
-    } catch {
-      // Fallback seguro a Gmail Web
-    }
-
-    return {
-      ok: true,
-      mode: 'assisted-gmail',
-      recipientsCount: todos.length,
-      recipients: todos,
-      smtpNotice: directErr?.message || 'Envío asistido por Gmail',
-      message: `Correo preparado en Gmail para ${todos.join(', ')}.`
+      message: `Correo y flyer enviados directamente desde el sistema a ${todos.join(', ')}.`
     };
   }
+
+  throw new Error(
+    'Falta la llave de transporte de correo en el servidor (Render bloquea SMTP 465 por defecto). Agregue UNT_BREVO_API_KEY, UNT_RESEND_API_KEY o UNT_GAS_WEBHOOK_URL en las variables de entorno del servidor.'
+  );
 }

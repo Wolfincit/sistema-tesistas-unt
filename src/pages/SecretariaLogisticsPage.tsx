@@ -101,22 +101,14 @@ export const SecretariaLogisticsPage: React.FC = () => {
     smtpHost: 'smtp.gmail.com'
   });
   const [modalCorreoAbierto, setModalCorreoAbierto] = useState<boolean>(false);
-  const [cfgEmailInput, setCfgEmailInput] = useState<string>('');
+  const [cfgEmailInput, setCfgEmailInput] = useState<string>('cchau@unitru.edu.pe');
   const [cfgNameInput, setCfgNameInput] = useState<string>('Srta. Celia — Secretaría Ing. Industrial UNT');
-  const [cfgPassInput, setCfgPassInput] = useState<string>('');
-  const [cfgGasUrlInput, setCfgGasUrlInput] = useState<string>('');
-  const [modoVinculacion, setModoVinculacion] = useState<'directo' | 'workspace' | 'smtp'>('directo');
-  const [codigoGasCopiado, setCodigoGasCopiado] = useState<boolean>(false);
 
   useEffect(() => {
     logisticaSecretariaService.getEmailStatus().then((st) => {
       setEmailStatus(st);
       if (st.senderEmail) setCfgEmailInput(st.senderEmail);
       if (st.senderName) setCfgNameInput(st.senderName);
-      if (st.appsScriptUrl) {
-        setCfgGasUrlInput(st.appsScriptUrl);
-        setModoVinculacion('workspace');
-      }
     });
   }, []);
 
@@ -325,10 +317,9 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [busquedaTesistaCheck, setBusquedaTesistaCheck] = useState<string>('');
   const [busquedaJuradoCheck, setBusquedaJuradoCheck] = useState<string>('');
   const [enviandoCorreo, setEnviandoCorreo] = useState<boolean>(false);
-  const [enlaceGmailListo, setEnlaceGmailListo] = useState<{
-    gmailUrl: string;
-    mailtoUrl: string;
+  const [confirmacionEnvio, setConfirmacionEnvio] = useState<{
     destinatarios: string[];
+    fechaHora: string;
   } | null>(null);
 
   // Inputs rápidos para añadir tesista o jurado desde las listas de checks
@@ -379,24 +370,9 @@ export const SecretariaLogisticsPage: React.FC = () => {
     setTab('despacho');
   };
 
-  const construirEnlacesCorreo = (destinatarios: string[], asunto: string, cuerpo: string) => {
-    const toParam = encodeURIComponent(destinatarios.join(','));
-    const suParam = encodeURIComponent(asunto);
-    const bodyParam = encodeURIComponent(cuerpo);
-    const authUserParam = emailStatus.senderEmail
-      ? `&authuser=${encodeURIComponent(emailStatus.senderEmail)}`
-      : '';
-    return {
-      gmailUrl: `https://mail.google.com/mail/?view=cm&fs=1&to=${toParam}&su=${suParam}&body=${bodyParam}${authUserParam}`,
-      mailtoUrl: `mailto:${destinatarios.join(',')}?subject=${suParam}&body=${bodyParam}`,
-      destinatarios
-    };
-  };
-
   const handleEnviarAnuncioYFlyer = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Si escribió un correo en las cajitas inferiores "+" pero no presionó "+", incluirlo automáticamente
     const extraTesista = nuevoTesistaCorreo.trim().toLowerCase();
     const extraIng = nuevoIngCorreo.trim().toLowerCase();
     const listaTesistasFinal = Array.from(
@@ -422,30 +398,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
       mensajeChat.trim() ||
       `Estimado(a):\n\nSe remite comunicado y flyer oficial de la Escuela Profesional de Ingeniería Industrial — Universidad Nacional de Trujillo.\n\nAtentamente,\n${emailStatus.senderName || 'Secretaría de Escuela de Ingeniería Industrial UNT'}`;
 
-    const enlaces = construirEnlacesCorreo(todosDestinatarios, asuntoChat, textoMensajeFinal);
-    setEnlaceGmailListo(null);
-
-    // Si hay un Flyer cargado, copiar la imagen automáticamente al portapapeles para pegarla con Ctrl+V si usa Gmail Web
-    if (flyerPreview && navigator.clipboard && 'write' in navigator.clipboard) {
-      fetch(flyerPreview)
-        .then((r) => r.blob())
-        .then((blob) => {
-          const item = new ClipboardItem({ [blob.type || 'image/png']: blob });
-          navigator.clipboard.write([item]).catch(() => {});
-        })
-        .catch(() => {});
-    }
-
-    // Si vinculó su correo en Modo Directo 1 Clic (sin conector Apps Script ni clave SMTP), abrir Gmail SÍNCRONAMENTE antes del await
-    let ventanaAbiertaSincrona = false;
-    if (!emailStatus.configured) {
-      const win = window.open(enlaces.gmailUrl, '_blank');
-      ventanaAbiertaSincrona = Boolean(win);
-      if (!ventanaAbiertaSincrona) {
-        setEnlaceGmailListo(enlaces);
-      }
-    }
-
+    setConfirmacionEnvio(null);
     setEnviandoCorreo(true);
     try {
       const res = await logisticaSecretariaService.enviarDespachoCorreo({
@@ -484,37 +437,13 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setHistorialChat(nuevoHistorial);
       await logisticaSecretariaService.saveHistorialDespachos(nuevoHistorial);
 
-      if (res.mode === 'smtp-direct') {
-        setEnlaceGmailListo(null);
-        agregarToast('success', 'Correo Enviado', res.message);
-      } else {
-        setEnlaceGmailListo(enlaces);
-        if (!ventanaAbiertaSincrona) {
-          const win = window.open(enlaces.gmailUrl, '_blank');
-          if (win) {
-            agregarToast(
-              'success',
-              'Abierto en Gmail',
-              `Se abrió Gmail con el correo para ${todosDestinatarios.join(', ')} listo para enviar.`
-            );
-          } else {
-            agregarToast(
-              'info',
-              'Correo Preparado',
-              'Haz clic en el botón "Abrir en Gmail y Enviar" que apareció abajo.'
-            );
-          }
-        } else {
-          agregarToast(
-            'success',
-            'Listo en Gmail',
-            `Se abrió Gmail con ${todosDestinatarios.join(', ')} ya cargado.`
-          );
-        }
-      }
+      setConfirmacionEnvio({
+        destinatarios: todosDestinatarios,
+        fechaHora
+      });
+      agregarToast('success', 'Correo Enviado', res.message);
     } catch (err: any) {
-      setEnlaceGmailListo(enlaces);
-      agregarToast('error', 'Error', err?.message || 'Use el botón directo de Gmail abajo.');
+      agregarToast('error', 'No se pudo enviar desde el servidor', err?.message || 'Error de envío.');
     } finally {
       setEnviandoCorreo(false);
     }
@@ -1322,34 +1251,19 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   <Send className="w-4 h-4" />
                   <span>
                     {enviandoCorreo
-                      ? 'Enviando...'
-                      : `Enviar a los Correos Seleccionados (${tesistasChecks.length + juradoChecks.length})`}
+                      ? 'Enviando desde el sistema...'
+                      : `Enviar Ahora (${tesistasChecks.length + juradoChecks.length})`}
                   </span>
                 </button>
 
-                {enlaceGmailListo && (
-                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 space-y-2.5 animate-in fade-in">
-                    <div className="text-xs font-bold text-emerald-950">
-                      ✓ Correo preparado para: <span className="font-mono">{enlaceGmailListo.destinatarios.join(', ')}</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <a
-                        href={enlaceGmailListo.gmailUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 py-2.5 px-4 rounded-xl bg-[#082F64] hover:bg-[#0C4D96] text-white font-extrabold text-xs text-center shadow-xs inline-flex items-center justify-center gap-1.5"
-                      >
-                        <Mail className="w-4 h-4 text-amber-300" />
-                        <span>Abrir en Gmail y Enviar Ahora</span>
-                      </a>
-                      <a
-                        href={enlaceGmailListo.mailtoUrl}
-                        className="py-2.5 px-3.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-bold text-xs inline-flex items-center justify-center gap-1.5"
-                      >
-                        <Send className="w-3.5 h-3.5 text-unt-blue" />
-                        <span>Abrir en App de Correo</span>
-                      </a>
-                    </div>
+                {confirmacionEnvio && (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-xs font-bold text-emerald-950 flex items-center justify-between gap-2 animate-in fade-in">
+                    <span>
+                      ✓ Enviado directamente a: <span className="font-mono">{confirmacionEnvio.destinatarios.join(', ')}</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-emerald-700 shrink-0">
+                      {confirmacionEnvio.fechaHora}
+                    </span>
                   </div>
                 )}
               </form>
@@ -2112,18 +2026,18 @@ export const SecretariaLogisticsPage: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL PARA VINCULAR CORREO @UNITRU.EDU.PE (3 OPCIONES SIN BLOQUEO DE CONTRASEÑA DE APLICACIÓN) */}
+      {/* MODAL SIMPLE EN 1 CLIC PARA VINCULAR CORREO DE SECRETARÍA */}
       {modalCorreoAbierto && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
           onClick={() => setModalCorreoAbierto(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 bg-[#082F64] text-white flex items-center justify-between">
-              <h3 className="text-sm font-bold">Vincular Correo (@unitru.edu.pe o Gmail)</h3>
+              <h3 className="text-sm font-bold">Vincular Mi Correo</h3>
               <button
                 type="button"
                 onClick={() => setModalCorreoAbierto(false)}
@@ -2139,20 +2053,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 try {
                   const st = await logisticaSecretariaService.saveEmailConfig({
                     senderEmail: cfgEmailInput,
-                    senderName: cfgNameInput,
-                    appPassword: modoVinculacion === 'smtp' ? cfgPassInput : '',
-                    appsScriptUrl: modoVinculacion === 'workspace' ? cfgGasUrlInput : ''
+                    senderName: cfgNameInput
                   });
                   setEmailStatus(st);
-                  setCfgPassInput('');
                   setModalCorreoAbierto(false);
-                  agregarToast(
-                    'success',
-                    'Correo Vinculado',
-                    st.mode === 'google-workspace-https'
-                      ? `Quedó activo el envío automático en 1 clic para ${st.senderEmail}.`
-                      : `Quedó vinculado ${st.senderEmail}.`
-                  );
+                  agregarToast('success', 'Correo Vinculado', `Quedó vinculado ${st.senderEmail}.`);
                 } catch (err: any) {
                   agregarToast('error', 'Error', err.message);
                 }
@@ -2161,7 +2066,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
             >
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
-                  Correo Institucional o Gmail:
+                  Correo (@unitru.edu.pe o @gmail.com):
                 </label>
                 <input
                   type="email"
@@ -2172,120 +2077,6 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   className="w-full p-2.5 rounded-xl border border-slate-300 font-mono"
                 />
               </div>
-
-              {/* Selector de Modo de Vinculación (Especial para @unitru.edu.pe donde Google bloquea Contraseñas de Aplicación) */}
-              <div className="space-y-2">
-                <label className="block font-bold text-slate-700">
-                  Método de conexión:
-                </label>
-                <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => setModoVinculacion('directo')}
-                    className={`py-2 px-2 rounded-lg font-bold text-[11px] cursor-pointer transition-all ${
-                      modoVinculacion === 'directo'
-                        ? 'bg-[#082F64] text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    1. Directo (Sin clave)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setModoVinculacion('workspace')}
-                    className={`py-2 px-2 rounded-lg font-bold text-[11px] cursor-pointer transition-all ${
-                      modoVinculacion === 'workspace'
-                        ? 'bg-[#082F64] text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    2. Auto @unitru
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setModoVinculacion('smtp')}
-                    className={`py-2 px-2 rounded-lg font-bold text-[11px] cursor-pointer transition-all ${
-                      modoVinculacion === 'smtp'
-                        ? 'bg-[#082F64] text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    3. Clave Gmail
-                  </button>
-                </div>
-              </div>
-
-              {/* MODO 1: DIRECTO SIN CLAVE (FUNCIONA AL INSTANTE CON @UNITRU.EDU.PE) */}
-              {modoVinculacion === 'directo' && (
-                <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200 text-slate-700 space-y-1">
-                  <div className="font-bold text-[#082F64]">
-                    ✓ Recomendado para @unitru.edu.pe (0 contraseñas)
-                  </div>
-                  <p className="text-[11px] leading-relaxed">
-                    Las cuentas <strong>@unitru.edu.pe</strong> tienen desactivadas las "Contraseñas de aplicación" por la UNT. Con esta opción no necesitas ninguna clave: al enviar, se abre tu correo institucional con todos los destinatarios, asunto y mensaje cargados (y el flyer copiado al portapapeles).
-                  </p>
-                </div>
-              )}
-
-              {/* MODO 2: CONECTOR GOOGLE WORKSPACE (@UNITRU.EDU.PE ENVÍO AUTOMÁTICO SIN CONTRASEÑA DE APLICACIÓN) */}
-              {modoVinculacion === 'workspace' && (
-                <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200 space-y-2.5">
-                  <div className="font-bold text-emerald-950">
-                    Envío 100% automático desde @unitru.edu.pe (vía Google Apps Script)
-                  </div>
-                  <p className="text-[11px] text-slate-700 leading-snug">
-                    Permite enviar correos y flyers en 1 clic desde tu cuenta <strong>@unitru.edu.pe</strong> sin usar contraseñas de aplicación:
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const scriptCode = `function doPost(e) {\n  var d = JSON.parse(e.postData.contents);\n  var opts = { htmlBody: d.htmlBody, name: d.fromName || 'Secretaría Ing. Industrial UNT' };\n  if (d.flyerBase64) {\n    var blob = Utilities.newBlob(Utilities.base64Decode(d.flyerBase64), d.flyerMime || 'image/png', d.flyerName || 'Flyer_UNT.png');\n    opts.inlineImages = { flyer_unt_cid: blob };\n    opts.attachments = [blob];\n  }\n  MailApp.sendEmail(d.toList.join(','), d.subject, d.textBody || '', opts);\n  return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);\n}`;
-                        navigator.clipboard.writeText(scriptCode);
-                        setCodigoGasCopiado(true);
-                        setTimeout(() => setCodigoGasCopiado(false), 3000);
-                      }}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#082F64] text-white font-bold text-[11px] cursor-pointer"
-                    >
-                      {codigoGasCopiado ? '✓ Código copiado' : '1. Copiar código'}
-                    </button>
-                    <a
-                      href="https://script.google.com/home/start"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 text-[#082F64] font-bold text-[11px]"
-                    >
-                      2. Abrir script.google.com ↗
-                    </a>
-                  </div>
-                  <div className="text-[10px] text-slate-600">
-                    En script.google.com: crea un proyecto, pega el código, dale a <strong>Implementar → Nueva implementación → Aplicación web (Acceso: Cualquier persona)</strong> y pega aquí la URL:
-                  </div>
-                  <input
-                    type="url"
-                    value={cfgGasUrlInput}
-                    onChange={(e) => setCfgGasUrlInput(e.target.value)}
-                    placeholder="https://script.google.com/macros/s/.../exec"
-                    className="w-full p-2 rounded-lg border border-emerald-300 bg-white font-mono text-[11px]"
-                  />
-                </div>
-              )}
-
-              {/* MODO 3: CLAVE SMTP (SOLO PARA @GMAIL.COM PERSONAL) */}
-              {modoVinculacion === 'smtp' && (
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                  <div className="text-[11px] text-slate-600">
-                    Solo para cuentas <strong>@gmail.com</strong> personales que tengan habilitada una clave de aplicación de 16 letras:
-                  </div>
-                  <input
-                    type="password"
-                    value={cfgPassInput}
-                    onChange={(e) => setCfgPassInput(e.target.value)}
-                    placeholder="Clave de 16 letras"
-                    className="w-full p-2 rounded-xl border border-slate-300 bg-white font-mono"
-                  />
-                </div>
-              )}
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
@@ -2299,7 +2090,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 rounded-xl bg-[#082F64] text-white font-bold cursor-pointer"
                 >
-                  Vincular Ahora
+                  Vincular en 1 Clic
                 </button>
               </div>
             </form>

@@ -24,8 +24,7 @@ import {
 import {
   getEmailStatus,
   saveEmailConfig,
-  dispatchAnnouncementEmail,
-  sendSmtpTlsMail
+  dispatchAnnouncementEmail
 } from './emailEngine.mjs';
 import {
   saveOAuthCredentials,
@@ -542,17 +541,6 @@ export async function handleApiRequest(req, res) {
       sendJson(res, 200, out);
     } catch (err) {
       sendJson(res, 400, { error: err?.message || 'No se pudo procesar el envío de correo.' });
-    }
-    return true;
-  }
-
-  if (urlObj.pathname === '/api/correo/smtp-relay' && req.method === 'POST') {
-    try {
-      const body = await readJsonBody(req, 12 * 1024 * 1024);
-      const out = await sendSmtpTlsMail({ ...body, timeoutMs: 6000 });
-      sendJson(res, 200, out);
-    } catch (err) {
-      sendJson(res, 400, { ok: false, error: err?.message || 'Error en relay SMTP.' });
     }
     return true;
   }

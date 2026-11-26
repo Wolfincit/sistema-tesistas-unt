@@ -22,10 +22,10 @@ const TITULO_SUSTENTACIONES_KEY = 'unt_industrial_titulo_sustentaciones_v1';
 
 export interface EmailConfigStatus {
   configured: boolean;
-  mode?: 'google-workspace-https' | 'smtp' | 'gmail-direct';
+  serverTransportReady?: boolean;
+  mode?: 'cloud-https' | 'smtp' | 'unconfigured';
   senderEmail: string;
   senderName: string;
-  appsScriptUrl?: string;
   smtpHost: string;
 }
 
