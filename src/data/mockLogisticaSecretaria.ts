@@ -220,7 +220,7 @@ export interface DespachoChatAnuncioItem {
   flyerNombre?: string;
   tesistasDestinatarios: { nombre: string; correo: string }[];
   juradoDestinatarios: { nombre: string; correo: string }[];
-  modoEnvio: 'smtp-direct' | 'assisted-gmail' | 'registro-interno';
+  modoEnvio: 'smtp-direct' | 'registro-interno';
   enviadoPor: string;
 }
 

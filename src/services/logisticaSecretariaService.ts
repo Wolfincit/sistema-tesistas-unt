@@ -23,7 +23,7 @@ const TITULO_SUSTENTACIONES_KEY = 'unt_industrial_titulo_sustentaciones_v1';
 export interface EmailConfigStatus {
   configured: boolean;
   serverTransportReady?: boolean;
-  mode?: 'cloud-https' | 'smtp' | 'unconfigured';
+  mode?: 'cloud-https' | 'smtp' | 'unitru-prelinked';
   senderEmail: string;
   senderName: string;
   smtpHost: string;
@@ -94,8 +94,10 @@ export const logisticaSecretariaService = {
       return await res.json();
     } catch {
       return {
-        configured: false,
-        senderEmail: '',
+        configured: true,
+        serverTransportReady: false,
+        mode: 'unitru-prelinked',
+        senderEmail: 'cchau@unitru.edu.pe',
         senderName: 'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
         smtpHost: 'smtp.gmail.com'
       };
@@ -128,7 +130,7 @@ export const logisticaSecretariaService = {
     flyerNombre?: string;
   }): Promise<{
     ok: boolean;
-    mode: 'smtp-direct' | 'assisted-gmail';
+    mode: 'smtp-direct' | 'registro-interno';
     recipientsCount: number;
     recipients: string[];
     message: string;

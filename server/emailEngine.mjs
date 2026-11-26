@@ -1,18 +1,21 @@
 /**
  * Motor de Despacho de Correos Institucionales y Flyers — Secretaría Ing. Industrial UNT (Srta. Celia)
  *
- * - Permite vincular cualquier correo emisor (@unitru.edu.pe o @gmail.com) mediante SMTP TLS nativo
- *   (puerto 465 smtp.gmail.com) sin requerir paquetes externos pesados.
- * - Envía anuncios, alertas logísticas y flyers (imágenes embebidas y adjuntas) a los correos
- *   seleccionados con check [✓] tanto de Tesistas como del Jurado (Ingenieros UNT).
- * - Si aún no se ha configurado contraseña de aplicación SMTP, devuelve modo asistido Gmail Web
- *   para que la Srta. Celia pueda despachar el correo en 1 clic sin quedarse bloqueada nunca.
+ * - Viene pre-vinculado por defecto al correo institucional @unitru.edu.pe de Secretaría (cchau@unitru.edu.pe).
+ * - Envía los correos y flyers directamente desde el sistema por HTTPS (puerto 443) sin abrir pestañas externas:
+ *   1) API HTTPS Brevo / Resend (puerto 443, compatible con Render y servidores UNT).
+ *   2) Google Workspace OAuth 2.0 (@unitru.edu.pe vía HTTPS sin contraseña de aplicación).
+ *   3) Conector HTTPS institucional preconfigurado en servidor (UNT_GAS_WEBHOOK_URL).
+ *   4) SMTP TLS nativo cuando el servidor permite salida por puerto 465.
  */
 
 import tls from 'node:tls';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sendGoogleOAuthMail } from './googleDriveEngine.mjs';
+
+const DEFAULT_UNT_EMAIL = 'cchau@unitru.edu.pe';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,7 +25,7 @@ function readEmailConfig() {
   try {
     if (!fs.existsSync(EMAIL_CONFIG_PATH)) {
       return {
-        senderEmail: process.env.UNT_SMTP_EMAIL || '',
+        senderEmail: process.env.UNT_SMTP_EMAIL || DEFAULT_UNT_EMAIL,
         senderName:
           process.env.UNT_SMTP_NAME ||
           'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
@@ -38,7 +41,7 @@ function readEmailConfig() {
     }
     const raw = JSON.parse(fs.readFileSync(EMAIL_CONFIG_PATH, 'utf-8'));
     return {
-      senderEmail: raw.senderEmail || process.env.UNT_SMTP_EMAIL || '',
+      senderEmail: raw.senderEmail || process.env.UNT_SMTP_EMAIL || DEFAULT_UNT_EMAIL,
       senderName:
         raw.senderName ||
         process.env.UNT_SMTP_NAME ||
@@ -54,7 +57,7 @@ function readEmailConfig() {
     };
   } catch {
     return {
-      senderEmail: process.env.UNT_SMTP_EMAIL || '',
+      senderEmail: process.env.UNT_SMTP_EMAIL || DEFAULT_UNT_EMAIL,
       senderName: 'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
       appPassword: process.env.UNT_SMTP_PASSWORD || '',
       appsScriptUrl: process.env.UNT_GAS_WEBHOOK_URL || '',
@@ -77,10 +80,10 @@ export function getEmailStatus() {
   );
   const hasSmtp = Boolean((cfg.senderEmail || process.env.UNT_SMTP_EMAIL) && cfg.appPassword);
   return {
-    configured: Boolean(cfg.senderEmail || hasCloudApi),
+    configured: Boolean(cfg.senderEmail),
     serverTransportReady: Boolean(hasCloudApi || hasSmtp),
-    mode: hasCloudApi ? 'cloud-https' : hasSmtp ? 'smtp' : 'unconfigured',
-    senderEmail: cfg.senderEmail || '',
+    mode: hasCloudApi ? 'cloud-https' : hasSmtp ? 'smtp' : 'unitru-prelinked',
+    senderEmail: cfg.senderEmail || DEFAULT_UNT_EMAIL,
     senderName:
       cfg.senderName || 'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
     smtpHost: cfg.smtpHost || 'smtp.gmail.com'
@@ -101,8 +104,8 @@ export function saveEmailConfig({
   const cleanName = String(
     senderName || 'Srta. Celia — Secretaría Académica Ing. Industrial UNT'
   ).trim();
-  if (!cleanEmail || !cleanEmail.includes('@')) {
-    throw new Error('Ingrese un correo electrónico válido.');
+  if (!cleanEmail || !cleanEmail.endsWith('@unitru.edu.pe')) {
+    throw new Error('Ingrese un correo institucional válido terminado en @unitru.edu.pe.');
   }
   const existing = readEmailConfig();
   const data = {
@@ -121,6 +124,61 @@ export function saveEmailConfig({
  * Cliente SMTP sobre TLS nativo (Node.js node:tls) forzando IPv4 (family: 4)
  * y con timeout rápido de conexión para detectar bloqueos de puerto 465 en la nube.
  */
+function buildMimeMessagePayload({
+  fromEmail,
+  fromName,
+  replyTo,
+  toList,
+  subject,
+  htmlBody,
+  attachment
+}) {
+  const boundary = `----=_UNT_Industrial_Boundary_${Date.now().toString(16)}`;
+  const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, 'utf-8').toString('base64')}?=`;
+  const encodedFromName = `=?UTF-8?B?${Buffer.from(fromName, 'utf-8').toString('base64')}?=`;
+  const headers = [
+    `From: "${encodedFromName}" <${fromEmail}>`,
+    `Reply-To: ${replyTo || fromEmail}`,
+    `To: ${toList.join(', ')}`,
+    `Subject: ${encodedSubject}`,
+    `Date: ${new Date().toUTCString()}`,
+    'MIME-Version: 1.0',
+    `Content-Type: multipart/related; boundary="${boundary}"`
+  ];
+
+  const htmlBase64 = Buffer.from(htmlBody, 'utf-8')
+    .toString('base64')
+    .replace(/(.{76})/g, '$1\r\n');
+  const bodyParts = [
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    htmlBase64
+  ];
+
+  if (attachment && attachment.base64Data) {
+    const cleanB64 = attachment.base64Data
+      .replace(/^data:[^;]+;base64,/, '')
+      .replace(/\s+/g, '');
+    const wrappedB64 = cleanB64.replace(/(.{76})/g, '$1\r\n');
+    const mimeType = attachment.mimeType || 'image/png';
+    const fileName = attachment.fileName || 'Flyer_Sustentacion_UNT.png';
+    bodyParts.push(
+      `--${boundary}`,
+      `Content-Type: ${mimeType}; name="${fileName}"`,
+      'Content-Transfer-Encoding: base64',
+      'Content-ID: <flyer_unt_cid>',
+      `Content-Disposition: inline; filename="${fileName}"`,
+      '',
+      wrappedB64
+    );
+  }
+
+  bodyParts.push(`--${boundary}--`, '');
+  return [...headers, '', ...bodyParts].join('\r\n');
+}
+
 function sendSmtpTlsMail({
   host,
   port,
@@ -204,48 +262,16 @@ function sendSmtpTlsMail({
 
     const recipientsQueue = [...toList];
 
-    const buildMimeMessage = () => {
-      const boundary = `----=_UNT_Industrial_Boundary_${Date.now().toString(16)}`;
-      const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, 'utf-8').toString('base64')}?=`;
-      const encodedFromName = `=?UTF-8?B?${Buffer.from(fromName, 'utf-8').toString('base64')}?=`;
-      const headers = [
-        `From: "${encodedFromName}" <${user}>`,
-        `Reply-To: ${replyTo || user}`,
-        `To: ${toList.join(', ')}`,
-        `Subject: ${encodedSubject}`,
-        `Date: ${new Date().toUTCString()}`,
-        'MIME-Version: 1.0',
-        `Content-Type: multipart/related; boundary="${boundary}"`
-      ];
-
-      const htmlBase64 = Buffer.from(htmlBody, 'utf-8').toString('base64').replace(/(.{76})/g, '$1\r\n');
-      let bodyParts = [
-        `--${boundary}`,
-        'Content-Type: text/html; charset="UTF-8"',
-        'Content-Transfer-Encoding: base64',
-        '',
-        htmlBase64
-      ];
-
-      if (attachment && attachment.base64Data) {
-        const cleanB64 = attachment.base64Data.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
-        const wrappedB64 = cleanB64.replace(/(.{76})/g, '$1\r\n');
-        const mimeType = attachment.mimeType || 'image/png';
-        const fileName = attachment.fileName || 'Flyer_Sustentacion_UNT.png';
-        bodyParts.push(
-          `--${boundary}`,
-          `Content-Type: ${mimeType}; name="${fileName}"`,
-          'Content-Transfer-Encoding: base64',
-          'Content-ID: <flyer_unt_cid>',
-          `Content-Disposition: inline; filename="${fileName}"`,
-          '',
-          wrappedB64
-        );
-      }
-
-      bodyParts.push(`--${boundary}--`, '');
-      return [...headers, '', ...bodyParts].join('\r\n');
-    };
+    const buildMimeMessage = () =>
+      buildMimeMessagePayload({
+        fromEmail: user,
+        fromName,
+        replyTo,
+        toList,
+        subject,
+        htmlBody,
+        attachment
+      });
 
     socket.on('error', (err) => fail(err));
 
@@ -362,6 +388,36 @@ export async function dispatchAnnouncementEmail({
       </div>
     </div>
   `;
+
+  // 0. VÍA GOOGLE WORKSPACE OAUTH 2.0 HTTPS (Envía desde la misma cuenta @unitru.edu.pe sin contraseña de aplicación)
+  try {
+    const rawMime = buildMimeMessagePayload({
+      fromEmail: cfg.senderEmail || DEFAULT_UNT_EMAIL,
+      fromName: cfg.senderName,
+      replyTo: cfg.senderEmail || DEFAULT_UNT_EMAIL,
+      toList: todos,
+      subject: subjectFinal,
+      htmlBody,
+      attachment
+    });
+    const rawMimeBase64Url = Buffer.from(rawMime, 'utf-8')
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+    const oauthResult = await sendGoogleOAuthMail({ rawMimeBase64Url });
+    if (oauthResult.sent) {
+      return {
+        ok: true,
+        mode: 'smtp-direct',
+        recipientsCount: todos.length,
+        recipients: todos,
+        message: `Correo enviado directamente desde ${cfg.senderEmail || DEFAULT_UNT_EMAIL} a ${todos.join(', ')}.`
+      };
+    }
+  } catch {
+    // Continúa a las demás vías HTTPS
+  }
 
   // 1. VÍA CLOUD HTTPS (Puerto 443): Brevo API v3 (preconfigurado en el servidor sin pedir claves a la secretaria)
   if (cfg.brevoApiKey) {

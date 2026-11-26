@@ -43,6 +43,7 @@ const GOOGLE_DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
 
 const DRIVE_SCOPES = [
   'https://www.googleapis.com/auth/drive',
+  'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile'
 ].join(' ');
@@ -543,6 +544,27 @@ export async function handleOAuthCallback({ code, state, origin }) {
   });
 
   return { accountEmail, accountName };
+}
+
+export async function sendGoogleOAuthMail({ rawMimeBase64Url }) {
+  if (!isDriveConnected()) {
+    return { sent: false, reason: 'OAuth @unitru no conectado' };
+  }
+  const token = await getValidAccessToken();
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ raw: rawMimeBase64Url })
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    return { sent: false, reason: `HTTP ${res.status}: ${errText.slice(0, 120)}` };
+  }
+  const json = await res.json().catch(() => ({}));
+  return { sent: true, id: json.id || '' };
 }
 
 export async function disconnectDrive() {

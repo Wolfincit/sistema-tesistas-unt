@@ -93,11 +93,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
     logisticaSecretariaService.getHistorialDespachos()
   );
 
-  // Correo vinculado de la Srta. Celia (cuando está vinculado, solo muestra la tuerca ⚙️)
+  // Correo institucional pre-vinculado de la Srta. Celia (@unitru.edu.pe)
   const [emailStatus, setEmailStatus] = useState<EmailConfigStatus>({
-    configured: false,
-    senderEmail: '',
-    senderName: 'Srta. Celia — Secretaría Ing. Industrial UNT',
+    configured: true,
+    senderEmail: 'cchau@unitru.edu.pe',
+    senderName: 'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
     smtpHost: 'smtp.gmail.com'
   });
   const [modalCorreoAbierto, setModalCorreoAbierto] = useState<boolean>(false);
@@ -2057,7 +2057,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   });
                   setEmailStatus(st);
                   setModalCorreoAbierto(false);
-                  agregarToast('success', 'Correo Vinculado', `Quedó vinculado ${st.senderEmail}.`);
+                  agregarToast('success', 'Correo Institucional Vinculado', `Remitente activo: ${st.senderEmail}`);
                 } catch (err: any) {
                   agregarToast('error', 'Error', err.message);
                 }
@@ -2066,7 +2066,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
             >
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
-                  Correo (@unitru.edu.pe o @gmail.com):
+                  Correo Institucional (@unitru.edu.pe):
                 </label>
                 <input
                   type="email"
