@@ -17,7 +17,9 @@ import {
 import { pushClientService, PushStatsInfo } from '../services/pushClientService';
 import {
   generarFlyerOficialPng,
-  construirTextoWhatsAppDocentes
+  construirTextoWhatsAppDocentes,
+  FlyerSustentacionInput,
+  TipoFlyerInvitacion
 } from '../utils/flyerGenerator';
 import { SecretariaHoyTab } from '../components/secretaria/SecretariaHoyTab';
 import { SecretariaColacionTab } from '../components/secretaria/SecretariaColacionTab';
@@ -551,6 +553,31 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [whatsappDocentesTexto, setWhatsappDocentesTexto] = useState<string>('');
   const [generandoFlyer, setGenerandoFlyer] = useState<boolean>(false);
   const [tesistaDespachoActivoId, setTesistaDespachoActivoId] = useState<string>('');
+  const [flyerDatosActivos, setFlyerDatosActivos] = useState<FlyerSustentacionInput | null>(null);
+
+  const regenerarFlyerDesdeDatos = async (datos: FlyerSustentacionInput, actualizarTextoCorreo = true) => {
+    setFlyerDatosActivos(datos);
+    setWhatsappDocentesTexto(construirTextoWhatsAppDocentes(datos));
+    if (actualizarTextoCorreo) {
+      const esReprog = datos.tipo === 'reprogramacion';
+      const prefijoAsunto = esReprog ? 'Reprogramación de Sustentación de Tesis' : 'Invitación a Sustentación de Tesis';
+      const bachilleresStr = [datos.tesistaNombre, datos.segundoBachiller].filter(Boolean).join(' / ');
+      setAsuntoChat(`${prefijoAsunto}: ${bachilleresStr} (${datos.fechaJueves} · ${datos.horario})`);
+      setMensajeChat(
+        `Estimados miembros del Jurado y Bachiller(es) ${bachilleresStr}:\n\nSe remite el flyer y citación oficial de ${esReprog ? 'REPROGRAMACIÓN de ' : ''}sustentación pública del trabajo de tesis "${datos.tituloTesis}", programada para el ${datos.fechaJueves} a las ${datos.horario} en ${datos.lugar}.\n\nJurado Evaluador:\n- ${datos.juradoPresidente}\n- ${datos.juradoSecretario}\n- ${datos.juradoVocal}${datos.asesor ? `\nAsesor: ${datos.asesor}` : ''}\n\nAtentamente,\nSrta. Celia — Secretaría de Escuela de Ingeniería Industrial UNT`
+      );
+    }
+    setGenerandoFlyer(true);
+    try {
+      const generado = await generarFlyerOficialPng(datos);
+      setFlyerPreview(generado.dataUrl);
+      setFlyerNombre(generado.fileName);
+    } catch {
+      // Puede subir uno manual si falla canvas
+    } finally {
+      setGenerandoFlyer(false);
+    }
+  };
 
   const handleSubirFlyerImagen = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -567,19 +594,14 @@ export const SecretariaLogisticsPage: React.FC = () => {
     seg: SeguimientoTesisItem,
     fechaJueves?: string,
     horarioJueves?: string,
-    lugarJueves?: string
+    lugarJueves?: string,
+    tipoFlyer: TipoFlyerInvitacion = 'normal'
   ) => {
     const fechaStr = fechaJueves || seg.fechaSustentacionProgramada || '2026-11-26';
-    const horarioStr = horarioJueves || '11:00 a.m. - 1:00 p.m.';
-    const lugarStr = lugarJueves || 'Auditorio de Ingeniería Industrial UNT';
+    const horarioStr = horarioJueves || '11:00 a.m.';
+    const lugarStr = lugarJueves || 'Auditorio de la Escuela de Ingeniería Industrial';
 
     setTesistaDespachoActivoId(seg.id);
-    setAsuntoChat(
-      `Sustentación de Tesis: ${seg.tesistaNombre} (${fechaStr} · ${horarioStr})`
-    );
-    setMensajeChat(
-      `Estimados miembros del Jurado y Tesista ${seg.tesistaNombre}:\n\nSe remite el flyer y citación oficial para la sustentación pública de la tesis "${seg.tituloTesis}", programada para el día jueves ${fechaStr} en horario ${horarioStr} (${lugarStr}).\n\nJurado:\n- Presidente: ${seg.juradoPresidente}\n- Secretario: ${seg.juradoSecretario}\n- Vocal: ${seg.juradoVocal}\n\nAtentamente,\nSrta. Celia — Secretaría de Escuela de Ingeniería Industrial UNT`
-    );
 
     if (seg.tesistaCorreo) {
       setTesistasChecks([seg.tesistaCorreo.toLowerCase()]);
@@ -600,8 +622,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
       .map((ing) => ing.correo.toLowerCase());
     setJuradoChecks(correosJuradoMatch);
 
-    const flyerInput = {
+    const flyerInput: FlyerSustentacionInput = {
+      tipo: tipoFlyer,
       tesistaNombre: seg.tesistaNombre,
+      segundoBachiller: '',
       tituloTesis: seg.tituloTesis,
       fechaJueves: fechaStr,
       horario: horarioStr,
@@ -611,20 +635,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
       juradoVocal: seg.juradoVocal,
       asesor: seg.asesor
     };
-    setWhatsappDocentesTexto(construirTextoWhatsAppDocentes(flyerInput));
     setTab('despacho');
-
-    // Generar automáticamente el flyer oficial PNG sin abrir Canva
-    setGenerandoFlyer(true);
-    try {
-      const generado = await generarFlyerOficialPng(flyerInput);
-      setFlyerPreview(generado.dataUrl);
-      setFlyerNombre(generado.fileName);
-    } catch {
-      // Puede subir uno manual si falla canvas
-    } finally {
-      setGenerandoFlyer(false);
-    }
+    await regenerarFlyerDesdeDatos(flyerInput, true);
   };
 
   const handleEnviarAnuncioYFlyer = async (e: React.FormEvent) => {
@@ -1572,6 +1584,138 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 onSubmit={handleEnviarAnuncioYFlyer}
                 className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4 text-xs"
               >
+                {/* Selector Rápido de Plantilla Oficial de la Escuela (Invitación Normal vs Reprogramación) */}
+                {flyerDatosActivos && (
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-left">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-unt-blue">
+                        Plantilla Oficial del Flyer
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            regenerarFlyerDesdeDatos({ ...flyerDatosActivos, tipo: 'normal' }, true)
+                          }
+                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                            (flyerDatosActivos.tipo || 'normal') === 'normal'
+                              ? 'bg-[#004AAD] text-white shadow-2xs'
+                              : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          Invitación Normal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            regenerarFlyerDesdeDatos({ ...flyerDatosActivos, tipo: 'reprogramacion' }, true)
+                          }
+                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                            flyerDatosActivos.tipo === 'reprogramacion'
+                              ? 'bg-amber-500 text-slate-950 shadow-2xs'
+                              : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          Reprogramación
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Día</label>
+                        <input
+                          type="date"
+                          value={flyerDatosActivos.fechaJueves}
+                          onChange={(e) =>
+                            regenerarFlyerDesdeDatos(
+                              { ...flyerDatosActivos, fechaJueves: e.target.value },
+                              true
+                            )
+                          }
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Hora</label>
+                        <input
+                          type="text"
+                          value={flyerDatosActivos.horario}
+                          onChange={(e) =>
+                            regenerarFlyerDesdeDatos(
+                              { ...flyerDatosActivos, horario: e.target.value },
+                              false
+                            )
+                          }
+                          placeholder="11:00 a.m."
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Lugar (Auditorio o Aula)</label>
+                        <input
+                          type="text"
+                          value={flyerDatosActivos.lugar}
+                          onChange={(e) =>
+                            regenerarFlyerDesdeDatos(
+                              { ...flyerDatosActivos, lugar: e.target.value },
+                              false
+                            )
+                          }
+                          placeholder="Auditorio de la Escuela de Ingeniería Industrial"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                          2.º Bachiller (opcional si son 2 tesistas)
+                        </label>
+                        <input
+                          type="text"
+                          value={flyerDatosActivos.segundoBachiller || ''}
+                          onChange={(e) =>
+                            regenerarFlyerDesdeDatos(
+                              { ...flyerDatosActivos, segundoBachiller: e.target.value },
+                              false
+                            )
+                          }
+                          placeholder="Ej. DALIA DANIA SOLANO CASTILLO"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs"
+                        />
+                      </div>
+                      <div className="flex items-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            regenerarFlyerDesdeDatos(
+                              {
+                                ...flyerDatosActivos,
+                                lugar: 'Auditorio de la Escuela de Ingeniería Industrial'
+                              },
+                              false
+                            )
+                          }
+                          className="flex-1 py-1.5 px-2 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-[11px] font-bold text-slate-700 cursor-pointer"
+                        >
+                          Auditorio Escuela
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            regenerarFlyerDesdeDatos({ ...flyerDatosActivos, lugar: 'Aula II-6' }, false)
+                          }
+                          className="flex-1 py-1.5 px-2 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-[11px] font-bold text-slate-700 cursor-pointer"
+                        >
+                          Aula II-6
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Caja Grande y Amigable para Subir el Flyer */}
                 <div className="p-4 rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/30 text-center space-y-3">
                   {!flyerPreview ? (
