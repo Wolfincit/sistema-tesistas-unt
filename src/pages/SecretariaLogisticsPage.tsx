@@ -319,6 +319,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [busquedaTesistaCheck, setBusquedaTesistaCheck] = useState<string>('');
   const [busquedaJuradoCheck, setBusquedaJuradoCheck] = useState<string>('');
   const [enviandoCorreo, setEnviandoCorreo] = useState<boolean>(false);
+  const [enlaceGmailListo, setEnlaceGmailListo] = useState<{
+    gmailUrl: string;
+    mailtoUrl: string;
+    destinatarios: string[];
+  } | null>(null);
 
   // Inputs rápidos para añadir tesista o jurado desde las listas de checks
   const [nuevoTesistaNombre, setNuevoTesistaNombre] = useState<string>('');
@@ -368,33 +373,78 @@ export const SecretariaLogisticsPage: React.FC = () => {
     setTab('despacho');
   };
 
+  const construirEnlacesCorreo = (destinatarios: string[], asunto: string, cuerpo: string) => {
+    const toParam = encodeURIComponent(destinatarios.join(','));
+    const suParam = encodeURIComponent(asunto);
+    const bodyParam = encodeURIComponent(cuerpo);
+    const authUserParam = emailStatus.senderEmail
+      ? `&authuser=${encodeURIComponent(emailStatus.senderEmail)}`
+      : '';
+    return {
+      gmailUrl: `https://mail.google.com/mail/?view=cm&fs=1&to=${toParam}&su=${suParam}&body=${bodyParam}${authUserParam}`,
+      mailtoUrl: `mailto:${destinatarios.join(',')}?subject=${suParam}&body=${bodyParam}`,
+      destinatarios
+    };
+  };
+
   const handleEnviarAnuncioYFlyer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (tesistasChecks.length === 0 && juradoChecks.length === 0) {
+
+    // Si escribió un correo en las cajitas inferiores "+" pero no presionó "+", incluirlo automáticamente
+    const extraTesista = nuevoTesistaCorreo.trim().toLowerCase();
+    const extraIng = nuevoIngCorreo.trim().toLowerCase();
+    const listaTesistasFinal = Array.from(
+      new Set([
+        ...tesistasChecks,
+        ...(extraTesista.includes('@') ? [extraTesista] : [])
+      ])
+    );
+    const listaJuradoFinal = Array.from(
+      new Set([
+        ...juradoChecks,
+        ...(extraIng.includes('@') ? [extraIng] : [])
+      ])
+    );
+    const todosDestinatarios = Array.from(new Set([...listaTesistasFinal, ...listaJuradoFinal]));
+
+    if (todosDestinatarios.length === 0) {
       agregarToast('warning', 'Falta seleccionar correos', 'Marque con check [✓] al menos un correo a la derecha.');
       return;
     }
-    if (!mensajeChat.trim() && !flyerPreview) {
-      agregarToast('warning', 'Falta el flyer o mensaje', 'Suba su flyer o escriba un anuncio antes de enviar.');
-      return;
+
+    const textoMensajeFinal =
+      mensajeChat.trim() ||
+      `Estimado(a):\n\nSe remite comunicado y flyer oficial de la Escuela Profesional de Ingeniería Industrial — Universidad Nacional de Trujillo.\n\nAtentamente,\n${emailStatus.senderName || 'Secretaría de Escuela de Ingeniería Industrial UNT'}`;
+
+    const enlaces = construirEnlacesCorreo(todosDestinatarios, asuntoChat, textoMensajeFinal);
+    setEnlaceGmailListo(null);
+
+    // Si vinculó su correo en 1 clic (sin clave SMTP), abrir Gmail SÍNCRONAMENTE antes del await para que el navegador NUNCA bloquee la ventana
+    let ventanaAbiertaSincrona = false;
+    if (!emailStatus.configured) {
+      const win = window.open(enlaces.gmailUrl, '_blank');
+      ventanaAbiertaSincrona = Boolean(win);
+      if (!ventanaAbiertaSincrona) {
+        setEnlaceGmailListo(enlaces);
+      }
     }
 
     setEnviandoCorreo(true);
     try {
       const res = await logisticaSecretariaService.enviarDespachoCorreo({
         asunto: asuntoChat,
-        mensaje: mensajeChat,
-        tesistasCorreos: tesistasChecks,
-        juradoCorreos: juradoChecks,
+        mensaje: textoMensajeFinal,
+        tesistasCorreos: listaTesistasFinal,
+        juradoCorreos: listaJuradoFinal,
         flyerDataUrl: flyerPreview || undefined,
         flyerNombre: flyerNombre || undefined
       });
 
       const tesistasInfo = seguimientos
-        .filter((s) => tesistasChecks.includes(s.tesistaCorreo.toLowerCase()))
+        .filter((s) => listaTesistasFinal.includes(s.tesistaCorreo.toLowerCase()))
         .map((s) => ({ nombre: s.tesistaNombre, correo: s.tesistaCorreo }));
       const juradoInfo = directorioJurado
-        .filter((j) => juradoChecks.includes(j.correo.toLowerCase()))
+        .filter((j) => listaJuradoFinal.includes(j.correo.toLowerCase()))
         .map((j) => ({ nombre: j.nombre, correo: j.correo }));
 
       const now = new Date();
@@ -404,7 +454,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
         id: `desp-${Date.now()}`,
         fechaHora,
         asunto: asuntoChat,
-        mensaje: mensajeChat || 'Flyer adjunto.',
+        mensaje: textoMensajeFinal,
         flyerDataUrl: flyerPreview || undefined,
         flyerNombre: flyerNombre || undefined,
         tesistasDestinatarios: tesistasInfo,
@@ -418,20 +468,36 @@ export const SecretariaLogisticsPage: React.FC = () => {
       await logisticaSecretariaService.saveHistorialDespachos(nuevoHistorial);
 
       if (res.mode === 'smtp-direct') {
-        agregarToast('success', 'Enviado', res.message);
+        setEnlaceGmailListo(null);
+        agregarToast('success', 'Correo Enviado', res.message);
       } else {
-        const toParam = encodeURIComponent(res.recipients.join(','));
-        const suParam = encodeURIComponent(asuntoChat);
-        const bodyParam = encodeURIComponent(mensajeChat);
-        window.open(
-          `https://mail.google.com/mail/?view=cm&fs=1&to=${toParam}&su=${suParam}&body=${bodyParam}`,
-          '_blank',
-          'noopener,noreferrer'
-        );
-        agregarToast('success', 'Listo en Gmail', `Se abrió Gmail con los ${res.recipientsCount} correos ya cargados.`);
+        setEnlaceGmailListo(enlaces);
+        if (!ventanaAbiertaSincrona) {
+          const win = window.open(enlaces.gmailUrl, '_blank');
+          if (win) {
+            agregarToast(
+              'success',
+              'Abierto en Gmail',
+              `Se abrió Gmail con el correo para ${todosDestinatarios.join(', ')} listo para enviar.`
+            );
+          } else {
+            agregarToast(
+              'info',
+              'Correo Preparado',
+              'Haz clic en el botón "Abrir en Gmail y Enviar" que apareció abajo.'
+            );
+          }
+        } else {
+          agregarToast(
+            'success',
+            'Listo en Gmail',
+            `Se abrió Gmail con ${todosDestinatarios.join(', ')} ya cargado.`
+          );
+        }
       }
     } catch (err: any) {
-      agregarToast('error', 'Error', err.message);
+      setEnlaceGmailListo(enlaces);
+      agregarToast('error', 'Error', err?.message || 'Use el botón directo de Gmail abajo.');
     } finally {
       setEnviandoCorreo(false);
     }
@@ -1256,6 +1322,32 @@ export const SecretariaLogisticsPage: React.FC = () => {
                       : `Enviar a los Correos Seleccionados (${tesistasChecks.length + juradoChecks.length})`}
                   </span>
                 </button>
+
+                {enlaceGmailListo && (
+                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 space-y-2.5 animate-in fade-in">
+                    <div className="text-xs font-bold text-emerald-950">
+                      ✓ Correo preparado para: <span className="font-mono">{enlaceGmailListo.destinatarios.join(', ')}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <a
+                        href={enlaceGmailListo.gmailUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 py-2.5 px-4 rounded-xl bg-[#082F64] hover:bg-[#0C4D96] text-white font-extrabold text-xs text-center shadow-xs inline-flex items-center justify-center gap-1.5"
+                      >
+                        <Mail className="w-4 h-4 text-amber-300" />
+                        <span>Abrir en Gmail y Enviar Ahora</span>
+                      </a>
+                      <a
+                        href={enlaceGmailListo.mailtoUrl}
+                        className="py-2.5 px-3.5 rounded-xl bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-bold text-xs inline-flex items-center justify-center gap-1.5"
+                      >
+                        <Send className="w-3.5 h-3.5 text-unt-blue" />
+                        <span>Abrir en App de Correo</span>
+                      </a>
+                    </div>
+                  </div>
+                )}
               </form>
 
               {/* Historial de Envíos Tipo Chat */}
@@ -1410,11 +1502,13 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={async () => {
-                      if (!nuevoTesistaCorreo.includes('@') || !nuevoTesistaNombre.trim()) return;
+                      if (!nuevoTesistaCorreo.includes('@')) return;
+                      const nombreDefault =
+                        nuevoTesistaNombre.trim() || nuevoTesistaCorreo.split('@')[0];
                       const nuevo: SeguimientoTesisItem = {
                         id: `seg-${Date.now()}`,
-                        codigoMatricula: `1021${Math.floor(100000 + Math.random() * 900000)}`,
-                        tesistaNombre: nuevoTesistaNombre.trim(),
+                        codigoMatricula: `1511${Math.floor(100000 + Math.random() * 900000)}`,
+                        tesistaNombre: nombreDefault,
                         tesistaCorreo: nuevoTesistaCorreo.trim().toLowerCase(),
                         tituloTesis: 'Tesis en seguimiento',
                         lineaInvestigacion: 'Ingeniería Industrial',
@@ -1571,10 +1665,12 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={async () => {
-                      if (!nuevoIngCorreo.includes('@') || !nuevoIngNombre.trim()) return;
+                      if (!nuevoIngCorreo.includes('@')) return;
+                      const nombreIngDefault =
+                        nuevoIngNombre.trim() || `Ing. ${nuevoIngCorreo.split('@')[0]}`;
                       const nuevoIng: IngenieroJuradoItem = {
                         id: `ing-${Date.now()}`,
-                        nombre: nuevoIngNombre.trim(),
+                        nombre: nombreIngDefault,
                         correo: nuevoIngCorreo.trim().toLowerCase(),
                         especialidad: 'Ingeniería Industrial',
                         categoria: 'Docente UNT',

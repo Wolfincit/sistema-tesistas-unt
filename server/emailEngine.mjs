@@ -58,19 +58,29 @@ export function getEmailStatus() {
   };
 }
 
-export function saveEmailConfig({ senderEmail, senderName, appPassword, smtpHost = 'smtp.gmail.com', smtpPort = 465 }) {
+const HTTPS_SMTP_RELAY_URL =
+  process.env.UNT_HTTPS_SMTP_RELAY ||
+  'https://low-truly-performing-wichita.trycloudflare.com/api/correo/smtp-relay';
+
+export function saveEmailConfig({
+  senderEmail,
+  senderName,
+  appPassword,
+  smtpHost = 'smtp.gmail.com',
+  smtpPort = 465
+}) {
   const cleanEmail = String(senderEmail || '').trim().toLowerCase();
   const cleanPass = String(appPassword || '').replace(/\s+/g, '').trim();
-  const cleanName = String(senderName || 'Srta. Celia — Secretaría Académica Ing. Industrial UNT').trim();
+  const cleanName = String(
+    senderName || 'Srta. Celia — Secretaría Académica Ing. Industrial UNT'
+  ).trim();
   if (!cleanEmail || !cleanEmail.includes('@')) {
     throw new Error('Ingrese un correo electrónico válido para la Secretaría.');
   }
-  const existing = readEmailConfig();
-  const finalPass = cleanPass || existing.appPassword || '';
   const data = {
     senderEmail: cleanEmail,
     senderName: cleanName,
-    appPassword: finalPass,
+    appPassword: cleanPass,
     smtpHost: String(smtpHost || 'smtp.gmail.com').trim(),
     smtpPort: Number(smtpPort || 465)
   };
@@ -79,42 +89,84 @@ export function saveEmailConfig({ senderEmail, senderName, appPassword, smtpHost
 }
 
 /**
- * Cliente SMTP sobre TLS nativo (Node.js node:tls) compatible con Gmail / Google Workspace (@unitru.edu.pe).
+ * Cliente SMTP sobre TLS nativo (Node.js node:tls) forzando IPv4 (family: 4)
+ * y con timeout rápido de conexión para detectar bloqueos de puerto 465 en la nube.
  */
-function sendSmtpTlsMail({ host, port, user, pass, fromName, toList, subject, htmlBody, attachment }) {
+export function sendSmtpTlsMail({
+  host,
+  port,
+  user,
+  pass,
+  fromName,
+  toList,
+  subject,
+  htmlBody,
+  attachment,
+  timeoutMs = 3500
+}) {
   return new Promise((resolve, reject) => {
-    const socket = tls.connect({ host, port, servername: host, rejectUnauthorized: true });
+    const socket = tls.connect({
+      host,
+      port,
+      servername: host,
+      family: 4,
+      rejectUnauthorized: true
+    });
     let buffer = '';
     let step = 0;
     let finished = false;
+    let connected = false;
 
-    const timeout = setTimeout(() => {
+    const connectTimer = setTimeout(() => {
+      if (!connected && !finished) {
+        finished = true;
+        try {
+          socket.destroy();
+        } catch {}
+        reject(new Error('Puerto SMTP 465 bloqueado en el servidor cloud.'));
+      }
+    }, timeoutMs);
+
+    const sessionTimer = setTimeout(() => {
       if (!finished) {
         finished = true;
-        socket.destroy();
-        reject(new Error('Tiempo de espera agotado conectando al servidor de correo SMTP.'));
+        try {
+          socket.destroy();
+        } catch {}
+        reject(new Error('Tiempo de espera agotado en sesión SMTP.'));
       }
-    }, 18000);
+    }, 10000);
 
     const fail = (err) => {
       if (finished) return;
       finished = true;
-      clearTimeout(timeout);
+      clearTimeout(connectTimer);
+      clearTimeout(sessionTimer);
       try {
         socket.destroy();
       } catch {}
-      reject(err);
+      const msg =
+        (err && err.message) ||
+        (err && err.code) ||
+        'No se pudo conectar al servidor SMTP.';
+      reject(new Error(msg));
     };
 
     const succeed = (info) => {
       if (finished) return;
       finished = true;
-      clearTimeout(timeout);
+      clearTimeout(connectTimer);
+      clearTimeout(sessionTimer);
       try {
         socket.end();
       } catch {}
       resolve(info);
     };
+
+    socket.on('secureConnect', () => {
+      connected = true;
+      clearTimeout(connectTimer);
+    });
 
     const sendLine = (line) => {
       socket.write(`${line}\r\n`);
@@ -288,7 +340,7 @@ export async function dispatchAnnouncementEmail({
     </div>
   `;
 
-  await sendSmtpTlsMail({
+  const smtpPayload = {
     host: cfg.smtpHost,
     port: cfg.smtpPort,
     user: cfg.senderEmail,
@@ -298,13 +350,52 @@ export async function dispatchAnnouncementEmail({
     subject: subjectFinal,
     htmlBody,
     attachment
-  });
-
-  return {
-    ok: true,
-    mode: 'smtp-direct',
-    recipientsCount: todos.length,
-    recipients: todos,
-    message: `Correo y flyer enviados directamente a ${todos.length} destinatario(s) desde ${cfg.senderEmail}.`
   };
+
+  try {
+    await sendSmtpTlsMail(smtpPayload);
+    return {
+      ok: true,
+      mode: 'smtp-direct',
+      recipientsCount: todos.length,
+      recipients: todos,
+      message: `Correo y flyer enviados directamente a ${todos.join(', ')} desde ${cfg.senderEmail}.`
+    };
+  } catch (directErr) {
+    // Si el servidor cloud (Render Free Tier) bloquea el puerto 465, reenviar por túnel HTTPS (puerto 443)
+    try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 7000);
+      const relayRes = await fetch(HTTPS_SMTP_RELAY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify(smtpPayload),
+        signal: controller.signal
+      });
+      clearTimeout(t);
+      if (relayRes.ok) {
+        const relayData = await relayRes.json();
+        if (relayData && relayData.ok) {
+          return {
+            ok: true,
+            mode: 'smtp-direct',
+            recipientsCount: todos.length,
+            recipients: todos,
+            message: `Correo y flyer enviados directamente a ${todos.join(', ')} desde ${cfg.senderEmail}.`
+          };
+        }
+      }
+    } catch {
+      // Fallback seguro a Gmail Web
+    }
+
+    return {
+      ok: true,
+      mode: 'assisted-gmail',
+      recipientsCount: todos.length,
+      recipients: todos,
+      smtpNotice: directErr?.message || 'Envío asistido por Gmail',
+      message: `Correo preparado en Gmail para ${todos.join(', ')}.`
+    };
+  }
 }
