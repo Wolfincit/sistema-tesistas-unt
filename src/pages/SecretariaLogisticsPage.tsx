@@ -2105,10 +2105,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Opción directa: Agregar correos manuales extra en el flyer (por si acaso) */}
+                {/* Destinatario adicional por correo manual */}
                 <div className="p-3 rounded-xl bg-blue-50/40 border border-blue-200/80 space-y-2">
                   <label className="block text-[11px] font-bold text-[#082F64]">
-                    Añadir correo manual extra (opcional, por si acaso):
+                    Destinatario adicional (correo manual):
                   </label>
                   <div className="flex items-center gap-1.5">
                     <input
