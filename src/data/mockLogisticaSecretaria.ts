@@ -294,75 +294,10 @@ export interface DespachoChatAnuncioItem {
   enviadoPor: string;
 }
 
-export const INITIAL_DIRECTORIO_JURADO: IngenieroJuradoItem[] = [
-  {
-    id: 'ing-prueba-01',
-    nombre: 'Jurado de Prueba 1',
-    correo: 'gicasasas@unitru.edu.pe',
-    especialidad: 'Correo de prueba — Ingeniería Industrial',
-    categoria: 'Prueba',
-    activo: true
-  },
-  {
-    id: 'ing-prueba-02',
-    nombre: 'Jurado de Prueba 2 (Carlos)',
-    correo: 'cdchavezas@unitru.edu.pe',
-    especialidad: 'Correo de prueba — Ingeniería Industrial',
-    categoria: 'Prueba',
-    activo: true
-  }
-];
+export const INITIAL_DIRECTORIO_JURADO: IngenieroJuradoItem[] = [];
 
-export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
-  {
-    id: 'seg-prueba-01',
-    codigoMatricula: '1511300999',
-    tesistaNombre: 'Tesista de Prueba',
-    tesistaCorreo: 'jpmirandava@unitru.edu.pe',
-    tesistaTelefono: '',
-    tituloTesis: 'Propuesta de mejora de procesos industriales (Registro de Prueba)',
-    lineaInvestigacion: 'Ingeniería Industrial',
-    asesor: 'Jurado de Prueba 2 (Carlos)',
-    juradoPresidente: 'Jurado de Prueba 1',
-    juradoSecretario: 'Jurado de Prueba 2 (Carlos)',
-    juradoVocal: 'Jurado de Prueba 1',
-    estacionActual: 4,
-    semaforo: 'operativo',
-    fechaIngresoEstacion: '2026-11-26',
-    fechaInicioTramite: '2026-11-20',
-    ubicacionFisica: 'Auditorio de la Escuela de Ingeniería Industrial',
-    esCuelloBotellaExterno: false,
-    notasSecretaria: 'Registro seguro para pruebas de envío de flyers y notificaciones.',
-    fechaSustentacionProgramada: '2026-11-26',
-    requisitosFisicos: {
-      futFisico: true,
-      voucherTupa: true,
-      reporteTurnitin: true,
-      constanciaPracticas: true,
-      resolucionProyecto: true,
-      tresBorradoresJurado: true
-    }
-  }
-];
+export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [];
 
-export const INITIAL_SUSTENTACIONES_JUEVES: SustentacionJuevesItem[] = [
-  {
-    id: 'jue-prueba-01',
-    fecha: '2026-11-26',
-    horario: '11:00 a.m.',
-    tesistaId: 'seg-prueba-01',
-    tesistaNombre: 'Tesista de Prueba',
-    tesistaCodigo: '1511300999',
-    tesistaCorreo: 'jpmirandava@unitru.edu.pe',
-    tituloTesis: 'Propuesta de mejora de procesos industriales (Registro de Prueba)',
-    asesor: 'Jurado de Prueba 2 (Carlos)',
-    juradoPresidente: 'Jurado de Prueba 1',
-    juradoSecretario: 'Jurado de Prueba 2 (Carlos)',
-    juradoVocal: 'Jurado de Prueba 1',
-    aulaOAuditorio: 'Auditorio de la Escuela de Ingeniería Industrial',
-    estado: 'Programada',
-    observacion: 'Registro seguro para pruebas.'
-  }
-];
+export const INITIAL_SUSTENTACIONES_JUEVES: SustentacionJuevesItem[] = [];
 
 export const INITIAL_HISTORIAL_DESPACHOS: DespachoChatAnuncioItem[] = [];
