@@ -484,6 +484,49 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
     setSeguimientos(actualizados);
     await logisticaSecretariaService.saveSeguimientos(actualizados);
+
+    // Sincronizar también si este tesista ya tiene un Jueves agendado
+    const tieneSust = sustentaciones.some((su) => su.tesistaId === nuevo.id);
+    if (tieneSust) {
+      const sustSync = sustentaciones.map((su) =>
+        su.tesistaId === nuevo.id
+          ? {
+              ...su,
+              tesistaNombre: nuevo.tesistaNombre,
+              tesistaCodigo: nuevo.codigoMatricula,
+              tesistaCorreo: nuevo.tesistaCorreo,
+              tesista2Nombre: nuevo.tesista2Nombre,
+              tesista2Codigo: nuevo.tesista2Codigo,
+              tesista2Correo: nuevo.tesista2Correo,
+              tituloTesis: nuevo.tituloTesis,
+              asesor: nuevo.asesor,
+              juradoPresidente: nuevo.juradoPresidente,
+              juradoSecretario: nuevo.juradoSecretario,
+              juradoVocal: nuevo.juradoVocal
+            }
+          : su
+      );
+      setSustentaciones(sustSync);
+      await logisticaSecretariaService.saveSustentacionesJueves(sustSync);
+    }
+
+    // Si este tesista es el que está cargado en el flyer, regenerar el flyer al instante
+    if (flyerDatosActivos && tesistaDespachoActivoId === nuevo.id) {
+      regenerarFlyerDesdeDatos(
+        {
+          ...flyerDatosActivos,
+          tesistaNombre: nuevo.tesistaNombre,
+          segundoBachiller: nuevo.tesista2Nombre || '',
+          tituloTesis: nuevo.tituloTesis,
+          asesor: nuevo.asesor,
+          juradoPresidente: nuevo.juradoPresidente,
+          juradoSecretario: nuevo.juradoSecretario,
+          juradoVocal: nuevo.juradoVocal
+        },
+        false
+      ).catch(() => {});
+    }
+
     setModalSeguimientoAbierto(false);
     marcarFeedbackGuardado(nuevo.id);
     logisticaSecretariaService.notificarCambioEtapaAutomatico(nuevo).catch(() => { });
@@ -1023,18 +1066,44 @@ export const SecretariaLogisticsPage: React.FC = () => {
       const segActualizados = seguimientos.map((s) =>
         s.id === calTesistaId
           ? {
-            ...s,
-            fechaSustentacionProgramada: fechaJuevesActiva,
-            estacionActual: 4 as EstacionLogisticaId,
-            asesor: calAsesor.trim() || s.asesor,
-            juradoPresidente: calPresidente,
-            juradoSecretario: calSecretario,
-            juradoVocal: calVocal
-          }
+              ...s,
+              tesistaNombre: calTesistaNombre.trim() || s.tesistaNombre,
+              tesistaCorreo: calTesistaCorreo.trim() || s.tesistaCorreo,
+              tesista2Nombre: calTesista2Nombre.trim() || undefined,
+              tesista2Codigo: calTesista2Codigo.trim() || s.tesista2Codigo,
+              tesista2Correo: calTesista2Correo.trim() || undefined,
+              tituloTesis: calTituloTesis.trim() || s.tituloTesis,
+              fechaSustentacionProgramada: fechaJuevesActiva,
+              estacionActual: 4 as EstacionLogisticaId,
+              asesor: calAsesor.trim(),
+              juradoPresidente: calPresidente.trim(),
+              juradoSecretario: calSecretario.trim(),
+              juradoVocal: calVocal.trim()
+            }
           : s
       );
       setSeguimientos(segActualizados);
       await logisticaSecretariaService.saveSeguimientos(segActualizados);
+    }
+
+    // Si el flyer activo corresponde a esta sustentación/tesista, actualizarlo al instante
+    if (flyerDatosActivos) {
+      await regenerarFlyerDesdeDatos(
+        {
+          ...flyerDatosActivos,
+          tesistaNombre: registro.tesistaNombre,
+          segundoBachiller: registro.tesista2Nombre || '',
+          tituloTesis: registro.tituloTesis,
+          fechaJueves: registro.fecha,
+          horario: registro.horario,
+          lugar: registro.aulaOAuditorio,
+          asesor: registro.asesor,
+          juradoPresidente: registro.juradoPresidente,
+          juradoSecretario: registro.juradoSecretario,
+          juradoVocal: registro.juradoVocal
+        },
+        false
+      );
     }
 
     agregarToast('success', 'Fecha Guardada', `Sustentación agendada para el ${fechaJuevesActiva}.`);
@@ -1799,35 +1868,37 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         (sust.tesistaCodigo && s.codigoMatricula === sust.tesistaCodigo)
                     );
                     prepararDespachoParaTesistaYJurado(
-                      seg || {
-                        id: sust.tesistaId || sust.id,
-                        codigoMatricula: sust.tesistaCodigo || '',
-                        tesistaNombre: sust.tesistaNombre,
-                        tesistaCorreo: sust.tesistaCorreo || '',
-                        tesista2Nombre: sust.tesista2Nombre,
-                        tesista2Codigo: sust.tesista2Codigo,
-                        tesista2Correo: sust.tesista2Correo,
-                        tituloTesis: sust.tituloTesis,
-                        lineaInvestigacion: 'Ingeniería Industrial',
-                        asesor: sust.asesor || '',
-                        juradoPresidente: sust.juradoPresidente,
-                        juradoSecretario: sust.juradoSecretario,
-                        juradoVocal: sust.juradoVocal,
-                        estacionActual: 4,
-                        fechaIngresoEstacion: sust.fecha,
-                        fechaInicioTramite: sust.fecha,
-                        ubicacionFisica: sust.aulaOAuditorio,
-                        esCuelloBotellaExterno: false,
-                        notasSecretaria: '',
-                        fechaSustentacionProgramada: sust.fecha,
-                        requisitosFisicos: {
-                          futFisico: true,
-                          voucherTupa: true,
-                          reporteTurnitin: true,
-                          constanciaPracticas: true,
-                          resolucionProyecto: true,
-                          tresBorradoresJurado: true
-                        }
+                      {
+                        ...(seg || {
+                          id: sust.tesistaId || sust.id,
+                          codigoMatricula: sust.tesistaCodigo || '',
+                          lineaInvestigacion: 'Ingeniería Industrial',
+                          estacionActual: 4 as EstacionLogisticaId,
+                          fechaIngresoEstacion: sust.fecha,
+                          fechaInicioTramite: sust.fecha,
+                          ubicacionFisica: sust.aulaOAuditorio,
+                          esCuelloBotellaExterno: false,
+                          notasSecretaria: '',
+                          requisitosFisicos: {
+                            futFisico: true,
+                            voucherTupa: true,
+                            reporteTurnitin: true,
+                            constanciaPracticas: true,
+                            resolucionProyecto: true,
+                            tresBorradoresJurado: true
+                          }
+                        }),
+                        tesistaNombre: sust.tesistaNombre || seg?.tesistaNombre || '',
+                        tesistaCorreo: sust.tesistaCorreo || seg?.tesistaCorreo || '',
+                        tesista2Nombre: sust.tesista2Nombre ?? seg?.tesista2Nombre,
+                        tesista2Codigo: sust.tesista2Codigo ?? seg?.tesista2Codigo,
+                        tesista2Correo: sust.tesista2Correo ?? seg?.tesista2Correo,
+                        tituloTesis: sust.tituloTesis || seg?.tituloTesis || '',
+                        asesor: sust.asesor || seg?.asesor || '',
+                        juradoPresidente: sust.juradoPresidente || seg?.juradoPresidente || '',
+                        juradoSecretario: sust.juradoSecretario || seg?.juradoSecretario || '',
+                        juradoVocal: sust.juradoVocal || seg?.juradoVocal || '',
+                        fechaSustentacionProgramada: sust.fecha
                       },
                       sust.fecha,
                       sust.horario,
@@ -2874,35 +2945,37 @@ export const SecretariaLogisticsPage: React.FC = () => {
                     await handleGuardarSustentacionJueves(e as unknown as React.FormEvent);
                     const segExistente = seguimientos.find((s) => s.id === calTesistaId);
                     await prepararDespachoParaTesistaYJurado(
-                      segExistente || {
-                        id: calTesistaId || `seg-${Date.now()}`,
-                        codigoMatricula: calTesistaCodigo,
-                        tesistaNombre: calTesistaNombre,
-                        tesistaCorreo: calTesistaCorreo,
+                      {
+                        ...(segExistente || {
+                          id: calTesistaId || `seg-${Date.now()}`,
+                          codigoMatricula: calTesistaCodigo,
+                          lineaInvestigacion: 'Ingeniería Industrial',
+                          estacionActual: 4 as EstacionLogisticaId,
+                          fechaIngresoEstacion: fechaJuevesActiva,
+                          fechaInicioTramite: fechaJuevesActiva,
+                          ubicacionFisica: 'Auditorio de la Escuela de Ingeniería Industrial',
+                          esCuelloBotellaExterno: false,
+                          notasSecretaria: '',
+                          requisitosFisicos: {
+                            futFisico: true,
+                            voucherTupa: true,
+                            reporteTurnitin: true,
+                            constanciaPracticas: true,
+                            resolucionProyecto: true,
+                            tresBorradoresJurado: true
+                          }
+                        }),
+                        tesistaNombre: calTesistaNombre.trim(),
+                        tesistaCorreo: calTesistaCorreo.trim(),
                         tesista2Nombre: calTesista2Nombre.trim() || undefined,
-                        tesista2Codigo: calTesista2Codigo.trim() || undefined,
+                        tesista2Codigo: calTesista2Codigo.trim() || segExistente?.tesista2Codigo,
                         tesista2Correo: calTesista2Correo.trim() || undefined,
-                        tituloTesis: calTituloTesis,
-                        lineaInvestigacion: 'Ingeniería Industrial',
-                        asesor: calAsesor,
-                        juradoPresidente: calPresidente,
-                        juradoSecretario: calSecretario,
-                        juradoVocal: calVocal,
-                        estacionActual: 4,
-                        fechaIngresoEstacion: fechaJuevesActiva,
-                        fechaInicioTramite: fechaJuevesActiva,
-                        ubicacionFisica: 'Auditorio de Ingeniería Industrial UNT',
-                        esCuelloBotellaExterno: false,
-                        notasSecretaria: '',
-                        fechaSustentacionProgramada: fechaJuevesActiva,
-                        requisitosFisicos: {
-                          futFisico: true,
-                          voucherTupa: true,
-                          reporteTurnitin: true,
-                          constanciaPracticas: true,
-                          resolucionProyecto: true,
-                          tresBorradoresJurado: true
-                        }
+                        tituloTesis: calTituloTesis.trim(),
+                        asesor: calAsesor.trim(),
+                        juradoPresidente: calPresidente.trim(),
+                        juradoSecretario: calSecretario.trim(),
+                        juradoVocal: calVocal.trim(),
+                        fechaSustentacionProgramada: fechaJuevesActiva
                       },
                       fechaJuevesActiva,
                       calHorario
