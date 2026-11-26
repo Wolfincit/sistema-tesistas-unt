@@ -894,13 +894,13 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
 
                   <div className="pt-2 border-t border-blue-100 text-[11px] text-slate-700 space-y-0.5">
                     <div>
-                      <strong>Presidente:</strong> {s.juradoPresidente}
+                      <strong>Jurado 1:</strong> {s.juradoPresidente}
                     </div>
                     <div>
-                      <strong>Secretario:</strong> {s.juradoSecretario}
+                      <strong>Jurado 2:</strong> {s.juradoSecretario}
                     </div>
                     <div>
-                      <strong>Vocal:</strong> {s.juradoVocal}
+                      <strong>Jurado 3:</strong> {s.juradoVocal}
                     </div>
                   </div>
                 </div>
@@ -1168,21 +1168,21 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                   type="text"
                   value={sPresidente}
                   onChange={(e) => setSPresidente(e.target.value)}
-                  placeholder="Presidente del Jurado"
+                  placeholder="Jurado 1"
                   className="w-full p-2 rounded-xl border border-slate-300"
                 />
                 <input
                   type="text"
                   value={sSecretario}
                   onChange={(e) => setSSecretario(e.target.value)}
-                  placeholder="Secretario del Jurado"
+                  placeholder="Jurado 2"
                   className="w-full p-2 rounded-xl border border-slate-300"
                 />
                 <input
                   type="text"
                   value={sVocal}
                   onChange={(e) => setSVocal(e.target.value)}
-                  placeholder="Vocal del Jurado"
+                  placeholder="Jurado 3"
                   className="w-full p-2 rounded-xl border border-slate-300"
                 />
               </div>

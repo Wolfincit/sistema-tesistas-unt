@@ -51,7 +51,7 @@ export const ESTACIONES_LOGISTICAS: EstacionLogisticaMeta[] = [
     nombre: 'Revisión de Jurado (10 días)',
     corto: '3. Jurado',
     fase: 'sustentacion',
-    responsable: 'Jurado Evaluador (Presidente, Secretario, Vocal)',
+    responsable: 'Jurado Evaluador (Jurado 1, Jurado 2, Jurado 3)',
     tipoFlujo: 'EXTERNO_JURADO',
     modalidad: 'Mixto (Físico + Virtual)',
     slaDiasMax: 10,
@@ -428,7 +428,7 @@ export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
     ubicacionFisica: 'En revisión del Jurado (Plazo 10 días)',
     esCuelloBotellaExterno: true,
     motivoRetrasoExterno: 'En revisión del Jurado Evaluador.',
-    notasSecretaria: 'Presidente y Vocal aprobaron; falta firma de Secretario en el Dictamen físico.',
+    notasSecretaria: 'Jurado 1 y Jurado 3 aprobaron; falta firma de Jurado 2 en el Dictamen físico.',
     requisitosFisicos: {
       futFisico: true,
       voucherTupa: true,
@@ -544,9 +544,9 @@ export const INITIAL_HISTORIAL_DESPACHOS: DespachoChatAnuncioItem[] = [
       { nombre: 'Carlos Eduardo Mendoza Villanueva', correo: 'tesista.industrial@unitru.edu.pe' }
     ],
     juradoDestinatarios: [
-      { nombre: 'Dr. Ing. Ángel Hernández Molina (Presidente)', correo: 'ahernandezm@unitru.edu.pe' },
-      { nombre: 'Mg. Ing. Carlos José Sandoval Reyes (Secretario)', correo: 'csandovalr@unitru.edu.pe' },
-      { nombre: 'Dr. Ing. Joe Alexis González Vásquez (Vocal)', correo: 'jgonzalezv@unitru.edu.pe' }
+      { nombre: 'Dr. Ing. Ángel Hernández Molina (Jurado 1)', correo: 'ahernandezm@unitru.edu.pe' },
+      { nombre: 'Mg. Ing. Carlos José Sandoval Reyes (Jurado 2)', correo: 'csandovalr@unitru.edu.pe' },
+      { nombre: 'Dr. Ing. Joe Alexis González Vásquez (Jurado 3)', correo: 'jgonzalezv@unitru.edu.pe' }
     ],
     modoEnvio: 'registro-interno',
     enviadoPor: 'Srta. Celia (Secretaría Académica)'

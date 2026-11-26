@@ -1290,13 +1290,13 @@ export const SecretariaLogisticsPage: React.FC = () => {
                             </p>
                             <div className="mt-1.5 flex flex-wrap gap-1 text-[10px] text-slate-600">
                               <span className="px-1.5 py-0.5 rounded bg-slate-100 truncate max-w-[130px]">
-                                <strong>P:</strong> {item.juradoPresidente}
+                                <strong>J1:</strong> {item.juradoPresidente}
                               </span>
                               <span className="px-1.5 py-0.5 rounded bg-slate-100 truncate max-w-[130px]">
-                                <strong>S:</strong> {item.juradoSecretario}
+                                <strong>J2:</strong> {item.juradoSecretario}
                               </span>
                               <span className="px-1.5 py-0.5 rounded bg-slate-100 truncate max-w-[130px]">
-                                <strong>V:</strong> {item.juradoVocal}
+                                <strong>J3:</strong> {item.juradoVocal}
                               </span>
                             </div>
                           </td>
@@ -2343,7 +2343,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Presidente:</label>
+                  <label className="block font-bold text-slate-700 mb-1">Jurado 1:</label>
                   <input
                     list="lista-ingenieros-unt"
                     value={calPresidente}
@@ -2352,7 +2352,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Secretario:</label>
+                  <label className="block font-bold text-slate-700 mb-1">Jurado 2:</label>
                   <input
                     list="lista-ingenieros-unt"
                     value={calSecretario}
@@ -2361,7 +2361,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Vocal:</label>
+                  <label className="block font-bold text-slate-700 mb-1">Jurado 3:</label>
                   <input
                     list="lista-ingenieros-unt"
                     value={calVocal}
@@ -2547,7 +2547,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Presidente:</label>
+                  <label className="block font-bold text-slate-700 mb-1">Jurado 1:</label>
                   <input
                     list="lista-ingenieros-unt"
                     value={formPresidente}
@@ -2556,7 +2556,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Secretario:</label>
+                  <label className="block font-bold text-slate-700 mb-1">Jurado 2:</label>
                   <input
                     list="lista-ingenieros-unt"
                     value={formSecretario}
@@ -2565,7 +2565,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Vocal:</label>
+                  <label className="block font-bold text-slate-700 mb-1">Jurado 3:</label>
                   <input
                     list="lista-ingenieros-unt"
                     value={formVocal}
