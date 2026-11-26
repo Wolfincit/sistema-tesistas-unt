@@ -2,36 +2,36 @@ import { FaqItem } from '../types';
 import { storageService } from './storageService';
 import { driveApiService } from './driveApiService';
 
-const FAQ_STORAGE_KEY = 'unt_industrial_faqs_v2';
+const FAQ_STORAGE_KEY = 'unt_industrial_faqs_v3';
 
 const INITIAL_FAQS: FaqItem[] = [
   {
     id: 'faq-1',
-    pregunta: '¿Qué parte del trámite de sustentación es física y qué parte es virtual?',
-    respuesta: 'La entrega inicial del expediente (FUT, voucher TUPA, reporte Turnitin < 20% firmado por el asesor, constancia de prácticas, resolución de proyecto y 3 ejemplares de tesis) se realiza en FÍSICO en la Secretaría de Escuela (Srta. Celia). El seguimiento logístico del expediente puedes consultarlo virtualmente en la pestaña "Instrucciones y Seguimiento", y tras sustentar, la Carpeta de Titulación se sube virtualmente en tramites-uraa.unitru.edu.pe.',
-    categoria: 'Trámite Físico y Virtual',
-    fechaActualizacion: '2026-11-22'
+    pregunta: '¿Qué parte del trámite de tesis es virtual y qué parte es física?',
+    respuesta: 'El envío del Proyecto de Tesis (Opción 34 del FUT) y la solicitud de Jurado Evaluador (Opción 29 del FUT) se realizan virtualmente enviando los archivos PDF a mesadepartes_ingenieria@unitru.edu.pe. Una vez que el jurado aprueba el borrador, se entrega en físico en Secretaría de Escuela (48 horas antes) el Dictamen de Aprobación firmado por los 3 jurados junto con las evidencias impresas y los ejemplares.',
+    categoria: 'Trámite',
+    fechaActualizacion: '2026-11-25'
   },
   {
     id: 'faq-2',
-    pregunta: '¿Qué días y en qué horario se realizan las sustentaciones de tesis en Ingeniería Industrial?',
-    respuesta: 'Las sustentaciones de tesis en la Escuela Profesional de Ingeniería Industrial UNT se programan exclusivamente los días JUEVES de 11:00 a.m. a 1:00 p.m., una vez que los 3 miembros del Jurado Evaluador (Presidente, Secretario y Vocal) han firmado el dictamen favorable.',
-    categoria: 'Sustentación (Jueves 11-1 PM)',
-    fechaActualizacion: '2026-11-22'
+    pregunta: '¿Qué días y en qué horario se realizan las sustentaciones?',
+    respuesta: 'Las sustentaciones se programan los días jueves de 11:00 a.m. a 1:00 p.m. (turnos de 11:00 a.m. y 12:00 p.m.) en el Auditorio de Ingeniería Industrial (sin costo de derecho de uso) o en el Aula II-4.',
+    categoria: 'Sustentación',
+    fechaActualizacion: '2026-11-25'
   },
   {
     id: 'faq-3',
-    pregunta: '¿Por qué puede demorar mi trámite si ya entregué mi folder físico en Secretaría de Escuela?',
-    respuesta: 'En la Secretaría de Escuela (Srta. Celia) el expediente se procesa y deriva en 24 a 48 horas. Los cuellos de botella ocurren en instancias externas a la Escuela: (1) Emisión y firma de Resolución de Jurado en Decanato de Facultad, o (2) Plazo de revisión de los 3 ejemplares por los miembros del Jurado Evaluador (15 a 30 días). Puedes verificar en qué estación exacta está tu trámite con tu Código de Matrícula.',
-    categoria: 'Logística y Cuellos de Botella',
-    fechaActualizacion: '2026-11-22'
+    pregunta: '¿Qué debo hacer si el jurado modifica u observa el título de mi tesis?',
+    respuesta: 'Si el jurado solicita cambiar el título del borrador, antes de sustentar debes tramitar una nueva resolución enviando a mesadepartes_ingenieria@unitru.edu.pe un solo PDF con: FUT, recibo de S/ 5.00 (Cód. Interbank 005-166-01), carta del jurado justificando el nuevo título, proveído y resolución de jurado.',
+    categoria: 'Expediente',
+    fechaActualizacion: '2026-11-25'
   },
   {
     id: 'faq-4',
-    pregunta: '¿Cuál es el porcentaje máximo de similitud permitido en Turnitin?',
-    respuesta: 'El reporte oficial de originalidad Turnitin debe registrar un porcentaje de similitud menor al 20% y contar con la firma física de conformidad de tu docente asesor.',
+    pregunta: '¿Cuál es el procedimiento después de aprobar la sustentación para obtener el título?',
+    respuesta: '1) Solicitar al asesor el 2do Turnitin con recibo de depósito y subirlo al Sistema del Comité de Ética de la Facultad con el recibo de S/ 87.60 para obtener la Constancia de Originalidad.\n2) Enviar el PDF de la tesis con los 4 anexos al Ing. Valerio Ynfantes (vynfantes@unitru.edu.pe) para obtener el código URL y la Constancia de Repositorio.\n3) Pagar S/ 275.90 en Interbank (Cód. 005-166-17), subir la carpeta al Sistema URA (tramites-uraa.unitru.edu.pe), entregar 2 empastados (Biblioteca de Facultad y Escuela) y enviar el archivo T004_DNI_T.pdf a cchau@unitru.edu.pe.',
     categoria: 'Requisitos',
-    fechaActualizacion: '2026-11-22'
+    fechaActualizacion: '2026-11-25'
   }
 ];
 
