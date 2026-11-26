@@ -44,6 +44,35 @@ export interface EmailConfigStatus {
   smtpHost: string;
 }
 
+const HISTORIAL_RETENCION_DIAS = 14;
+const HISTORIAL_MAX_ITEMS = 8;
+const HISTORIAL_MAX_CON_IMAGEN = 3;
+
+function parseFechaHistorialMs(fechaHora: string): number {
+  if (!fechaHora) return 0;
+  const iso = fechaHora.trim().replace(' ', 'T');
+  const parsed = Date.parse(iso);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+export function purgarHistorialDespachos(items: DespachoChatAnuncioItem[]): DespachoChatAnuncioItem[] {
+  const ahora = Date.now();
+  const limiteMs = HISTORIAL_RETENCION_DIAS * 24 * 60 * 60 * 1000;
+  return (Array.isArray(items) ? items : [])
+    .filter((item) => {
+      const ts = parseFechaHistorialMs(item?.fechaHora || '');
+      // Si no tiene fecha válida, conservarlo brevemente; si excede 14 días, auto-purgar
+      if (!ts) return true;
+      return ahora - ts <= limiteMs;
+    })
+    .slice(0, HISTORIAL_MAX_ITEMS)
+    .map((item, idx) =>
+      idx < HISTORIAL_MAX_CON_IMAGEN
+        ? item
+        : { ...item, flyerDataUrl: undefined }
+    );
+}
+
 export const logisticaSecretariaService = {
   getSeguimientos(): SeguimientoTesisItem[] {
     return storageService.get<SeguimientoTesisItem[]>(SEGUIMIENTO_KEY, INITIAL_SEGUIMIENTO_LOGISTICO);
@@ -73,12 +102,18 @@ export const logisticaSecretariaService = {
   },
 
   getHistorialDespachos(): DespachoChatAnuncioItem[] {
-    return storageService.get<DespachoChatAnuncioItem[]>(HISTORIAL_DESPACHOS_KEY, INITIAL_HISTORIAL_DESPACHOS);
+    const raw = storageService.get<DespachoChatAnuncioItem[]>(HISTORIAL_DESPACHOS_KEY, INITIAL_HISTORIAL_DESPACHOS);
+    const purgado = purgarHistorialDespachos(raw);
+    if (purgado.length !== raw.length) {
+      storageService.set(HISTORIAL_DESPACHOS_KEY, purgado);
+    }
+    return purgado;
   },
 
   async saveHistorialDespachos(items: DespachoChatAnuncioItem[]): Promise<void> {
-    storageService.set(HISTORIAL_DESPACHOS_KEY, items);
-    await driveApiService.saveCollection('historialDespachos', items);
+    const purgado = purgarHistorialDespachos(items);
+    storageService.set(HISTORIAL_DESPACHOS_KEY, purgado);
+    await driveApiService.saveCollection('historialDespachos', purgado);
   },
 
   getInstruccionesPasos(): InstruccionPasoItem[] {

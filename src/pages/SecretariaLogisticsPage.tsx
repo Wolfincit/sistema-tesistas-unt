@@ -12,7 +12,8 @@ import {
 } from '../data/mockLogisticaSecretaria';
 import {
   logisticaSecretariaService,
-  EmailConfigStatus
+  EmailConfigStatus,
+  purgarHistorialDespachos
 } from '../services/logisticaSecretariaService';
 import { pushClientService, PushStatsInfo } from '../services/pushClientService';
 import {
@@ -52,7 +53,8 @@ import {
   MessageCircle,
   ChevronDown,
   ChevronUp,
-  BellRing
+  BellRing,
+  Undo2
 } from 'lucide-react';
 
 const sanitizeText = (val: string): string =>
@@ -193,6 +195,79 @@ export const SecretariaLogisticsPage: React.FC = () => {
   }, []);
 
   // =========================================================
+  // BOTÓN DE RETROCESO / DESHACER (CON SOPORTE CTRL + Z)
+  // =========================================================
+  interface UndoSnapshot {
+    label: string;
+    seguimientos?: SeguimientoTesisItem[];
+    directorioJurado?: IngenieroJuradoItem[];
+    sustentaciones?: SustentacionJuevesItem[];
+    historialChat?: DespachoChatAnuncioItem[];
+    asuntoChat?: string;
+    mensajeChat?: string;
+    flyerPreview?: string;
+    flyerNombre?: string;
+    tesistasChecks?: string[];
+    juradoChecks?: string[];
+  }
+
+  const [undoStack, setUndoStack] = useState<UndoSnapshot[]>([]);
+
+  const registrarPuntoRetroceso = (snap: UndoSnapshot) => {
+    setUndoStack((prev) => [snap, ...prev].slice(0, 20));
+  };
+
+  const handleDeshacer = async () => {
+    if (undoStack.length === 0) return;
+    const [ultimo, ...resto] = undoStack;
+    setUndoStack(resto);
+
+    if (ultimo.seguimientos) {
+      setSeguimientos(ultimo.seguimientos);
+      await logisticaSecretariaService.saveSeguimientos(ultimo.seguimientos);
+    }
+    if (ultimo.directorioJurado) {
+      setDirectorioJurado(ultimo.directorioJurado);
+      await logisticaSecretariaService.saveDirectorioJurado(ultimo.directorioJurado);
+    }
+    if (ultimo.sustentaciones) {
+      setSustentaciones(ultimo.sustentaciones);
+      await logisticaSecretariaService.saveSustentacionesJueves(ultimo.sustentaciones);
+    }
+    if (ultimo.historialChat) {
+      setHistorialChat(ultimo.historialChat);
+      await logisticaSecretariaService.saveHistorialDespachos(ultimo.historialChat);
+    }
+    if (typeof ultimo.asuntoChat === 'string') setAsuntoChat(ultimo.asuntoChat);
+    if (typeof ultimo.mensajeChat === 'string') setMensajeChat(ultimo.mensajeChat);
+    if (typeof ultimo.flyerPreview === 'string') setFlyerPreview(ultimo.flyerPreview);
+    if (typeof ultimo.flyerNombre === 'string') setFlyerNombre(ultimo.flyerNombre);
+    if (ultimo.tesistasChecks) setTesistasChecks(ultimo.tesistasChecks);
+    if (ultimo.juradoChecks) setJuradoChecks(ultimo.juradoChecks);
+
+    agregarToast('info', 'Cambio deshecho', `Se restauró: ${ultimo.label}.`);
+  };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        const tag = (document.activeElement?.tagName || '').toLowerCase();
+        const isEditable =
+          tag === 'input' ||
+          tag === 'textarea' ||
+          tag === 'select' ||
+          Boolean((document.activeElement as HTMLElement | null)?.isContentEditable);
+        if (!isEditable && undoStack.length > 0) {
+          e.preventDefault();
+          handleDeshacer();
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [undoStack]);
+
+  // =========================================================
   // ELIMINACIÓN SINCRONIZADA CON ADVERTENCIA CORTA
   // =========================================================
   const [confirmarEliminar, setConfirmarEliminar] = useState<{
@@ -205,6 +280,12 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const ejecutarEliminacionSincronizada = async () => {
     if (!confirmarEliminar) return;
     if (confirmarEliminar.tipo === 'tesista') {
+      registrarPuntoRetroceso({
+        label: `Eliminar a ${confirmarEliminar.nombre}`,
+        seguimientos: [...seguimientos],
+        sustentaciones: [...sustentaciones],
+        tesistasChecks: [...tesistasChecks]
+      });
       const nuevosSeg = seguimientos.filter((s) => s.id !== confirmarEliminar.id);
       setSeguimientos(nuevosSeg);
       await logisticaSecretariaService.saveSeguimientos(nuevosSeg);
@@ -220,15 +301,20 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setTesistasChecks((prev) =>
         prev.filter((c) => c !== confirmarEliminar.correo.toLowerCase())
       );
-      agregarToast('info', 'Tesista Eliminado', `Se quitó a ${confirmarEliminar.nombre} de Seguimiento y de la lista de correos.`);
+      agregarToast('info', 'Tesista Eliminado', `Se quitó a ${confirmarEliminar.nombre}. Puedes recuperarlo con Deshacer (Ctrl+Z).`);
     } else {
+      registrarPuntoRetroceso({
+        label: `Eliminar jurado ${confirmarEliminar.nombre}`,
+        directorioJurado: [...directorioJurado],
+        juradoChecks: [...juradoChecks]
+      });
       const nuevosJur = directorioJurado.filter((j) => j.id !== confirmarEliminar.id);
       setDirectorioJurado(nuevosJur);
       await logisticaSecretariaService.saveDirectorioJurado(nuevosJur);
       setJuradoChecks((prev) =>
         prev.filter((c) => c !== confirmarEliminar.correo.toLowerCase())
       );
-      agregarToast('info', 'Ingeniero Eliminado', `Se quitó a ${confirmarEliminar.nombre} de la lista del jurado.`);
+      agregarToast('info', 'Ingeniero Eliminado', `Se quitó a ${confirmarEliminar.nombre}. Puedes recuperarlo con Deshacer (Ctrl+Z).`);
     }
     setConfirmarEliminar(null);
   };
@@ -388,6 +474,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
       }
     };
 
+    registrarPuntoRetroceso({
+      label: editandoSeg ? `Editar a ${editandoSeg.tesistaNombre}` : `Agregar a ${nuevo.tesistaNombre}`,
+      seguimientos: [...seguimientos]
+    });
     const actualizados = editandoSeg
       ? seguimientos.map((s) => (s.id === editandoSeg.id ? nuevo : s))
       : [nuevo, ...seguimientos];
@@ -405,6 +495,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
   };
 
   const handleCambiarEtapaDirecto = async (id: string, nuevaEtapa: EstacionLogisticaId) => {
+    registrarPuntoRetroceso({
+      label: 'Cambio de etapa',
+      seguimientos: [...seguimientos]
+    });
     let actualizadoRef: SeguimientoTesisItem | null = null;
     const hoyIso = new Date().toISOString().slice(0, 10);
     const actualizados = seguimientos.map((s) => {
@@ -440,6 +534,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
   };
 
   const handleCambiarSemaforoDirecto = async (id: string, nuevoSemaforo: SemaforoEstadoId) => {
+    registrarPuntoRetroceso({
+      label: 'Cambio de semáforo',
+      seguimientos: [...seguimientos]
+    });
     let actualizadoRef: SeguimientoTesisItem | null = null;
     const actualizados = seguimientos.map((s) => {
       if (s.id !== id) return s;
@@ -456,6 +554,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
   };
 
   const handleMoverLoteColacion = async (ids: string[], nuevaEtapa: EstacionLogisticaId) => {
+    registrarPuntoRetroceso({
+      label: `Mover lote (${ids.length}) en Colación`,
+      seguimientos: [...seguimientos]
+    });
     const idSet = new Set(ids);
     const hoyIso = new Date().toISOString().slice(0, 10);
     const movidos: SeguimientoTesisItem[] = [];
@@ -748,7 +850,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
         enviadoPor: usuario?.nombre || 'Srta. Celia'
       };
 
-      const nuevoHistorial = [nuevoMsg, ...historialChat];
+      const nuevoHistorial = purgarHistorialDespachos([nuevoMsg, ...historialChat]);
       setHistorialChat(nuevoHistorial);
       await logisticaSecretariaService.saveHistorialDespachos(nuevoHistorial);
 
@@ -921,6 +1023,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
   };
 
   const handleEliminarSustentacionFecha = async (fechaIso: string) => {
+    registrarPuntoRetroceso({
+      label: `Quitar sustentación del ${fechaIso}`,
+      sustentaciones: [...sustentaciones]
+    });
     const nuevas = sustentaciones.filter((s) => s.fecha !== fechaIso);
     setSustentaciones(nuevas);
     await logisticaSecretariaService.saveSustentacionesJueves(nuevas);
@@ -1096,34 +1202,56 @@ export const SecretariaLogisticsPage: React.FC = () => {
             )}
           </div>
 
-          {(tab === 'despacho' || tab === 'calendario') && (
-            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => setTab('despacho')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                  tab === 'despacho'
-                    ? 'bg-[#082F64] text-white shadow-2xs'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>1. Flyer y Correos</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setTab('calendario')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                  tab === 'calendario'
-                    ? 'bg-[#082F64] text-white shadow-2xs'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                <span>2. Agenda Jueves</span>
-              </button>
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {(tab === 'despacho' || tab === 'calendario') && (
+              <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => setTab('despacho')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                    tab === 'despacho'
+                      ? 'bg-[#082F64] text-white shadow-2xs'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>1. Flyer y Correos</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('calendario')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                    tab === 'calendario'
+                      ? 'bg-[#082F64] text-white shadow-2xs'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>2. Agenda Jueves</span>
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleDeshacer}
+              disabled={undoStack.length === 0}
+              title={
+                undoStack.length > 0
+                  ? `Deshacer (Ctrl+Z): ${undoStack[0].label}`
+                  : 'Sin cambios recientes para deshacer (Ctrl+Z)'
+              }
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all ${
+                undoStack.length > 0
+                  ? 'bg-amber-50 hover:bg-amber-100 text-amber-950 border-amber-300 shadow-2xs cursor-pointer'
+                  : 'bg-white text-slate-400 border-slate-200 cursor-not-allowed opacity-70'
+              }`}
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+              <span>Deshacer{undoStack.length > 0 ? ` (${undoStack.length})` : ''}</span>
+              <span className="hidden sm:inline text-[10px] font-mono opacity-75">Ctrl+Z</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1900,6 +2028,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => {
+                            registrarPuntoRetroceso({
+                              label: 'Quitar imagen del flyer',
+                              flyerPreview,
+                              flyerNombre
+                            });
                             setFlyerPreview('');
                             setFlyerNombre('');
                           }}
@@ -2081,12 +2214,34 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 )}
               </form>
 
-              {/* Historial de Envíos Tipo Chat */}
+              {/* Historial de Envíos Tipo Chat (con Auto-purga cada 14 días / máx. 8 para evitar saturación) */}
               {historialChat.length > 0 && (
                 <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-3">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Enviados recientemente
-                  </h4>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                        Enviados recientemente ({historialChat.length})
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-semibold">
+                        Auto-purga cada 14 días · máx. 8
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        registrarPuntoRetroceso({
+                          label: 'Vaciar historial de envíos',
+                          historialChat: [...historialChat]
+                        });
+                        setHistorialChat([]);
+                        await logisticaSecretariaService.saveHistorialDespachos([]);
+                        agregarToast('info', 'Historial limpiado', 'Puedes recuperarlo con Deshacer (Ctrl+Z).');
+                      }}
+                      className="text-[11px] font-bold text-slate-500 hover:text-rose-600 cursor-pointer"
+                    >
+                      Vaciar ahora
+                    </button>
+                  </div>
                   <div className="space-y-3 max-h-80 overflow-y-auto">
                     {historialChat.map((msg) => (
                       <div
