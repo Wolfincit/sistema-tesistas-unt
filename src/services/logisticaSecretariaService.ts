@@ -164,16 +164,23 @@ export const logisticaSecretariaService = {
         ? `${item.notasSecretaria} · "${tituloCorto}"`
         : `${estMeta?.descripcion || 'Revisa tu siguiente paso oficial en el sistema.'} · "${tituloCorto}"`;
 
-    const res = await pushClientService.notifyThesisUpdate({
-      codigoMatricula: item.codigoMatricula,
-      title: prefijo,
-      body: cuerpo.slice(0, 220),
-      url: '/',
-      tag: `tesis-${item.codigoMatricula}-est-${item.estacionActual}`,
-      tipo: item.semaforo === 'incidencia' ? 'observacion' : 'estado',
-      urgente: true
-    });
-    return res.pushedCount;
+    const matriculas = [item.codigoMatricula, item.tesista2Codigo]
+      .map((m) => String(m || '').replace(/\D/g, ''))
+      .filter((m) => m.length === 10);
+    let totalPushed = 0;
+    for (const mat of Array.from(new Set(matriculas))) {
+      const res = await pushClientService.notifyThesisUpdate({
+        codigoMatricula: mat,
+        title: prefijo,
+        body: cuerpo.slice(0, 220),
+        url: '/',
+        tag: `tesis-${mat}-est-${item.estacionActual}`,
+        tipo: item.semaforo === 'incidencia' ? 'observacion' : 'estado',
+        urgente: true
+      });
+      totalPushed += res.pushedCount;
+    }
+    return totalPushed;
   },
 
   async getEmailStatus(): Promise<EmailConfigStatus> {

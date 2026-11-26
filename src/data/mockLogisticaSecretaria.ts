@@ -125,6 +125,9 @@ export interface SeguimientoTesisItem {
   tesistaNombre: string;
   tesistaCorreo: string;
   tesistaTelefono?: string;
+  tesista2Nombre?: string;
+  tesista2Codigo?: string;
+  tesista2Correo?: string;
   tipoTramite?: TipoTramiteId; // 'titulado' (default) | 'bachiller' (ruta rápida sin Ética ni Repositorio)
   sede?: 'Trujillo' | 'Valle Jequetepeque' | 'Huamachuco';
   tituloTesis: string;
@@ -192,6 +195,9 @@ export interface SustentacionJuevesItem {
   tesistaNombre: string;
   tesistaCodigo: string;
   tesistaCorreo: string;
+  tesista2Nombre?: string;
+  tesista2Codigo?: string;
+  tesista2Correo?: string;
   tituloTesis: string;
   asesor: string;
   juradoPresidente: string;

@@ -121,7 +121,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
   });
 
   useEffect(() => {
-    pushClientService.getStats().then(setPushStats).catch(() => {});
+    pushClientService.getStats().then(setPushStats).catch(() => { });
   }, []);
   const [directorioJurado, setDirectorioJurado] = useState<IngenieroJuradoItem[]>(() =>
     logisticaSecretariaService.getDirectorioJurado()
@@ -246,6 +246,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [formNombre, setFormNombre] = useState<string>('');
   const [formCodigo, setFormCodigo] = useState<string>('');
   const [formCorreo, setFormCorreo] = useState<string>('');
+  const [formEnPareja, setFormEnPareja] = useState<boolean>(false);
+  const [formNombre2, setFormNombre2] = useState<string>('');
+  const [formCodigo2, setFormCodigo2] = useState<string>('');
+  const [formCorreo2, setFormCorreo2] = useState<string>('');
   const [formTitulo, setFormTitulo] = useState<string>('');
   const [formAsesor, setFormAsesor] = useState<string>('');
   const [formPresidente, setFormPresidente] = useState<string>('');
@@ -273,6 +277,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setFormNombre(item.tesistaNombre);
       setFormCodigo(item.codigoMatricula);
       setFormCorreo(item.tesistaCorreo);
+      setFormEnPareja(Boolean(item.tesista2Nombre || item.tesista2Codigo || item.tesista2Correo));
+      setFormNombre2(item.tesista2Nombre || '');
+      setFormCodigo2(item.tesista2Codigo || '');
+      setFormCorreo2(item.tesista2Correo || '');
       setFormTitulo(item.tituloTesis);
       setFormAsesor(item.asesor);
       setFormPresidente(item.juradoPresidente);
@@ -291,6 +299,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setFormNombre('');
       setFormCodigo('');
       setFormCorreo('');
+      setFormEnPareja(false);
+      setFormNombre2('');
+      setFormCodigo2('');
+      setFormCorreo2('');
       setFormTitulo('');
       setFormAsesor(directorioJurado[0]?.nombre || '');
       setFormPresidente(directorioJurado[0]?.nombre || '');
@@ -325,11 +337,24 @@ export const SecretariaLogisticsPage: React.FC = () => {
       formTipoTramite === 'bachiller' && formEstacion < 7 ? 7 : formEstacion;
     const semaforoFinal: SemaforoEstadoId = formCambioTitulo ? 'incidencia' : formSemaforo;
 
+    const matricula2Digits = formEnPareja ? formCodigo2.replace(/\D/g, '') : '';
+    if (formEnPareja && matricula2Digits.length > 0 && matricula2Digits.length !== 10) {
+      agregarToast(
+        'warning',
+        'Matrícula del 2.º tesista',
+        'Si ingresas matrícula para el 2.º tesista, debe tener exactamente 10 dígitos.'
+      );
+      return;
+    }
+
     const nuevo: SeguimientoTesisItem = {
       id: editandoSeg ? editandoSeg.id : `seg-${Date.now()}`,
       codigoMatricula: matriculaDigits,
       tesistaNombre: sanitizeText(formNombre.trim()),
       tesistaCorreo: sanitizeText(formCorreo.trim().toLowerCase()),
+      tesista2Nombre: formEnPareja && formNombre2.trim() ? sanitizeText(formNombre2.trim()) : undefined,
+      tesista2Codigo: formEnPareja && matricula2Digits.length === 10 ? matricula2Digits : undefined,
+      tesista2Correo: formEnPareja && formCorreo2.trim() ? sanitizeText(formCorreo2.trim().toLowerCase()) : undefined,
       tipoTramite: formTipoTramite,
       sede: formSede,
       tituloTesis: sanitizeText(
@@ -371,7 +396,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
     await logisticaSecretariaService.saveSeguimientos(actualizados);
     setModalSeguimientoAbierto(false);
     marcarFeedbackGuardado(nuevo.id);
-    logisticaSecretariaService.notificarCambioEtapaAutomatico(nuevo).catch(() => {});
+    logisticaSecretariaService.notificarCambioEtapaAutomatico(nuevo).catch(() => { });
     agregarToast(
       'success',
       editandoSeg ? 'Guardado y notificado' : 'Tesista Agregado',
@@ -388,8 +413,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
         nuevaEtapa === 4 || nuevaEtapa === 8
           ? 'operativo'
           : s.semaforo === 'incidencia'
-          ? 'incidencia'
-          : 'atencion';
+            ? 'incidencia'
+            : 'atencion';
       const next: SeguimientoTesisItem = {
         ...s,
         estacionActual: nuevaEtapa,
@@ -426,7 +451,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
     marcarFeedbackGuardado(id);
     await logisticaSecretariaService.saveSeguimientos(actualizados);
     if (actualizadoRef && nuevoSemaforo === 'incidencia') {
-      logisticaSecretariaService.notificarCambioEtapaAutomatico(actualizadoRef).catch(() => {});
+      logisticaSecretariaService.notificarCambioEtapaAutomatico(actualizadoRef).catch(() => { });
     }
   };
 
@@ -474,11 +499,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
     const actualizadas: DudaTesistaPendiente[] = dudasPendientes.map((d) =>
       d.id === duda.id
         ? {
-            ...d,
-            estado: 'respondida',
-            respuestaOficial: respuesta,
-            fechaRespuesta: new Date().toLocaleString('es-PE', { hour12: false })
-          }
+          ...d,
+          estado: 'respondida',
+          respuestaOficial: respuesta,
+          fechaRespuesta: new Date().toLocaleString('es-PE', { hour12: false })
+        }
         : d
     );
     setDudasPendientes(actualizadas);
@@ -550,10 +575,22 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [nuevoTesistaCorreo, setNuevoTesistaCorreo] = useState<string>('');
   const [nuevoIngNombre, setNuevoIngNombre] = useState<string>('');
   const [nuevoIngCorreo, setNuevoIngCorreo] = useState<string>('');
+  const [correosManuales, setCorreosManuales] = useState<string[]>([]);
+  const [inputCorreoManual, setInputCorreoManual] = useState<string>('');
   const [whatsappDocentesTexto, setWhatsappDocentesTexto] = useState<string>('');
   const [generandoFlyer, setGenerandoFlyer] = useState<boolean>(false);
   const [tesistaDespachoActivoId, setTesistaDespachoActivoId] = useState<string>('');
   const [flyerDatosActivos, setFlyerDatosActivos] = useState<FlyerSustentacionInput | null>(null);
+
+  const agregarCorreoManual = () => {
+    const candidatos = inputCorreoManual
+      .split(/[,;\s]+/)
+      .map((c) => c.trim().toLowerCase())
+      .filter((c) => c.includes('@') && c.includes('.'));
+    if (candidatos.length === 0) return;
+    setCorreosManuales((prev) => Array.from(new Set([...prev, ...candidatos])));
+    setInputCorreoManual('');
+  };
 
   const regenerarFlyerDesdeDatos = async (datos: FlyerSustentacionInput, actualizarTextoCorreo = true) => {
     setFlyerDatosActivos(datos);
@@ -603,8 +640,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
     setTesistaDespachoActivoId(seg.id);
 
-    if (seg.tesistaCorreo) {
-      setTesistasChecks([seg.tesistaCorreo.toLowerCase()]);
+    const correosTesistaInit = [seg.tesistaCorreo, seg.tesista2Correo]
+      .map((c) => String(c || '').trim().toLowerCase())
+      .filter((c) => c.includes('@'));
+    if (correosTesistaInit.length > 0) {
+      setTesistasChecks(Array.from(new Set(correosTesistaInit)));
     }
     const nombresJurado = [seg.juradoPresidente, seg.juradoSecretario, seg.juradoVocal]
       .map((n) => n.toLowerCase())
@@ -625,7 +665,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
     const flyerInput: FlyerSustentacionInput = {
       tipo: tipoFlyer,
       tesistaNombre: seg.tesistaNombre,
-      segundoBachiller: '',
+      segundoBachiller: seg.tesista2Nombre || '',
       tituloTesis: seg.tituloTesis,
       fechaJueves: fechaStr,
       horario: horarioStr,
@@ -644,10 +684,16 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
     const extraTesista = nuevoTesistaCorreo.trim().toLowerCase();
     const extraIng = nuevoIngCorreo.trim().toLowerCase();
+    const manualesTyped = inputCorreoManual
+      .split(/[,;\s]+/)
+      .map((c) => c.trim().toLowerCase())
+      .filter((c) => c.includes('@') && c.includes('.'));
     const listaTesistasFinal = Array.from(
       new Set([
         ...tesistasChecks,
-        ...(extraTesista.includes('@') ? [extraTesista] : [])
+        ...(extraTesista.includes('@') ? [extraTesista] : []),
+        ...correosManuales,
+        ...manualesTyped
       ])
     );
     const listaJuradoFinal = Array.from(
@@ -659,7 +705,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
     const todosDestinatarios = Array.from(new Set([...listaTesistasFinal, ...listaJuradoFinal]));
 
     if (todosDestinatarios.length === 0) {
-      agregarToast('warning', 'Falta seleccionar correos', 'Marque con check [✓] al menos un correo a la derecha.');
+      agregarToast('warning', 'Falta seleccionar correos', 'Marca al menos un correo a la derecha o añade un correo manual.');
       return;
     }
 
@@ -706,10 +752,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setHistorialChat(nuevoHistorial);
       await logisticaSecretariaService.saveHistorialDespachos(nuevoHistorial);
 
-      // Marcar flyerEnviado y notificar automáticamente al celular de cada tesista destinatario
+      // Marcar flyerEnviado y notificar automáticamente al celular de cada tesista destinatario (1 o 2 en pareja)
       const tesistasNotif = seguimientos.filter(
         (s) =>
           listaTesistasFinal.includes(s.tesistaCorreo.toLowerCase()) ||
+          (s.tesista2Correo && listaTesistasFinal.includes(s.tesista2Correo.toLowerCase())) ||
           (tesistaDespachoActivoId && s.id === tesistaDespachoActivoId)
       );
       if (tesistasNotif.length > 0) {
@@ -720,14 +767,23 @@ export const SecretariaLogisticsPage: React.FC = () => {
         setSeguimientos(segActualizados);
         await logisticaSecretariaService.saveSeguimientos(segActualizados);
 
+        const matriculasANotificar = Array.from(
+          new Set(
+            tesistasNotif.flatMap((t) =>
+              [t.codigoMatricula, t.tesista2Codigo].filter(
+                (m): m is string => Boolean(m && m.replace(/\D/g, '').length === 10)
+              )
+            )
+          )
+        );
         await Promise.all(
-          tesistasNotif.map((t) =>
+          matriculasANotificar.map((mat) =>
             pushClientService.notifyThesisUpdate({
-              codigoMatricula: t.codigoMatricula,
+              codigoMatricula: mat,
               title: '📢 ¡Tu sustentación ya tiene citación y flyer oficial!',
               body: `${asuntoChat}. Recuerda llegar 1 hora antes con vestimenta formal y tus diapositivas.`,
               url: '/',
-              tag: `flyer-${t.codigoMatricula}`,
+              tag: `flyer-${mat}`,
               tipo: 'sustentacion',
               urgente: true
             })
@@ -739,6 +795,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
         destinatarios: todosDestinatarios,
         fechaHora
       });
+      setCorreosManuales([]);
+      setInputCorreoManual('');
       agregarToast('success', 'Despacho y Aviso Completados', res.message);
     } catch (err: any) {
       agregarToast('error', 'No se pudo enviar desde el servidor', err?.message || 'Error de envío.');
@@ -758,6 +816,9 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [calTesistaNombre, setCalTesistaNombre] = useState<string>('');
   const [calTesistaCodigo, setCalTesistaCodigo] = useState<string>('');
   const [calTesistaCorreo, setCalTesistaCorreo] = useState<string>('');
+  const [calTesista2Nombre, setCalTesista2Nombre] = useState<string>('');
+  const [calTesista2Codigo, setCalTesista2Codigo] = useState<string>('');
+  const [calTesista2Correo, setCalTesista2Correo] = useState<string>('');
   const [calTituloTesis, setCalTituloTesis] = useState<string>('');
   const [calAsesor, setCalAsesor] = useState<string>('');
   const [calPresidente, setCalPresidente] = useState<string>('');
@@ -773,15 +834,18 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setCalTesistaNombre(existente.tesistaNombre);
       setCalTesistaCodigo(existente.tesistaCodigo);
       setCalTesistaCorreo(existente.tesistaCorreo);
+      setCalTesista2Nombre(existente.tesista2Nombre || '');
+      setCalTesista2Codigo(existente.tesista2Codigo || '');
+      setCalTesista2Correo(existente.tesista2Correo || '');
       setCalTituloTesis(existente.tituloTesis);
       setCalAsesor(existente.asesor);
       setCalPresidente(existente.juradoPresidente);
       setCalSecretario(existente.juradoSecretario);
       setCalVocal(existente.juradoVocal);
-      setCalHorario(existente.horario || '11:00 a.m. - 01:00 p.m.');
+      setCalHorario(existente.horario || '11:00 a.m.');
     } else if (seguimientos[0]) {
       cargarTesistaEnCalendario(seguimientos[0].id);
-      setCalHorario('11:00 a.m. - 01:00 p.m.');
+      setCalHorario('11:00 a.m.');
     }
   };
 
@@ -792,6 +856,9 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setCalTesistaNombre(found.tesistaNombre);
       setCalTesistaCodigo(found.codigoMatricula);
       setCalTesistaCorreo(found.tesistaCorreo);
+      setCalTesista2Nombre(found.tesista2Nombre || '');
+      setCalTesista2Codigo(found.tesista2Codigo || '');
+      setCalTesista2Correo(found.tesista2Correo || '');
       setCalTituloTesis(found.tituloTesis);
       setCalAsesor(found.asesor);
       setCalPresidente(found.juradoPresidente);
@@ -808,17 +875,20 @@ export const SecretariaLogisticsPage: React.FC = () => {
     const registro: SustentacionJuevesItem = {
       id: existenteIdx >= 0 ? sustentaciones[existenteIdx].id : `jue-${Date.now()}`,
       fecha: fechaJuevesActiva,
-      horario: calHorario || '11:00 a.m. - 01:00 p.m.',
+      horario: calHorario || '11:00 a.m.',
       tesistaId: calTesistaId || undefined,
       tesistaNombre: calTesistaNombre.trim(),
       tesistaCodigo: calTesistaCodigo.trim(),
       tesistaCorreo: calTesistaCorreo.trim(),
+      tesista2Nombre: calTesista2Nombre.trim() || undefined,
+      tesista2Codigo: calTesista2Codigo.trim() || undefined,
+      tesista2Correo: calTesista2Correo.trim() || undefined,
       tituloTesis: calTituloTesis.trim(),
       asesor: calAsesor.trim(),
       juradoPresidente: calPresidente.trim(),
       juradoSecretario: calSecretario.trim(),
       juradoVocal: calVocal.trim(),
-      aulaOAuditorio: 'Auditorio de Ingeniería Industrial UNT',
+      aulaOAuditorio: 'Auditorio de la Escuela de Ingeniería Industrial',
       estado: 'Programada'
     };
 
@@ -874,7 +944,9 @@ export const SecretariaLogisticsPage: React.FC = () => {
       const q = busquedaSeg.toLowerCase();
       return (
         s.tesistaNombre.toLowerCase().includes(q) ||
+        (s.tesista2Nombre || '').toLowerCase().includes(q) ||
         s.codigoMatricula.toLowerCase().includes(q) ||
+        (s.tesista2Codigo || '').toLowerCase().includes(q) ||
         s.tituloTesis.toLowerCase().includes(q) ||
         s.asesor.toLowerCase().includes(q)
       );
@@ -908,99 +980,152 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
   return (
     <div className="space-y-5">
-      {/* Navegación Serena de 5 Módulos: Hoy · Trámites · Jueves y Flyers · Colación · Instrucciones */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-2xs flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => setTab('hoy')}
-          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'hoy'
-            ? 'bg-[#082F64] text-white shadow-xs'
-            : 'text-slate-600 hover:bg-slate-100'
-            }`}
-        >
-          <Sparkles className="w-4 h-4 text-amber-400" />
-          <span>Hoy</span>
-          {dudasSinResponderCount > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black leading-none">
-              {dudasSinResponderCount}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setTab('seguimiento')}
-          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'seguimiento'
-            ? 'bg-[#082F64] text-white shadow-xs'
-            : 'text-slate-600 hover:bg-slate-100'
-            }`}
-        >
-          <ClipboardList className="w-4 h-4 text-amber-300" />
-          <span>Trámites ({seguimientos.length})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setTab('despacho')}
-          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'despacho' || tab === 'calendario'
-            ? 'bg-[#082F64] text-white shadow-xs'
-            : 'text-slate-600 hover:bg-slate-100'
-            }`}
-        >
-          <Send className="w-4 h-4 text-amber-300" />
-          <span>Jueves y Flyers</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setTab('colacion')}
-          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'colacion'
-            ? 'bg-[#082F64] text-white shadow-xs'
-            : 'text-slate-600 hover:bg-slate-100'
-            }`}
-        >
-          <GraduationCap className="w-4 h-4 text-amber-300" />
-          <span>Colación</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setTab('instrucciones')}
-          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'instrucciones'
-            ? 'bg-[#082F64] text-white shadow-xs'
-            : 'text-slate-600 hover:bg-slate-100'
-            }`}
-        >
-          <Edit3 className="w-4 h-4 text-amber-300" />
-          <span>Guías y Preguntas</span>
-        </button>
-      </div>
-
-      {/* Sub-barra limpia dentro de Jueves y Flyers para alternar entre Despacho 1-Clic y Calendario */}
-      {(tab === 'despacho' || tab === 'calendario') && (
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200 w-fit">
-          <button
-            type="button"
-            onClick={() => setTab('despacho')}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-              tab === 'despacho' ? 'bg-white text-[#082F64] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>Preparar Flyer y Correos (1 Clic)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('calendario')}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-              tab === 'calendario' ? 'bg-white text-[#082F64] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Agenda de Jueves (11:00 - 1:00)</span>
-          </button>
+      {/* Navegación Clara y Amigable: 5 Tarjetas con Subtítulo (sin confusiones al cambiar) */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-2.5 shadow-sm space-y-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {[
+            {
+              id: 'hoy' as const,
+              titulo: 'Hoy',
+              subtitulo: 'Resumen del día',
+              activo: tab === 'hoy',
+              badge: dudasSinResponderCount > 0 ? dudasSinResponderCount : undefined,
+              icon: <Sparkles className="w-4 h-4 shrink-0" />
+            },
+            {
+              id: 'seguimiento' as const,
+              titulo: `Trámites (${seguimientos.length})`,
+              subtitulo: 'Padrón y etapas',
+              activo: tab === 'seguimiento',
+              icon: <ClipboardList className="w-4 h-4 shrink-0" />
+            },
+            {
+              id: 'despacho' as const,
+              titulo: 'Jueves y Flyers',
+              subtitulo: 'Agenda y correos',
+              activo: tab === 'despacho' || tab === 'calendario',
+              icon: <Send className="w-4 h-4 shrink-0" />
+            },
+            {
+              id: 'colacion' as const,
+              titulo: 'Colación',
+              subtitulo: 'Ética, Repo y URA',
+              activo: tab === 'colacion',
+              icon: <GraduationCap className="w-4 h-4 shrink-0" />
+            },
+            {
+              id: 'instrucciones' as const,
+              titulo: 'Guías y FAQ',
+              subtitulo: 'Pasos y respuestas',
+              activo: tab === 'instrucciones',
+              icon: <Edit3 className="w-4 h-4 shrink-0" />
+            }
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              className={`group flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left transition-all cursor-pointer border ${
+                item.activo
+                  ? 'bg-[#082F64] text-white border-[#082F64] shadow-sm'
+                  : 'bg-slate-50/70 text-slate-700 border-transparent hover:bg-blue-50/70 hover:border-blue-200'
+              }`}
+            >
+              <div
+                className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                  item.activo
+                    ? 'bg-white/15 text-amber-300'
+                    : 'bg-white text-[#082F64] shadow-2xs group-hover:bg-blue-100/70'
+                }`}
+              >
+                {item.icon}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-extrabold truncate">{item.titulo}</span>
+                  {item.badge && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black leading-none">
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
+                <div
+                  className={`text-[10px] truncate mt-0.5 ${
+                    item.activo ? 'text-blue-200' : 'text-slate-500'
+                  }`}
+                >
+                  {item.subtitulo}
+                </div>
+              </div>
+            </button>
+          ))}
         </div>
-      )}
+
+        {/* Barra de ubicación actual: siempre sabes exactamente dónde estás y qué hacer */}
+        <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-slate-50 via-blue-50/40 to-slate-50 border border-slate-200/70 text-xs">
+          <div className="text-slate-600">
+            {tab === 'hoy' && (
+              <span>
+                <strong className="text-slate-900">Vista Hoy:</strong> Solo tus pendientes prioritarios de esta semana sin saturación.
+              </span>
+            )}
+            {tab === 'seguimiento' && (
+              <span>
+                <strong className="text-slate-900">Padrón de Trámites:</strong> Registra tesistas (individual o en pareja de 2) y mueve su etapa con 1 clic.
+              </span>
+            )}
+            {(tab === 'despacho' || tab === 'calendario') && (
+              <span>
+                <strong className="text-slate-900">
+                  {tab === 'despacho' ? 'Jueves y Flyers → Preparar y Enviar:' : 'Jueves y Flyers → Agenda de Jueves:'}
+                </strong>{' '}
+                {tab === 'despacho'
+                  ? 'Genera el flyer oficial (Invitación o Reprogramación) y envíalo al tesista y jurado.'
+                  : 'Elige un jueves del calendario para programar una sustentación.'}
+              </span>
+            )}
+            {tab === 'colacion' && (
+              <span>
+                <strong className="text-slate-900">Modo Colación:</strong> Control masivo de Ética, Repositorio UNT y Carpeta URA.
+              </span>
+            )}
+            {tab === 'instrucciones' && (
+              <span>
+                <strong className="text-slate-900">Guías y Preguntas Oficiales:</strong> Edita los pasos y respuestas que ven los alumnos.
+              </span>
+            )}
+          </div>
+
+          {(tab === 'despacho' || tab === 'calendario') && (
+            <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setTab('despacho')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                  tab === 'despacho'
+                    ? 'bg-[#082F64] text-white shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>1. Flyer y Correos</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab('calendario')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                  tab === 'calendario'
+                    ? 'bg-[#082F64] text-white shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>2. Agenda Jueves</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* =====================================================================
           0. PORTADA "HOY": MÁXIMO 3 PENDIENTES CLAVE SIN SOBRECARGA VISUAL
@@ -1088,18 +1213,16 @@ export const SecretariaLogisticsPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setSubTabGuias('pasos')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                subTabGuias === 'pasos' ? 'bg-white text-[#082F64] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${subTabGuias === 'pasos' ? 'bg-white text-[#082F64] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               Pasos del Trámite
             </button>
             <button
               type="button"
               onClick={() => setSubTabGuias('faqs')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                subTabGuias === 'faqs' ? 'bg-white text-[#082F64] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${subTabGuias === 'faqs' ? 'bg-white text-[#082F64] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               Preguntas Frecuentes (Respuestas Oficiales)
             </button>
@@ -1206,265 +1329,290 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
           {/* TABLA ÚNICA Y LIMPIA DE TRÁMITES (SIN VISTAS DUPLICADAS) */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-[#082F64] text-white text-[11px] uppercase tracking-wider">
-                      <th className="py-3 px-3.5 font-extrabold">Estado</th>
-                      <th className="py-3 px-3.5 font-extrabold">Tesista / Matrícula</th>
-                      <th className="py-3 px-3.5 font-extrabold min-w-[220px]">Tesis y Jurado</th>
-                      <th className="py-3 px-3.5 font-extrabold min-w-[270px]">Etapa (1 Clic)</th>
-                      <th className="py-3 px-3.5 font-extrabold min-w-[240px]">Apuntes / Observación</th>
-                      <th className="py-3 px-3.5 font-extrabold text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 text-xs">
-                    {seguimientosFiltrados.map((item) => {
-                      const etapaActual = item.estacionActual;
-                      const sem = resolverSemaforo(item);
-                      const semMeta = SEMAFORO_META[sem];
-                      const guardadoAhora = guardadoRecienteId === item.id;
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#082F64] text-white text-[11px] uppercase tracking-wider">
+                    <th className="py-3 px-3.5 font-extrabold">Estado</th>
+                    <th className="py-3 px-3.5 font-extrabold">Tesista / Matrícula</th>
+                    <th className="py-3 px-3.5 font-extrabold min-w-[220px]">Tesis y Jurado</th>
+                    <th className="py-3 px-3.5 font-extrabold min-w-[270px]">Etapa (1 Clic)</th>
+                    <th className="py-3 px-3.5 font-extrabold min-w-[240px]">Apuntes / Observación</th>
+                    <th className="py-3 px-3.5 font-extrabold text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-xs">
+                  {seguimientosFiltrados.map((item) => {
+                    const etapaActual = item.estacionActual;
+                    const sem = resolverSemaforo(item);
+                    const semMeta = SEMAFORO_META[sem];
+                    const guardadoAhora = guardadoRecienteId === item.id;
 
-                      return (
-                        <tr
-                          key={item.id}
-                          className={`hover:bg-blue-50/30 transition-colors ${semMeta.rowBorder}`}
-                        >
-                          {/* Columna 1: Semáforo en 1 Clic */}
-                          <td className="py-3.5 px-3.5 align-top">
-                            <div className="flex flex-col gap-1.5">
-                              <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 w-fit">
-                                {(['operativo', 'atencion', 'incidencia'] as SemaforoEstadoId[]).map(
-                                  (estadoKey) => {
-                                    const activoSem = sem === estadoKey;
-                                    const dotColor =
-                                      estadoKey === 'operativo'
-                                        ? 'bg-emerald-500'
-                                        : estadoKey === 'atencion'
-                                          ? 'bg-amber-500'
-                                          : 'bg-rose-600';
-                                    return (
-                                      <button
-                                        key={estadoKey}
-                                        type="button"
-                                        onClick={() => handleCambiarSemaforoDirecto(item.id, estadoKey)}
-                                        title={SEMAFORO_META[estadoKey].label}
-                                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer ${activoSem
-                                          ? 'bg-white shadow-xs ring-2 ring-slate-400 scale-105'
-                                          : 'opacity-40 hover:opacity-90'
-                                          }`}
-                                      >
-                                        <span className={`w-3 h-3 rounded-full ${dotColor}`} />
-                                      </button>
-                                    );
-                                  }
-                                )}
-                              </div>
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold border w-fit ${semMeta.badge}`}
-                              >
-                                {semMeta.label}
-                              </span>
-                            </div>
-                          </td>
-
-                          {/* Columna 2: Tesista + Matrícula 10 dígitos */}
-                          <td className="py-3.5 px-3.5 align-top">
-                            <div className="font-black text-slate-900 text-xs leading-snug">
-                              {item.tesistaNombre}
-                            </div>
-                            <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono font-bold text-[11px] text-[#082F64]">
-                              {item.codigoMatricula}
-                            </div>
-                            <div className="text-[11px] font-mono text-slate-500 truncate max-w-[170px] mt-0.5">
-                              {item.tesistaCorreo}
-                            </div>
-                          </td>
-
-                          {/* Columna 3: Título + Jurado compacto */}
-                          <td className="py-3.5 px-3.5 align-top max-w-xs">
-                            <p className="text-xs font-semibold text-slate-800 line-clamp-2 leading-snug">
-                              {item.tituloTesis}
-                            </p>
-                            <div className="mt-1.5 flex flex-wrap gap-1 text-[10px] text-slate-600">
-                              <span className="px-1.5 py-0.5 rounded bg-slate-100 truncate max-w-[130px]">
-                                <strong>J1:</strong> {item.juradoPresidente}
-                              </span>
-                              <span className="px-1.5 py-0.5 rounded bg-slate-100 truncate max-w-[130px]">
-                                <strong>J2:</strong> {item.juradoSecretario}
-                              </span>
-                              <span className="px-1.5 py-0.5 rounded bg-slate-100 truncate max-w-[130px]">
-                                <strong>J3:</strong> {item.juradoVocal}
-                              </span>
-                            </div>
-                          </td>
-
-                          {/* Columna 4: Solo 4 botones claros según la fase actual del tesista (sin apretar 8 a la vez) */}
-                          <td className="py-3.5 px-3.5 align-top">
-                            <div className="space-y-1.5">
-                              {etapaActual <= 4 ? (
-                                <>
-                                  <div className="grid grid-cols-2 gap-1.5">
-                                    {ETAPAS_SIMPLES.filter((e) => e.fase === 'sustentacion').map((et) => {
-                                      const activo = etapaActual === et.id;
-                                      const completado = etapaActual > et.id;
-                                      return (
-                                        <button
-                                          key={et.id}
-                                          type="button"
-                                          onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
-                                          className={`py-1.5 px-2.5 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer truncate ${activo
-                                            ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
-                                            : completado
-                                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                            }`}
-                                        >
-                                          {et.corto}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                  {etapaActual === 4 && (
+                    return (
+                      <tr
+                        key={item.id}
+                        className={`hover:bg-blue-50/30 transition-colors ${semMeta.rowBorder}`}
+                      >
+                        {/* Columna 1: Semáforo en 1 Clic */}
+                        <td className="py-3.5 px-3.5 align-top">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 w-fit">
+                              {(['operativo', 'atencion', 'incidencia'] as SemaforoEstadoId[]).map(
+                                (estadoKey) => {
+                                  const activoSem = sem === estadoKey;
+                                  const dotColor =
+                                    estadoKey === 'operativo'
+                                      ? 'bg-emerald-500'
+                                      : estadoKey === 'atencion'
+                                        ? 'bg-amber-500'
+                                        : 'bg-rose-600';
+                                  return (
                                     <button
+                                      key={estadoKey}
                                       type="button"
-                                      onClick={() => handleCambiarEtapaDirecto(item.id, 5)}
-                                      className="w-full py-1.5 px-2.5 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-900 border border-violet-200 text-[11px] font-extrabold cursor-pointer"
+                                      onClick={() => handleCambiarSemaforoDirecto(item.id, estadoKey)}
+                                      title={SEMAFORO_META[estadoKey].label}
+                                      className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer ${activoSem
+                                        ? 'bg-white shadow-xs ring-2 ring-slate-400 scale-105'
+                                        : 'opacity-40 hover:opacity-90'
+                                        }`}
                                     >
-                                      Ya sustentó → Pasar a Ética y Colación
+                                      <span className={`w-3 h-3 rounded-full ${dotColor}`} />
                                     </button>
-                                  )}
-                                </>
-                              ) : (
-                                <>
-                                  <div className="grid grid-cols-2 gap-1.5">
-                                    {ETAPAS_SIMPLES.filter((e) => e.fase === 'colacion').map((et) => {
-                                      const activo = etapaActual === et.id;
-                                      const completado = etapaActual > et.id;
-                                      return (
-                                        <button
-                                          key={et.id}
-                                          type="button"
-                                          onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
-                                          className={`py-1.5 px-2.5 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer truncate ${activo
-                                            ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
-                                            : completado
-                                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                            }`}
-                                        >
-                                          {et.corto}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleCambiarEtapaDirecto(item.id, 4)}
-                                    className="text-[10px] text-slate-400 hover:text-slate-700 font-semibold cursor-pointer"
-                                  >
-                                    ← Volver a fase de sustentación
-                                  </button>
-                                </>
+                                  );
+                                }
                               )}
+                            </div>
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold border w-fit ${semMeta.badge}`}
+                            >
+                              {semMeta.label}
+                            </span>
+                          </div>
+                        </td>
 
-                              {(item.tipoTramite === 'bachiller' || item.cambioTituloActivo) && (
-                                <div className="flex flex-wrap items-center gap-1 pt-0.5">
-                                  {item.tipoTramite === 'bachiller' && (
-                                    <span className="px-1.5 py-0.5 rounded bg-teal-100 text-teal-900 text-[10px] font-bold">
-                                      Bachiller
-                                    </span>
-                                  )}
-                                  {item.cambioTituloActivo && (
-                                    <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold">
-                                      Cambio de Título
-                                    </span>
-                                  )}
+                        {/* Columna 2: Tesista(s) + Matrícula 10 dígitos (soporta 1 o 2 tesistas en pareja) */}
+                        <td className="py-3.5 px-3.5 align-top">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-black text-slate-900 text-xs leading-snug">
+                              {item.tesistaNombre}
+                            </span>
+                            {item.tesista2Nombre && (
+                              <span className="px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-900 text-[9px] font-black uppercase">
+                                2 Tesistas
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono font-bold text-[11px] text-[#082F64]">
+                            {item.codigoMatricula}
+                          </div>
+                          <div className="text-[11px] font-mono text-slate-500 truncate max-w-[180px] mt-0.5">
+                            {item.tesistaCorreo}
+                          </div>
+
+                          {item.tesista2Nombre && (
+                            <div className="mt-2 pt-2 border-t border-slate-100">
+                              <div className="font-bold text-slate-800 text-xs leading-snug">
+                                {item.tesista2Nombre}
+                              </div>
+                              {item.tesista2Codigo && (
+                                <div className="mt-0.5 inline-flex items-center px-2 py-0.5 rounded bg-sky-50 border border-sky-200 font-mono font-bold text-[10px] text-sky-900">
+                                  {item.tesista2Codigo}
+                                </div>
+                              )}
+                              {item.tesista2Correo && (
+                                <div className="text-[11px] font-mono text-slate-500 truncate max-w-[180px] mt-0.5">
+                                  {item.tesista2Correo}
                                 </div>
                               )}
                             </div>
-                          </td>
+                          )}
+                        </td>
 
-                          {/* Columna 5: Apuntes Directos en Línea (Offline-First) */}
-                          <td className="py-3.5 px-3.5 align-top">
-                            <div className="relative">
-                              <textarea
-                                rows={2}
-                                value={item.notasSecretaria}
-                                onChange={(e) => handleActualizarNotaDirecto(item.id, e.target.value)}
-                                placeholder="Apunte rápido..."
-                                className="w-full p-2 rounded-xl bg-amber-50/60 border border-amber-200 text-xs text-slate-800 focus:bg-white focus:border-[#082F64] focus:outline-hidden"
-                              />
-                              {guardadoAhora && (
-                                <span className="absolute right-2 bottom-2 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-bold">
-                                  ✓ Guardado
-                                </span>
-                              )}
-                            </div>
-                          </td>
+                        {/* Columna 3: Título + Jurado compacto */}
+                        <td className="py-3.5 px-3.5 align-top max-w-xs">
+                          <p className="text-xs font-semibold text-slate-800 line-clamp-2 leading-snug">
+                            {item.tituloTesis}
+                          </p>
+                          <div className="mt-1.5 flex flex-wrap gap-1 text-[10px] text-slate-600">
+                            <span className="px-1.5 py-0.5 rounded bg-slate-100 truncate max-w-[140px]">
+                              <strong>J1:</strong> {item.juradoPresidente}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded bg-slate-100 truncate max-w-[140px]">
+                              <strong>J2:</strong> {item.juradoSecretario}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded bg-slate-100 truncate max-w-[140px]">
+                              <strong>J3:</strong> {item.juradoVocal}
+                            </span>
+                          </div>
+                        </td>
 
-                          {/* Columna 6: Botones Grandes de Acción Rápida */}
-                          <td className="py-3.5 px-3.5 align-top text-right">
-                            <div className="flex flex-col gap-1.5 items-end">
-                              <div className="flex items-center gap-1.5">
+                        {/* Columna 4: Solo 4 botones claros según la fase actual del tesista (sin apretar 8 a la vez) */}
+                        <td className="py-3.5 px-3.5 align-top">
+                          <div className="space-y-1.5">
+                            {etapaActual <= 4 ? (
+                              <>
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  {ETAPAS_SIMPLES.filter((e) => e.fase === 'sustentacion').map((et) => {
+                                    const activo = etapaActual === et.id;
+                                    const completado = etapaActual > et.id;
+                                    return (
+                                      <button
+                                        key={et.id}
+                                        type="button"
+                                        onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
+                                        className={`py-1.5 px-2.5 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer truncate ${activo
+                                          ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
+                                          : completado
+                                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                          }`}
+                                      >
+                                        {et.corto}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                {etapaActual === 4 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCambiarEtapaDirecto(item.id, 5)}
+                                    className="w-full py-1.5 px-2.5 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-900 border border-violet-200 text-[11px] font-extrabold cursor-pointer"
+                                  >
+                                    Ya sustentó → Pasar a Ética y Colación
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  {ETAPAS_SIMPLES.filter((e) => e.fase === 'colacion').map((et) => {
+                                    const activo = etapaActual === et.id;
+                                    const completado = etapaActual > et.id;
+                                    return (
+                                      <button
+                                        key={et.id}
+                                        type="button"
+                                        onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
+                                        className={`py-1.5 px-2.5 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer truncate ${activo
+                                          ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
+                                          : completado
+                                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                          }`}
+                                      >
+                                        {et.corto}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    cargarTesistaEnCalendario(item.id);
-                                    setTab('calendario');
-                                  }}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-bold cursor-pointer"
-                                  title="Programar Jueves 11:00 - 1:00"
+                                  onClick={() => handleCambiarEtapaDirecto(item.id, 4)}
+                                  className="text-[10px] text-slate-400 hover:text-slate-700 font-semibold cursor-pointer"
                                 >
-                                  <Calendar className="w-3.5 h-3.5 text-[#082F64]" />
-                                  <span>{item.fechaSustentacionProgramada || 'Jueves'}</span>
+                                  ← Volver a fase de sustentación
                                 </button>
+                              </>
+                            )}
 
-                                <button
-                                  type="button"
-                                  onClick={() => prepararDespachoParaTesistaYJurado(item)}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] font-extrabold cursor-pointer"
-                                  title="Enviar Flyer al Jurado, Tesista y copias de los Martes"
-                                >
-                                  <Send className="w-3.5 h-3.5" />
-                                  <span>Flyer</span>
-                                </button>
+                            {(item.tipoTramite === 'bachiller' || item.cambioTituloActivo) && (
+                              <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                                {item.tipoTramite === 'bachiller' && (
+                                  <span className="px-1.5 py-0.5 rounded bg-teal-100 text-teal-900 text-[10px] font-bold">
+                                    Bachiller
+                                  </span>
+                                )}
+                                {item.cambioTituloActivo && (
+                                  <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold">
+                                    Cambio de Título
+                                  </span>
+                                )}
                               </div>
+                            )}
+                          </div>
+                        </td>
 
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => abrirModalSeguimiento(item)}
-                                  className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 cursor-pointer"
-                                  title="Editar"
-                                >
-                                  <Edit3 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setConfirmarEliminar({
-                                      tipo: 'tesista',
-                                      id: item.id,
-                                      nombre: item.tesistaNombre,
-                                      correo: item.tesistaCorreo
-                                    })
-                                  }
-                                  className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 cursor-pointer"
-                                  title="Eliminar"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
+                        {/* Columna 5: Apuntes Directos en Línea (Offline-First) */}
+                        <td className="py-3.5 px-3.5 align-top">
+                          <div className="relative">
+                            <textarea
+                              rows={2}
+                              value={item.notasSecretaria}
+                              onChange={(e) => handleActualizarNotaDirecto(item.id, e.target.value)}
+                              placeholder="Apunte rápido..."
+                              className="w-full p-2 rounded-xl bg-amber-50/60 border border-amber-200 text-xs text-slate-800 focus:bg-white focus:border-[#082F64] focus:outline-hidden"
+                            />
+                            {guardadoAhora && (
+                              <span className="absolute right-2 bottom-2 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-bold">
+                                ✓ Guardado
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Columna 6: Botones Grandes de Acción Rápida */}
+                        <td className="py-3.5 px-3.5 align-top text-right">
+                          <div className="flex flex-col gap-1.5 items-end">
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  cargarTesistaEnCalendario(item.id);
+                                  setTab('calendario');
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-[11px] font-bold cursor-pointer"
+                                title="Programar Jueves 11:00 - 1:00"
+                              >
+                                <Calendar className="w-3.5 h-3.5 text-[#082F64]" />
+                                <span>{item.fechaSustentacionProgramada || 'Jueves'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => prepararDespachoParaTesistaYJurado(item)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] font-extrabold cursor-pointer"
+                                title="Enviar Flyer al Jurado, Tesista y copias de los Martes"
+                              >
+                                <Send className="w-3.5 h-3.5" />
+                                <span>Flyer</span>
+                              </button>
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => abrirModalSeguimiento(item)}
+                                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 cursor-pointer"
+                                title="Editar"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setConfirmarEliminar({
+                                    tipo: 'tesista',
+                                    id: item.id,
+                                    nombre: item.tesistaNombre,
+                                    correo: item.tesistaCorreo
+                                  })
+                                }
+                                className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 cursor-pointer"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
+          </div>
         </div>
       )}
 
@@ -1502,6 +1650,9 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         codigoMatricula: sust.tesistaCodigo || '',
                         tesistaNombre: sust.tesistaNombre,
                         tesistaCorreo: sust.tesistaCorreo || '',
+                        tesista2Nombre: sust.tesista2Nombre,
+                        tesista2Codigo: sust.tesista2Codigo,
+                        tesista2Correo: sust.tesista2Correo,
                         tituloTesis: sust.tituloTesis,
                         lineaInvestigacion: 'Ingeniería Industrial',
                         asesor: sust.asesor || '',
@@ -1595,11 +1746,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
                           onClick={() =>
                             regenerarFlyerDesdeDatos({ ...flyerDatosActivos, tipo: 'normal' }, true)
                           }
-                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                            (flyerDatosActivos.tipo || 'normal') === 'normal'
+                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${(flyerDatosActivos.tipo || 'normal') === 'normal'
                               ? 'bg-[#004AAD] text-white shadow-2xs'
                               : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
-                          }`}
+                            }`}
                         >
                           Invitación Normal
                         </button>
@@ -1608,11 +1758,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
                           onClick={() =>
                             regenerarFlyerDesdeDatos({ ...flyerDatosActivos, tipo: 'reprogramacion' }, true)
                           }
-                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                            flyerDatosActivos.tipo === 'reprogramacion'
+                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${flyerDatosActivos.tipo === 'reprogramacion'
                               ? 'bg-amber-500 text-slate-950 shadow-2xs'
                               : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
-                          }`}
+                            }`}
                         >
                           Reprogramación
                         </button>
@@ -1820,18 +1969,76 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   />
                 </div>
 
+                {/* Opción directa: Agregar correos manuales extra en el flyer (por si acaso) */}
+                <div className="p-3 rounded-xl bg-blue-50/40 border border-blue-200/80 space-y-2">
+                  <label className="block text-[11px] font-bold text-[#082F64]">
+                    Añadir correo manual extra (opcional, por si acaso):
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={inputCorreoManual}
+                      onChange={(e) => setInputCorreoManual(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          agregarCorreoManual();
+                        }
+                      }}
+                      placeholder="Escribe correo@unitru.edu.pe y pulsa Añadir..."
+                      className="flex-1 px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-mono focus:border-[#082F64] focus:outline-hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={agregarCorreoManual}
+                      className="px-3.5 py-2 rounded-xl bg-[#082F64] hover:bg-[#0C4D96] text-white text-xs font-bold cursor-pointer shrink-0 inline-flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Añadir</span>
+                    </button>
+                  </div>
+                  {correosManuales.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {correosManuales.map((correo) => (
+                        <span
+                          key={correo}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white border border-blue-300 text-[#082F64] font-mono text-[11px] font-bold shadow-2xs"
+                        >
+                          <span>{correo}</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCorreosManuales((prev) => prev.filter((c) => c !== correo))
+                            }
+                            className="text-slate-400 hover:text-rose-600 cursor-pointer"
+                            title="Quitar correo manual"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {(() => {
+                  const manualesEnInput = inputCorreoManual
+                    .split(/[,;\s]+/)
+                    .map((c) => c.trim().toLowerCase())
+                    .filter((c) => c.includes('@') && c.includes('.'));
                   const previewDestinatarios = Array.from(
                     new Set([
                       ...tesistasChecks,
                       ...(nuevoTesistaCorreo.trim().includes('@') ? [nuevoTesistaCorreo.trim().toLowerCase()] : []),
                       ...juradoChecks,
-                      ...(nuevoIngCorreo.trim().includes('@') ? [nuevoIngCorreo.trim().toLowerCase()] : [])
+                      ...(nuevoIngCorreo.trim().includes('@') ? [nuevoIngCorreo.trim().toLowerCase()] : []),
+                      ...correosManuales,
+                      ...manualesEnInput
                     ])
                   );
                   return (
                     <>
-                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-700">
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-700">
                         <span className="font-bold text-slate-900">
                           Destinatarios exactos ({previewDestinatarios.length}):{' '}
                         </span>
@@ -1841,7 +2048,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                           </span>
                         ) : (
                           <span className="text-slate-500">
-                            Ninguno seleccionado aún (marca checks a la derecha o escribe un correo puntual).
+                            Ninguno seleccionado aún (marca checks a la derecha o añade un correo manual arriba).
                           </span>
                         )}
                       </div>
@@ -1849,7 +2056,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                       <button
                         type="submit"
                         disabled={enviandoCorreo || previewDestinatarios.length === 0}
-                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm shadow-sm cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm shadow-sm cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
                       >
                         <Send className="w-4 h-4" />
                         <span>
@@ -1920,7 +2127,16 @@ export const SecretariaLogisticsPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() =>
-                        setTesistasChecks(seguimientos.map((s) => s.tesistaCorreo.toLowerCase()))
+                        setTesistasChecks(
+                          Array.from(
+                            new Set(
+                              seguimientos
+                                .flatMap((s) => [s.tesistaCorreo, s.tesista2Correo || ''])
+                                .map((c) => c.trim().toLowerCase())
+                                .filter((c) => c.includes('@'))
+                            )
+                          )
+                        )
                       }
                       className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 font-semibold cursor-pointer"
                     >
@@ -1946,18 +2162,27 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
                 <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
                   {seguimientos
+                    .flatMap((s) => {
+                      const items = [
+                        { key: `${s.id}-1`, nombre: s.tesistaNombre, correo: s.tesistaCorreo, pareja: Boolean(s.tesista2Nombre) }
+                      ];
+                      if (s.tesista2Nombre && s.tesista2Correo) {
+                        items.push({ key: `${s.id}-2`, nombre: s.tesista2Nombre, correo: s.tesista2Correo, pareja: true });
+                      }
+                      return items;
+                    })
                     .filter(
-                      (s) =>
+                      (t) =>
                         !busquedaTesistaCheck.trim() ||
-                        s.tesistaNombre.toLowerCase().includes(busquedaTesistaCheck.toLowerCase()) ||
-                        s.tesistaCorreo.toLowerCase().includes(busquedaTesistaCheck.toLowerCase())
+                        t.nombre.toLowerCase().includes(busquedaTesistaCheck.toLowerCase()) ||
+                        t.correo.toLowerCase().includes(busquedaTesistaCheck.toLowerCase())
                     )
-                    .map((s) => {
-                      const correoLow = s.tesistaCorreo.toLowerCase();
+                    .map((t) => {
+                      const correoLow = t.correo.toLowerCase();
                       const marcado = tesistasChecks.includes(correoLow);
                       return (
                         <div
-                          key={s.id}
+                          key={t.key}
                           className={`flex items-center justify-between p-2.5 text-xs ${marcado ? 'bg-blue-50/80' : 'hover:bg-slate-50'
                             }`}
                         >
@@ -1977,11 +2202,16 @@ export const SecretariaLogisticsPage: React.FC = () => {
                               className="w-4 h-4 rounded text-unt-blue cursor-pointer"
                             />
                             <div className="min-w-0">
-                              <div className="font-bold text-slate-900 truncate">
-                                {s.tesistaNombre}
+                              <div className="font-bold text-slate-900 truncate flex items-center gap-1.5">
+                                <span className="truncate">{t.nombre}</span>
+                                {t.pareja && (
+                                  <span className="px-1 py-0.5 rounded bg-sky-100 text-sky-900 text-[9px] font-black shrink-0">
+                                    Pareja
+                                  </span>
+                                )}
                               </div>
                               <div className="font-mono text-[11px] text-unt-blue truncate">
-                                {s.tesistaCorreo}
+                                {t.correo}
                               </div>
                             </div>
                           </label>
@@ -2308,7 +2538,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Tesista:</label>
+                  <label className="block font-bold text-slate-700 mb-1">Tesista 1:</label>
                   <input
                     type="text"
                     required
@@ -2318,12 +2548,35 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Correo:</label>
+                  <label className="block font-bold text-slate-700 mb-1">Correo Tesista 1:</label>
                   <input
                     type="email"
                     value={calTesistaCorreo}
                     onChange={(e) => setCalTesistaCorreo(e.target.value)}
                     className="w-full p-2.5 rounded-xl border border-slate-300 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-sky-50/50 border border-sky-200/70">
+                <div>
+                  <label className="block font-bold text-sky-900 mb-1">Tesista 2 (opcional si es en pareja):</label>
+                  <input
+                    type="text"
+                    value={calTesista2Nombre}
+                    onChange={(e) => setCalTesista2Nombre(e.target.value)}
+                    placeholder="Dejar vacío si es tesista individual"
+                    className="w-full p-2 rounded-lg border border-slate-300 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-sky-900 mb-1">Correo Tesista 2 (opcional):</label>
+                  <input
+                    type="email"
+                    value={calTesista2Correo}
+                    onChange={(e) => setCalTesista2Correo(e.target.value)}
+                    placeholder="tesista2@unitru.edu.pe"
+                    className="w-full p-2 rounded-lg border border-slate-300 bg-white font-mono"
                   />
                 </div>
               </div>
@@ -2393,6 +2646,9 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         codigoMatricula: calTesistaCodigo,
                         tesistaNombre: calTesistaNombre,
                         tesistaCorreo: calTesistaCorreo,
+                        tesista2Nombre: calTesista2Nombre.trim() || undefined,
+                        tesista2Codigo: calTesista2Codigo.trim() || undefined,
+                        tesista2Correo: calTesista2Correo.trim() || undefined,
                         tituloTesis: calTituloTesis,
                         lineaInvestigacion: 'Ingeniería Industrial',
                         asesor: calAsesor,
@@ -2531,6 +2787,63 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   />
                 </div>
               </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[11px] font-bold text-slate-600">
+                  ¿Esta tesis es en pareja (2 bachilleres)?
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setFormEnPareja((v) => !v)}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold cursor-pointer border transition-all ${
+                    formEnPareja
+                      ? 'bg-sky-600 text-white border-sky-600'
+                      : 'bg-sky-50 text-sky-900 border-sky-200 hover:bg-sky-100'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>{formEnPareja ? 'Sí · 2 Tesistas (Activo)' : '+ Agregar 2.º Tesista'}</span>
+                </button>
+              </div>
+
+              {formEnPareja && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-sky-50/70 border border-sky-200 animate-in fade-in">
+                  <div>
+                    <label className="block font-bold text-sky-950 mb-1">
+                      Matrícula 2 (10 dígitos):
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={formCodigo2}
+                      onChange={(e) => setFormCodigo2(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      placeholder="1511300998"
+                      className="w-full p-2 rounded-xl border border-sky-200 bg-white font-mono font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-sky-950 mb-1">Nombre Tesista 2:</label>
+                    <input
+                      type="text"
+                      value={formNombre2}
+                      onChange={(e) => setFormNombre2(e.target.value)}
+                      placeholder="Apellidos y nombres"
+                      className="w-full p-2 rounded-xl border border-sky-200 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-sky-950 mb-1">Correo Tesista 2:</label>
+                    <input
+                      type="email"
+                      value={formCorreo2}
+                      onChange={(e) => setFormCorreo2(e.target.value)}
+                      placeholder="tesista2@unitru.edu.pe"
+                      className="w-full p-2 rounded-xl border border-sky-200 bg-white font-mono"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Título de Tesis:</label>

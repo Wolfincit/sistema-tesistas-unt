@@ -152,7 +152,11 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
 
   const resultadosCourier = useMemo(() => {
     if (codigoLimpio.length !== 10) return [];
-    return seguimientos.filter((s) => s.codigoMatricula.trim() === codigoLimpio);
+    return seguimientos.filter(
+      (s) =>
+        s.codigoMatricula.trim() === codigoLimpio ||
+        (s.tesista2Codigo || '').trim() === codigoLimpio
+    );
   }, [codigoLimpio, seguimientos]);
 
   // Modal para crear / editar una Instrucción (Exclusivo Secretaría)
@@ -447,9 +451,11 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-sm font-black text-slate-900">
                               {item.tesistaNombre}
+                              {item.tesista2Nombre ? ` / ${item.tesista2Nombre}` : ''}
                             </span>
                             <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-xs font-bold">
                               Matrícula: {item.codigoMatricula}
+                              {item.tesista2Codigo ? ` · ${item.tesista2Codigo}` : ''}
                             </span>
                             <span
                               className={`px-2.5 py-0.5 rounded-full border text-[11px] font-extrabold ${semBadge.clase}`}
@@ -889,7 +895,12 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                     )}
                   </div>
 
-                  <div className="font-bold text-slate-900 text-sm">{s.tesistaNombre}</div>
+                  <div className="font-bold text-slate-900 text-sm">
+                    {s.tesistaNombre}
+                    {s.tesista2Nombre && (
+                      <div className="text-slate-700">{s.tesista2Nombre}</div>
+                    )}
+                  </div>
                   <p className="text-[11px] text-slate-600 italic">"{s.tituloTesis}"</p>
 
                   <div className="pt-2 border-t border-blue-100 text-[11px] text-slate-700 space-y-0.5">
