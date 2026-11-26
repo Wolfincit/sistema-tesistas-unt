@@ -39,16 +39,33 @@ function loadImageSafe(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-function wrapTextLines(
+function wrapTextStrict(
   ctx: CanvasRenderingContext2D,
   text: string,
-  maxWidth: number,
-  maxLines: number
+  maxWidth: number
 ): string[] {
-  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  const rawWords = String(text || '').trim().split(/\s+/).filter(Boolean);
+  const words: string[] = [];
+  // Si hay una palabra larguísima sin espacios, partirla para que nunca se salga del margen
+  for (const w of rawWords) {
+    if (ctx.measureText(w).width <= maxWidth) {
+      words.push(w);
+    } else {
+      let chunk = '';
+      for (const ch of Array.from(w)) {
+        if (ctx.measureText(chunk + ch).width <= maxWidth) {
+          chunk += ch;
+        } else {
+          if (chunk) words.push(chunk);
+          chunk = ch;
+        }
+      }
+      if (chunk) words.push(chunk);
+    }
+  }
+
   const lines: string[] = [];
   let current = '';
-
   for (const word of words) {
     const test = current ? `${current} ${word}` : word;
     if (ctx.measureText(test).width <= maxWidth) {
@@ -59,16 +76,6 @@ function wrapTextLines(
     }
   }
   if (current) lines.push(current);
-
-  if (lines.length > maxLines) {
-    const kept = lines.slice(0, maxLines - 1);
-    let last = lines.slice(maxLines - 1).join(' ');
-    while (last.length > 4 && ctx.measureText(`${last}…`).width > maxWidth) {
-      last = last.slice(0, -1);
-    }
-    kept.push(`${last.trim()}…`);
-    return kept;
-  }
   return lines;
 }
 
@@ -230,57 +237,57 @@ export async function generarFlyerOficialPng(data: FlyerSustentacionInput): Prom
   const NAVY = '#10107A';
   const FONT_SANS = 'Poppins, "Segoe UI", Arial, sans-serif';
 
-  // 2. TÍTULO DE LA TESIS (Grande, notorio, negrita azul marino — escala inteligentemente según longitud)
+  // 2. TÍTULO DE LA TESIS — Ajuste estricto dentro de la caja segura entre "titulado:" y "Día:"
+  // Garantiza matemáticamente que NUNCA pise el texto "Día:" sin importar qué tan largo sea el título
   const tituloLimpio = String(data.tituloTesis || 'Tesis de Ingeniería Industrial')
     .replace(/^[“""]+|[”""]+$/g, '')
     .trim()
     .toUpperCase();
   const tituloConComillas = `“${tituloLimpio}”`;
 
+  const boxTop = esReprog ? 296 : 306;
+  const boxBottom = esReprog ? 360 : 368;
+  const boxMaxHeight = boxBottom - boxTop;
+  const titleMaxW = 990;
+
   ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
   ctx.fillStyle = NAVY;
 
-  // Escala automática para que siempre se vea tan grande y notorio como el flyer oficial:
-  // 1 línea -> 30px | 2 líneas -> 26px | 3 líneas -> 24px (o 22px si es muy largo)
-  const titleMaxW = 1005;
-  let titleFontSize = 30;
-  let titleLineHeight = 34;
-  ctx.font = `800 ${titleFontSize}px ${FONT_SANS}`;
-  let tituloLines = wrapTextLines(ctx, tituloConComillas, titleMaxW, 4);
+  let chosenFontSize = 14;
+  let chosenLineHeight = 16;
+  let chosenLines: string[] = [tituloConComillas];
 
-  if (tituloLines.length === 1) {
-    titleFontSize = 30;
-    titleLineHeight = 34;
-  } else {
-    titleFontSize = 26;
-    titleLineHeight = 30;
-    ctx.font = `800 ${titleFontSize}px ${FONT_SANS}`;
-    tituloLines = wrapTextLines(ctx, tituloConComillas, titleMaxW, 4);
-
-    if (tituloLines.length === 3) {
-      titleFontSize = 24;
-      titleLineHeight = 27;
-      ctx.font = `800 ${titleFontSize}px ${FONT_SANS}`;
-      tituloLines = wrapTextLines(ctx, tituloConComillas, titleMaxW, 3);
-    } else if (tituloLines.length >= 4) {
-      titleFontSize = 21;
-      titleLineHeight = 24;
-      ctx.font = `800 ${titleFontSize}px ${FONT_SANS}`;
-      tituloLines = wrapTextLines(ctx, tituloConComillas, titleMaxW, 3);
+  for (let size = 28; size >= 13; size -= 1) {
+    const lh = Math.round(size * 1.14);
+    ctx.font = `800 ${size}px ${FONT_SANS}`;
+    const wrapped = wrapTextStrict(ctx, tituloConComillas, titleMaxW);
+    if (wrapped.length * lh <= boxMaxHeight) {
+      chosenFontSize = size;
+      chosenLineHeight = lh;
+      chosenLines = wrapped;
+      break;
+    }
+    if (size === 13) {
+      chosenFontSize = 13;
+      chosenLineHeight = 15;
+      const maxFit = Math.max(1, Math.floor(boxMaxHeight / 15));
+      chosenLines = wrapped.slice(0, maxFit);
+      if (wrapped.length > maxFit) {
+        const lastIdx = chosenLines.length - 1;
+        chosenLines[lastIdx] = `${chosenLines[lastIdx].slice(0, -2).trim()}…”`;
+      }
     }
   }
 
-  const startTitleY =
-    tituloLines.length === 1
-      ? coords.titleTopY + 38
-      : tituloLines.length === 2
-      ? coords.titleTopY + 24
-      : coords.titleTopY + 18;
+  const totalBlockH = chosenLines.length * chosenLineHeight;
+  const startTopY = boxTop + Math.max(0, Math.floor((boxMaxHeight - totalBlockH) / 2));
 
-  ctx.font = `800 ${titleFontSize}px ${FONT_SANS}`;
-  tituloLines.forEach((line, idx) => {
-    ctx.fillText(line, coords.titleCenterX, startTitleY + idx * titleLineHeight);
+  ctx.font = `800 ${chosenFontSize}px ${FONT_SANS}`;
+  chosenLines.forEach((line, idx) => {
+    ctx.fillText(line, coords.titleCenterX, startTopY + idx * chosenLineHeight);
   });
+  ctx.textBaseline = 'alphabetic';
 
   // 3. DÍA, HORA Y LUGAR
   ctx.textAlign = 'left';

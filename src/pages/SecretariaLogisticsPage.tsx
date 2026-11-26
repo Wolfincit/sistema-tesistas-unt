@@ -683,6 +683,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [generandoFlyer, setGenerandoFlyer] = useState<boolean>(false);
   const [tesistaDespachoActivoId, setTesistaDespachoActivoId] = useState<string>('');
   const [flyerDatosActivos, setFlyerDatosActivos] = useState<FlyerSustentacionInput | null>(null);
+  const [mostrarAjustesFlyer, setMostrarAjustesFlyer] = useState<boolean>(false);
   const [directorFlyerNombre, setDirectorFlyerNombre] = useState<string>(() => {
     try {
       return localStorage.getItem('unt_flyer_director_nombre') || 'Ms. Angel Hernández Molina';
@@ -1880,23 +1881,21 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 onSubmit={handleEnviarAnuncioYFlyer}
                 className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4 text-xs"
               >
-                {/* Selector Rápido de Plantilla Oficial de la Escuela (Invitación Normal vs Reprogramación) */}
+                {/* Barra limpia de 1 sola fila: Invitación Normal / Reprogramación · Lugar rápido · Ajustes discretos */}
                 {flyerDatosActivos && (
-                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-left">
+                  <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-left">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-[11px] font-black uppercase tracking-wider text-unt-blue">
-                        Plantilla Oficial del Flyer
-                      </span>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() =>
                             regenerarFlyerDesdeDatos({ ...flyerDatosActivos, tipo: 'normal' }, true)
                           }
-                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${(flyerDatosActivos.tipo || 'normal') === 'normal'
+                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                            (flyerDatosActivos.tipo || 'normal') === 'normal'
                               ? 'bg-[#004AAD] text-white shadow-2xs'
                               : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
-                            }`}
+                          }`}
                         >
                           Invitación Normal
                         </button>
@@ -1905,100 +1904,15 @@ export const SecretariaLogisticsPage: React.FC = () => {
                           onClick={() =>
                             regenerarFlyerDesdeDatos({ ...flyerDatosActivos, tipo: 'reprogramacion' }, true)
                           }
-                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${flyerDatosActivos.tipo === 'reprogramacion'
+                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                            flyerDatosActivos.tipo === 'reprogramacion'
                               ? 'bg-amber-500 text-slate-950 shadow-2xs'
                               : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-100'
-                            }`}
+                          }`}
                         >
                           Reprogramación
                         </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Día</label>
-                        <input
-                          type="date"
-                          value={flyerDatosActivos.fechaJueves}
-                          onChange={(e) =>
-                            regenerarFlyerDesdeDatos(
-                              { ...flyerDatosActivos, fechaJueves: e.target.value },
-                              true
-                            )
-                          }
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Hora</label>
-                        <input
-                          type="text"
-                          value={flyerDatosActivos.horario}
-                          onChange={(e) =>
-                            regenerarFlyerDesdeDatos(
-                              { ...flyerDatosActivos, horario: e.target.value },
-                              false
-                            )
-                          }
-                          placeholder="11:00 a.m."
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Lugar (Auditorio o Aula)</label>
-                        <input
-                          type="text"
-                          value={flyerDatosActivos.lugar}
-                          onChange={(e) =>
-                            regenerarFlyerDesdeDatos(
-                              { ...flyerDatosActivos, lugar: e.target.value },
-                              false
-                            )
-                          }
-                          placeholder="Auditorio de la Escuela de Ingeniería Industrial"
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                        Título de la Tesis (se ajusta automáticamente en el flyer)
-                      </label>
-                      <input
-                        type="text"
-                        value={flyerDatosActivos.tituloTesis}
-                        onChange={(e) =>
-                          regenerarFlyerDesdeDatos(
-                            { ...flyerDatosActivos, tituloTesis: e.target.value },
-                            false
-                          )
-                        }
-                        placeholder="Título completo del trabajo de tesis..."
-                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                          2.º Bachiller (opcional si son 2 tesistas)
-                        </label>
-                        <input
-                          type="text"
-                          value={flyerDatosActivos.segundoBachiller || ''}
-                          onChange={(e) =>
-                            regenerarFlyerDesdeDatos(
-                              { ...flyerDatosActivos, segundoBachiller: e.target.value },
-                              false
-                            )
-                          }
-                          placeholder="Ej. DALIA DANIA SOLANO CASTILLO"
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs"
-                        />
-                      </div>
-                      <div className="flex items-end gap-1.5">
+                        <span className="text-slate-300 px-0.5">|</span>
                         <button
                           type="button"
                           onClick={() =>
@@ -2010,66 +1924,132 @@ export const SecretariaLogisticsPage: React.FC = () => {
                               false
                             )
                           }
-                          className="flex-1 py-1.5 px-2 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-[11px] font-bold text-slate-700 cursor-pointer"
+                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer border ${
+                            flyerDatosActivos.lugar.toLowerCase().includes('auditorio')
+                              ? 'bg-blue-50 border-blue-300 text-[#082F64]'
+                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
                         >
-                          Auditorio Escuela
+                          Auditorio
                         </button>
                         <button
                           type="button"
                           onClick={() =>
                             regenerarFlyerDesdeDatos({ ...flyerDatosActivos, lugar: 'Aula II-6' }, false)
                           }
-                          className="flex-1 py-1.5 px-2 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 text-[11px] font-bold text-slate-700 cursor-pointer"
+                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer border ${
+                            flyerDatosActivos.lugar === 'Aula II-6'
+                              ? 'bg-blue-50 border-blue-300 text-[#082F64]'
+                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                          }`}
                         >
                           Aula II-6
                         </button>
                       </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setMostrarAjustesFlyer((v) => !v)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-bold text-slate-600 cursor-pointer"
+                      >
+                        <Settings className="w-3 h-3" />
+                        <span>{mostrarAjustesFlyer ? 'Ocultar' : 'Editar Director / Fecha'}</span>
+                      </button>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200/70">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                          Director de Escuela (editable)
-                        </label>
-                        <input
-                          type="text"
-                          value={flyerDatosActivos.directorNombre ?? directorFlyerNombre}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setDirectorFlyerNombre(val);
-                            try {
-                              localStorage.setItem('unt_flyer_director_nombre', val);
-                            } catch {}
-                            regenerarFlyerDesdeDatos(
-                              { ...flyerDatosActivos, directorNombre: val },
-                              false
-                            );
-                          }}
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
-                        />
+                    {mostrarAjustesFlyer && (
+                      <div className="pt-2.5 border-t border-slate-200/80 space-y-2 animate-in fade-in">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Día</label>
+                            <input
+                              type="date"
+                              value={flyerDatosActivos.fechaJueves}
+                              onChange={(e) =>
+                                regenerarFlyerDesdeDatos(
+                                  { ...flyerDatosActivos, fechaJueves: e.target.value },
+                                  true
+                                )
+                              }
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Hora</label>
+                            <input
+                              type="text"
+                              value={flyerDatosActivos.horario}
+                              onChange={(e) =>
+                                regenerarFlyerDesdeDatos(
+                                  { ...flyerDatosActivos, horario: e.target.value },
+                                  false
+                                )
+                              }
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Otro Lugar</label>
+                            <input
+                              type="text"
+                              value={flyerDatosActivos.lugar}
+                              onChange={(e) =>
+                                regenerarFlyerDesdeDatos(
+                                  { ...flyerDatosActivos, lugar: e.target.value },
+                                  false
+                                )
+                              }
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                              Director de Escuela
+                            </label>
+                            <input
+                              type="text"
+                              value={flyerDatosActivos.directorNombre ?? directorFlyerNombre}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setDirectorFlyerNombre(val);
+                                try {
+                                  localStorage.setItem('unt_flyer_director_nombre', val);
+                                } catch {}
+                                regenerarFlyerDesdeDatos(
+                                  { ...flyerDatosActivos, directorNombre: val },
+                                  false
+                                );
+                              }}
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                              Cargo del Director
+                            </label>
+                            <input
+                              type="text"
+                              value={flyerDatosActivos.directorCargo ?? directorFlyerCargo}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setDirectorFlyerCargo(val);
+                                try {
+                                  localStorage.setItem('unt_flyer_director_cargo', val);
+                                } catch {}
+                                regenerarFlyerDesdeDatos(
+                                  { ...flyerDatosActivos, directorCargo: val },
+                                  false
+                                );
+                              }}
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                          Cargo del Director
-                        </label>
-                        <input
-                          type="text"
-                          value={flyerDatosActivos.directorCargo ?? directorFlyerCargo}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setDirectorFlyerCargo(val);
-                            try {
-                              localStorage.setItem('unt_flyer_director_cargo', val);
-                            } catch {}
-                            regenerarFlyerDesdeDatos(
-                              { ...flyerDatosActivos, directorCargo: val },
-                              false
-                            );
-                          }}
-                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs"
-                        />
-                      </div>
-                    </div>
+                    )}
                   </div>
                 )}
 
