@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   EstacionLogisticaId,
   SemaforoEstadoId,
@@ -703,6 +703,27 @@ export const SecretariaLogisticsPage: React.FC = () => {
     'Sustentación de Tesis — Escuela de Ingeniería Industrial UNT'
   );
   const [mensajeChat, setMensajeChat] = useState<string>('');
+  const asuntoInputRef = useRef<HTMLInputElement | null>(null);
+  const mensajeTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const insertarIconoEnCursor = (
+    el: HTMLInputElement | HTMLTextAreaElement | null,
+    valorActual: string,
+    setter: (v: string) => void,
+    icono: string
+  ) => {
+    const start = el && typeof el.selectionStart === 'number' ? el.selectionStart : valorActual.length;
+    const end = el && typeof el.selectionEnd === 'number' ? el.selectionEnd : valorActual.length;
+    const nuevo = `${valorActual.slice(0, start)}${icono}${valorActual.slice(end)}`;
+    setter(nuevo);
+    requestAnimationFrame(() => {
+      if (el) {
+        el.focus();
+        const pos = start + icono.length;
+        el.setSelectionRange(pos, pos);
+      }
+    });
+  };
   const [flyerPreview, setFlyerPreview] = useState<string>('');
   const [flyerNombre, setFlyerNombre] = useState<string>('');
   const [tesistasChecks, setTesistasChecks] = useState<string[]>([]);
@@ -2260,32 +2281,47 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   )}
                 </div>
 
-                {whatsappDocentesTexto && (
+                {(mensajeChat.trim() || whatsappDocentesTexto) && (
                   <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-emerald-900">
                       <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span className="font-bold">Recordatorio listo para el grupo de WhatsApp de docentes</span>
+                      <span className="font-bold">
+                        Listo para WhatsApp (usa exactamente tu texto de abajo con todos sus íconos)
+                      </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => {
-                          navigator.clipboard?.writeText(whatsappDocentesTexto);
-                          agregarToast('success', 'Copiado', 'Texto de recordatorio copiado para pegar en WhatsApp.');
+                          const textoFinal = mensajeChat.trim() || whatsappDocentesTexto;
+                          navigator.clipboard?.writeText(textoFinal);
+                          agregarToast('success', 'Copiado con íconos intactos', 'Pega en WhatsApp con Ctrl + V.');
                         }}
                         className="px-2.5 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 font-bold cursor-pointer"
                       >
-                        Copiar texto
+                        Copiar texto (Ctrl+V)
                       </button>
-                      <a
-                        href={`https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappDocentesTexto)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold inline-flex items-center gap-1"
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const textoFinal = mensajeChat.trim() || whatsappDocentesTexto;
+                          navigator.clipboard?.writeText(textoFinal).catch(() => {});
+                          window.open(
+                            `https://web.whatsapp.com/send?text=${encodeURIComponent(textoFinal)}`,
+                            '_blank',
+                            'noopener,noreferrer'
+                          );
+                          agregarToast(
+                            'info',
+                            'WhatsApp Web abierto',
+                            'También se copió al portapapeles por si prefieres pegarlo con Ctrl + V.'
+                          );
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold inline-flex items-center gap-1 cursor-pointer"
                       >
                         <MessageCircle className="w-3.5 h-3.5" />
-                        <span>Abrir WhatsApp</span>
-                      </a>
+                        <span>Abrir en WhatsApp Web</span>
+                      </button>
                     </div>
                   </div>
                 )}
@@ -2298,8 +2334,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         <button
                           key={`as-${ico}`}
                           type="button"
-                          onClick={() => setAsuntoChat((prev) => `${ico} ${prev}`.trim())}
-                          title={`Insertar ${ico} en el asunto`}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() =>
+                            insertarIconoEnCursor(asuntoInputRef.current, asuntoChat, setAsuntoChat, ico)
+                          }
+                          title={`Insertar ${ico} donde está el cursor`}
                           className="px-1.5 py-0.5 rounded-md bg-slate-100 hover:bg-blue-100 text-xs cursor-pointer transition-colors"
                         >
                           {ico}
@@ -2308,6 +2347,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                     </div>
                   </div>
                   <input
+                    ref={asuntoInputRef}
                     type="text"
                     required
                     value={asuntoChat}
@@ -2318,36 +2358,30 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
                 <div>
                   <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
-                    <label className="font-bold text-slate-700">Mensaje o Anuncio:</label>
+                    <label className="font-bold text-slate-700">Mensaje o Anuncio (editable · admite emojis y texto de ChatGPT):</label>
                     <div className="flex flex-wrap items-center gap-1">
                       {['📢', '📅', '⏰', '📍', '🎓', '📄', '👨‍🏫', '✅', '📌', '✨'].map((ico) => (
                         <button
                           key={`msg-${ico}`}
                           type="button"
-                          onClick={() => setMensajeChat((prev) => `${prev}${prev && !prev.endsWith(' ') && !prev.endsWith('\n') ? ' ' : ''}${ico} `)}
-                          title={`Insertar ${ico}`}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() =>
+                            insertarIconoEnCursor(mensajeTextareaRef.current, mensajeChat, setMensajeChat, ico)
+                          }
+                          title={`Insertar ${ico} donde está el cursor`}
                           className="px-1.5 py-0.5 rounded-md bg-slate-100 hover:bg-blue-100 text-xs cursor-pointer transition-colors"
                         >
                           {ico}
                         </button>
                       ))}
-                      <a
-                        href={`https://api.whatsapp.com/send?text=${encodeURIComponent(mensajeChat || whatsappDocentesTexto || asuntoChat)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title="Enviar exactamente este mensaje (con tus íconos) a WhatsApp"
-                        className="ml-1 px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[10px] font-bold inline-flex items-center gap-1"
-                      >
-                        <MessageCircle className="w-3 h-3" />
-                        <span>Pasar a WhatsApp</span>
-                      </a>
                     </div>
                   </div>
                   <textarea
-                    rows={4}
+                    ref={mensajeTextareaRef}
+                    rows={5}
                     value={mensajeChat}
                     onChange={(e) => setMensajeChat(e.target.value)}
-                    placeholder="Escribe aquí el mensaje o anuncio (puedes usar cualquier ícono o emoji con los botones o Win + .)..."
+                    placeholder="Escribe o pega aquí tu mensaje (incluso desde ChatGPT con cualquier emoji)..."
                     className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white"
                   />
                 </div>
