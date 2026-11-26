@@ -224,6 +224,8 @@ export interface CuentaSecretaria {
   activo: boolean;
   password?: string;
   passwordCambiada?: boolean;
+  preguntaRecuperacion?: string;
+  respuestaRecuperacionHash?: string;
 }
 
 export interface ComunicadoGeneral {

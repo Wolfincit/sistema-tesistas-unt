@@ -14,6 +14,7 @@ import './envLoader.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import {
@@ -39,7 +40,7 @@ import {
   hydratePushStateFromTurso,
   flushPushTursoWrites
 } from './pushEngine.mjs';
-import { getTursoConfigInfo } from './tursoEngine.mjs';
+import { getTursoConfigInfo, tursoGetJson, tursoSetJson } from './tursoEngine.mjs';
 import {
   saveOAuthCredentials,
   buildOAuthAuthUrl,
@@ -91,6 +92,70 @@ const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const MAX_REQ_PER_WINDOW = 180;
 const SCRAPER_UA_RE = /(scrapy|python-requests|python-urllib|httrack|libwww-perl|go-http-client|sqlmap|nikto|nmap|masscan)/i;
+
+// ======================================================
+// UTILIDADES DE RECUPERACIÓN DE CONTRASEÑA SECRETARÍA
+// ======================================================
+const SALT_INSTITUCIONAL_AUTH = 'UNT::ING_INDUSTRIAL::2026::TITULACION::';
+const RESET_CODES_TURSO_KEY = 'unt_auth_reset_codes_v1';
+const memoryResetCodes = {};
+
+function hashPasswordSaltedServer(rawValue) {
+  const clean = String(rawValue || '').trim();
+  if (clean.startsWith('sha256:')) return clean;
+  const hex = crypto
+    .createHash('sha256')
+    .update(`${SALT_INSTITUCIONAL_AUTH}${clean}`)
+    .digest('hex');
+  return `sha256:${hex}`;
+}
+
+function getDefaultSecretariasSeed() {
+  const defaultHash = hashPasswordSaltedServer('UNT2026*');
+  return [
+    {
+      id: 'sec-unt-001',
+      correo: 'secretaria.industrial@unitru.edu.pe',
+      nombre: 'Secretaría Académica Principal',
+      cargo: 'Secretaría de Escuela — Ing. Industrial',
+      fechaRegistro: '2026-03-01',
+      activo: true,
+      password: defaultHash,
+      passwordCambiada: false
+    },
+    {
+      id: 'sec-unt-002',
+      correo: 'grados.industrial@unitru.edu.pe',
+      nombre: 'Asistente de Grados y Títulos',
+      cargo: 'Mesa de Partes y Expedientes — Ing. Industrial',
+      fechaRegistro: '2026-03-01',
+      activo: true,
+      password: defaultHash,
+      passwordCambiada: false
+    }
+  ];
+}
+
+async function loadResetCodesStore() {
+  const fromTurso = await tursoGetJson(RESET_CODES_TURSO_KEY).catch(() => null);
+  if (fromTurso && typeof fromTurso === 'object') {
+    return { ...memoryResetCodes, ...fromTurso };
+  }
+  return { ...memoryResetCodes };
+}
+
+async function saveResetCodesStore(store) {
+  Object.keys(memoryResetCodes).forEach((k) => delete memoryResetCodes[k]);
+  Object.assign(memoryResetCodes, store);
+  await tursoSetJson(RESET_CODES_TURSO_KEY, store).catch(() => {});
+}
+
+async function loadSecretariasForAuth(origin) {
+  const db = await getDbState({ forceDrivePull: false, origin });
+  const raw = db?.collections?.cuentasSecretaria;
+  if (Array.isArray(raw) && raw.length > 0) return raw;
+  return getDefaultSecretariasSeed();
+}
 
 function getRequestOrigin(req) {
   const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
@@ -679,6 +744,204 @@ export async function handleApiRequest(req, res) {
     return true;
   }
 
+  // ======================================================
+  // API RECUPERACIÓN SEGURA DE CONTRASEÑA (SECRETARÍA)
+  // ======================================================
+  if (urlObj.pathname === '/api/auth/recovery-options' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const cleanEmail = String(body?.email || '').trim().toLowerCase();
+      if (!cleanEmail || !cleanEmail.endsWith('@unitru.edu.pe')) {
+        sendJson(res, 400, { error: 'Ingrese un correo institucional válido (@unitru.edu.pe).' });
+        return true;
+      }
+
+      const origin = getRequestOrigin(req);
+      const cuentas = await loadSecretariasForAuth(origin);
+      const mailSt = await getEmailStatusHydrated();
+      const cuenta = cuentas.find((s) => String(s.correo || '').toLowerCase() === cleanEmail);
+      const esCorreoOAuth = mailSt.oauthEmail && mailSt.oauthEmail.toLowerCase() === cleanEmail;
+
+      if (!cuenta && !esCorreoOAuth) {
+        sendJson(res, 404, {
+          error: 'No encontramos una cuenta de Secretaría registrada con ese correo @unitru.edu.pe.'
+        });
+        return true;
+      }
+      if (cuenta && cuenta.activo === false) {
+        sendJson(res, 403, { error: 'Esta cuenta de Secretaría se encuentra suspendida.' });
+        return true;
+      }
+
+      sendJson(res, 200, {
+        ok: true,
+        email: cleanEmail,
+        emailReady: Boolean(mailSt.serverTransportReady),
+        hasSecurityQuestion: Boolean(cuenta?.respuestaRecuperacionHash && cuenta?.preguntaRecuperacion),
+        securityQuestion: cuenta?.preguntaRecuperacion || ''
+      });
+    } catch (err) {
+      sendJson(res, 500, { error: err.message || 'No se pudieron verificar las opciones de recuperación.' });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/auth/request-reset-code' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const cleanEmail = String(body?.email || '').trim().toLowerCase();
+      if (!cleanEmail || !cleanEmail.endsWith('@unitru.edu.pe')) {
+        sendJson(res, 400, { error: 'Ingrese un correo institucional válido (@unitru.edu.pe).' });
+        return true;
+      }
+
+      const origin = getRequestOrigin(req);
+      const cuentas = await loadSecretariasForAuth(origin);
+      const mailSt = await getEmailStatusHydrated();
+      const cuenta = cuentas.find((s) => String(s.correo || '').toLowerCase() === cleanEmail);
+      const esCorreoOAuth = mailSt.oauthEmail && mailSt.oauthEmail.toLowerCase() === cleanEmail;
+
+      if (!cuenta && !esCorreoOAuth) {
+        sendJson(res, 404, { error: 'Cuenta de Secretaría no encontrada.' });
+        return true;
+      }
+      if (cuenta && cuenta.activo === false) {
+        sendJson(res, 403, { error: 'Esta cuenta se encuentra suspendida.' });
+        return true;
+      }
+      if (!mailSt.serverTransportReady) {
+        sendJson(res, 400, {
+          error:
+            'El envío automático por correo aún no está vinculado. Usa tu pregunta/palabra secreta de recuperación o vincula tu cuenta Google desde el panel.'
+        });
+        return true;
+      }
+
+      const code = String(crypto.randomInt(100000, 1000000));
+      const store = await loadResetCodesStore();
+      store[cleanEmail] = {
+        codeHash: hashPasswordSaltedServer(code),
+        expiresAt: Date.now() + 15 * 60 * 1000,
+        attempts: 0
+      };
+      await saveResetCodesStore(store);
+
+      await dispatchAnnouncementEmail({
+        tesistasCorreos: [cleanEmail],
+        juradoCorreos: [],
+        asunto: '🔐 Código de recuperación de contraseña — Sistema Tesistas UNT',
+        mensaje: `Hola${cuenta?.nombre ? ` ${cuenta.nombre}` : ''},\n\nSolicitaste restablecer la contraseña de acceso al Sistema de Gestión de Tesistas (Escuela de Ingeniería Industrial UNT).\n\nTu código de verificación es:\n\n${code}\n\nEste código vence en 15 minutos y es de un solo uso.\nSi no solicitaste este cambio, puedes ignorar este mensaje.`
+      });
+
+      sendJson(res, 200, {
+        ok: true,
+        expiresInMinutes: 15,
+        sentTo: cleanEmail
+      });
+    } catch (err) {
+      sendJson(res, 400, { error: err?.message || 'No se pudo enviar el código de recuperación.' });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/auth/reset-password' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const cleanEmail = String(body?.email || '').trim().toLowerCase();
+      const method = String(body?.method || 'email_code');
+      const codeOrAnswer = String(body?.codeOrAnswer || '').trim();
+      const newPassword = String(body?.newPassword || '').trim();
+
+      if (!cleanEmail || !cleanEmail.endsWith('@unitru.edu.pe')) {
+        sendJson(res, 400, { error: 'Correo institucional inválido.' });
+        return true;
+      }
+      if (newPassword.length < 6) {
+        sendJson(res, 400, { error: 'La nueva contraseña debe tener al menos 6 caracteres.' });
+        return true;
+      }
+      if (!codeOrAnswer) {
+        sendJson(res, 400, { error: 'Ingrese el código o respuesta de recuperación.' });
+        return true;
+      }
+
+      const origin = getRequestOrigin(req);
+      const cuentas = [...(await loadSecretariasForAuth(origin))];
+      const idx = cuentas.findIndex((s) => String(s.correo || '').toLowerCase() === cleanEmail);
+
+      if (method === 'security_question') {
+        if (idx === -1 || !cuentas[idx].respuestaRecuperacionHash) {
+          sendJson(res, 400, { error: 'Esta cuenta no tiene configurada una palabra secreta de recuperación.' });
+          return true;
+        }
+        const hashIngresado = hashPasswordSaltedServer(codeOrAnswer.toLowerCase());
+        if (hashIngresado !== cuentas[idx].respuestaRecuperacionHash) {
+          sendJson(res, 400, { error: 'La respuesta de recuperación no coincide. Verifique e intente nuevamente.' });
+          return true;
+        }
+      } else {
+        const store = await loadResetCodesStore();
+        const rec = store[cleanEmail];
+        if (!rec) {
+          sendJson(res, 400, { error: 'No hay un código activo para este correo. Solicita uno nuevo.' });
+          return true;
+        }
+        if (Date.now() > Number(rec.expiresAt || 0)) {
+          delete store[cleanEmail];
+          await saveResetCodesStore(store);
+          sendJson(res, 400, { error: 'El código expiró (15 minutos). Solicita un código nuevo.' });
+          return true;
+        }
+        if (Number(rec.attempts || 0) >= 5) {
+          delete store[cleanEmail];
+          await saveResetCodesStore(store);
+          sendJson(res, 429, { error: 'Demasiados intentos fallidos. Solicita un nuevo código.' });
+          return true;
+        }
+        if (hashPasswordSaltedServer(codeOrAnswer) !== rec.codeHash) {
+          rec.attempts = Number(rec.attempts || 0) + 1;
+          store[cleanEmail] = rec;
+          await saveResetCodesStore(store);
+          sendJson(res, 400, {
+            error: `Código incorrecto (intento ${rec.attempts} de 5). Revisa el correo recibido.`
+          });
+          return true;
+        }
+        delete store[cleanEmail];
+        await saveResetCodesStore(store);
+      }
+
+      const newHash = hashPasswordSaltedServer(newPassword);
+      if (idx !== -1) {
+        cuentas[idx] = {
+          ...cuentas[idx],
+          password: newHash,
+          passwordCambiada: true
+        };
+      } else {
+        cuentas.unshift({
+          id: `sec-${Date.now()}`,
+          correo: cleanEmail,
+          nombre: 'Secretaría Académica',
+          cargo: 'Secretaría de Escuela — Ing. Industrial',
+          fechaRegistro: new Date().toISOString().split('T')[0],
+          activo: true,
+          password: newHash,
+          passwordCambiada: true
+        });
+      }
+
+      await saveDbCollection('cuentasSecretaria', cuentas);
+      sendJson(res, 200, {
+        ok: true,
+        message: 'Contraseña restablecida correctamente. Ya puedes ingresar con tu nueva clave.'
+      });
+    } catch (err) {
+      sendJson(res, 400, { error: err?.message || 'No se pudo restablecer la contraseña.' });
+    }
+    return true;
+  }
+
   return false;
 }
 
@@ -706,7 +969,8 @@ if (isDirectRun) {
         req.url.startsWith('/api/db/') ||
         req.url.startsWith('/api/files/') ||
         req.url.startsWith('/api/correo/') ||
-        req.url.startsWith('/api/push/'))
+        req.url.startsWith('/api/push/') ||
+        req.url.startsWith('/api/auth/'))
     ) {
       const handled = await handleApiRequest(req, res);
       if (handled) return;

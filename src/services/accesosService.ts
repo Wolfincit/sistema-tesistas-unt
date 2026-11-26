@@ -217,6 +217,102 @@ export const accesosService = {
     return actuales[idx];
   },
 
+  async actualizarPerfilSecretaria(
+    correoActual: string,
+    datos: { nombre: string; correo: string; cargo: string }
+  ): Promise<CuentaSecretaria> {
+    const actuales = await this.getSecretarias();
+    const viejo = correoActual.trim().toLowerCase();
+    const nuevoCorreo = sanitizarTextoSeguro(datos.correo).toLowerCase();
+    const nuevoNombre = sanitizarTextoSeguro(datos.nombre);
+    const nuevoCargo = sanitizarTextoSeguro(datos.cargo || 'Secretaría de Escuela — Ing. Industrial');
+
+    if (!nuevoCorreo.endsWith('@unitru.edu.pe')) {
+      throw new Error('El correo de acceso de Secretaría debe terminar en @unitru.edu.pe.');
+    }
+    if (nuevoNombre.length < 3) {
+      throw new Error('Ingrese un nombre válido (mínimo 3 caracteres).');
+    }
+
+    const idx = actuales.findIndex((s) => s.correo.toLowerCase() === viejo);
+    if (
+      nuevoCorreo !== viejo &&
+      actuales.some((s, i) => i !== idx && s.correo.toLowerCase() === nuevoCorreo)
+    ) {
+      throw new Error(`El correo ${nuevoCorreo} ya está registrado en otra cuenta de Secretaría.`);
+    }
+
+    if (idx !== -1) {
+      actuales[idx] = {
+        ...actuales[idx],
+        correo: nuevoCorreo,
+        nombre: nuevoNombre,
+        cargo: nuevoCargo
+      };
+      await this.saveSecretarias(actuales);
+      return actuales[idx];
+    }
+
+    const creada: CuentaSecretaria = {
+      id: `sec-${Date.now()}`,
+      correo: nuevoCorreo,
+      nombre: nuevoNombre,
+      cargo: nuevoCargo,
+      fechaRegistro: new Date().toISOString().split('T')[0],
+      activo: true,
+      password: this.getSecretariaPasswordHash(),
+      passwordCambiada: true
+    };
+    await this.saveSecretarias([creada, ...actuales]);
+    return creada;
+  },
+
+  async configurarRecuperacionSecretaria(
+    correoActual: string,
+    pregunta: string,
+    respuestaSecreta: string
+  ): Promise<CuentaSecretaria> {
+    const actuales = await this.getSecretarias();
+    const normalizado = correoActual.trim().toLowerCase();
+    const preguntaLimpia = sanitizarTextoSeguro(pregunta);
+    const respuestaLimpia = sanitizarTextoSeguro(respuestaSecreta).toLowerCase();
+
+    if (preguntaLimpia.length < 5) {
+      throw new Error('Escriba una pregunta o referencia de recuperación clara (mínimo 5 caracteres).');
+    }
+    if (respuestaLimpia.length < 3) {
+      throw new Error('La palabra o código de recuperación debe tener al menos 3 caracteres.');
+    }
+
+    const idx = actuales.findIndex((s) => s.correo.toLowerCase() === normalizado);
+    const hashRespuesta = hashPasswordSalted(respuestaLimpia);
+
+    if (idx !== -1) {
+      actuales[idx] = {
+        ...actuales[idx],
+        preguntaRecuperacion: preguntaLimpia,
+        respuestaRecuperacionHash: hashRespuesta
+      };
+      await this.saveSecretarias(actuales);
+      return actuales[idx];
+    }
+
+    const creada: CuentaSecretaria = {
+      id: `sec-${Date.now()}`,
+      correo: normalizado,
+      nombre: 'Secretaría Académica',
+      cargo: 'Secretaría de Escuela — Ing. Industrial',
+      fechaRegistro: new Date().toISOString().split('T')[0],
+      activo: true,
+      password: this.getSecretariaPasswordHash(),
+      passwordCambiada: true,
+      preguntaRecuperacion: preguntaLimpia,
+      respuestaRecuperacionHash: hashRespuesta
+    };
+    await this.saveSecretarias([creada, ...actuales]);
+    return creada;
+  },
+
   getSecretariaPasswordHash(): string {
     const stored = storageService.get<string>(SECRETARIA_PWD_KEY, '');
     if (!stored) {

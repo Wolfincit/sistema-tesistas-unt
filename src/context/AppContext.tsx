@@ -131,6 +131,15 @@ interface AppContextType {
     cargo: string;
     passwordInicial?: string;
   }) => Promise<void>;
+  actualizarMiCuentaSecretaria: (datos: {
+    nombre: string;
+    correo: string;
+    cargo: string;
+  }) => Promise<boolean>;
+  configurarRecuperacionSecretaria: (
+    pregunta: string,
+    respuestaSecreta: string
+  ) => Promise<boolean>;
   toggleActivoSecretaria: (id: string) => Promise<void>;
   eliminarSecretaria: (id: string) => Promise<void>;
   resetearPasswordSecretaria: (id: string) => Promise<void>;
@@ -483,11 +492,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           setCuentasSecretaria((prev) =>
             prev.map((s) => (s.id === actualizada.id ? actualizada : s))
           );
+        } else {
+          accesosService.cambiarSecretariaPassword(passwordActual, nuevaPassword);
+          const creada = await accesosService.agregarSecretaria({
+            correo: usuario.email,
+            nombre: usuario.nombre,
+            cargo: usuario.departamento || 'Secretaría de Escuela — Ing. Industrial',
+            passwordInicial: nuevaPassword
+          });
+          setCuentasSecretaria((prev) => [creada, ...prev]);
         }
         try {
           accesosService.cambiarSecretariaPassword(passwordActual, nuevaPassword);
-        } catch (err) {
-          if (!existeEnLista) throw err;
+        } catch {
+          // Sincronización silenciosa de clave local legada
         }
       } else {
         const actualizado = await accesosService.cambiarPasswordTesista(
@@ -1234,6 +1252,72 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const actualizarMiCuentaSecretaria = async (datos: {
+    nombre: string;
+    correo: string;
+    cargo: string;
+  }): Promise<boolean> => {
+    if (!usuario || usuario.rol !== 'secretaria') return false;
+    try {
+      const updated = await accesosService.actualizarPerfilSecretaria(usuario.email, datos);
+      setCuentasSecretaria((prev) => {
+        const existe = prev.some((s) => s.id === updated.id);
+        return existe ? prev.map((s) => (s.id === updated.id ? updated : s)) : [updated, ...prev];
+      });
+      const updatedUser: UserProfile = {
+        ...usuario,
+        id: updated.id,
+        nombre: updated.nombre,
+        email: updated.correo,
+        departamento: updated.cargo
+      };
+      setUsuario(updatedUser);
+      setUltimaSecretariaActiva(updatedUser);
+      storageService.set(USER_SESSION_KEY, updatedUser);
+      try {
+        localStorage.setItem('unt_industrial_last_sec_email', updated.correo);
+      } catch {
+        // Silencioso
+      }
+      agregarToast(
+        'success',
+        'Cuenta actualizada',
+        `Acceso guardado para ${updated.nombre} (${updated.correo}).`
+      );
+      return true;
+    } catch (e: any) {
+      agregarToast('error', 'No se pudo actualizar la cuenta', e.message || 'Revise los datos.');
+      return false;
+    }
+  };
+
+  const configurarRecuperacionSecretaria = async (
+    pregunta: string,
+    respuestaSecreta: string
+  ): Promise<boolean> => {
+    if (!usuario || usuario.rol !== 'secretaria') return false;
+    try {
+      const updated = await accesosService.configurarRecuperacionSecretaria(
+        usuario.email,
+        pregunta,
+        respuestaSecreta
+      );
+      setCuentasSecretaria((prev) => {
+        const existe = prev.some((s) => s.id === updated.id);
+        return existe ? prev.map((s) => (s.id === updated.id ? updated : s)) : [updated, ...prev];
+      });
+      agregarToast(
+        'success',
+        'Respaldo guardado',
+        'Tu pregunta y palabra secreta de recuperación quedaron cifradas en la nube.'
+      );
+      return true;
+    } catch (e: any) {
+      agregarToast('error', 'Error en respaldo', e.message || 'Revise los campos.');
+      return false;
+    }
+  };
+
   // Comunicados Generales con Nota de Voz
   const emitirComunicado = async (datos: {
     titulo: string;
@@ -1384,6 +1468,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         importarCorreosMasivo,
         restablecerPadron,
         agregarSecretaria,
+        actualizarMiCuentaSecretaria,
+        configurarRecuperacionSecretaria,
         toggleActivoSecretaria,
         eliminarSecretaria,
         resetearPasswordSecretaria,

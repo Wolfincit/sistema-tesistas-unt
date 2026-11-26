@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { CuentaSecretariaModal } from '../secretaria/CuentaSecretariaModal';
 import {
   LogOut,
   ShieldCheck,
   Lock,
   BookOpen,
-  ClipboardList
+  ClipboardList,
+  Settings
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -20,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({
   onAbrirLogin
 }) => {
   const { usuario, cerrarSesion } = useApp();
+  const [modalCuentaAbierto, setModalCuentaAbierto] = useState(false);
 
   return (
     <header className="sticky top-0 z-40 bg-[#082F64] text-white border-b border-[#051F42] shadow-md relative">
@@ -110,20 +113,26 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )
             ) : (
-              <div className="flex items-center gap-2.5 pl-2 border-l border-white/20">
-                <div className="hidden lg:flex items-center gap-2 select-none">
-                  <div className="w-8 h-8 rounded-full bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center shadow-xs">
+              <div className="flex items-center gap-2 sm:gap-2.5 pl-2 border-l border-white/20">
+                <button
+                  type="button"
+                  onClick={() => setModalCuentaAbierto(true)}
+                  title="Configurar correo de acceso, contraseña y recuperación"
+                  className="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/15 border border-white/15 hover:border-amber-300/60 transition-all cursor-pointer text-left"
+                >
+                  <div className="w-8 h-8 rounded-full bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center shadow-xs shrink-0">
                     <ShieldCheck className="w-4 h-4" />
                   </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold text-white leading-tight">
-                      Srta. Celia · Secretaría
+                  <div className="hidden lg:flex flex-col min-w-0">
+                    <span className="text-xs font-bold text-white leading-tight truncate max-w-[190px]">
+                      {usuario.nombre}
                     </span>
-                    <span className="text-[10px] text-blue-200 leading-none font-mono">
+                    <span className="text-[10px] text-blue-200 leading-none font-mono truncate max-w-[190px]">
                       {usuario.email}
                     </span>
                   </div>
-                </div>
+                  <Settings className="w-3.5 h-3.5 text-amber-300/90 group-hover:rotate-45 transition-transform shrink-0" />
+                </button>
 
                 <button
                   type="button"
@@ -139,6 +148,10 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       </div>
+
+      {modalCuentaAbierto && usuario?.rol === 'secretaria' && (
+        <CuentaSecretariaModal onClose={() => setModalCuentaAbierto(false)} />
+      )}
     </header>
   );
 };
