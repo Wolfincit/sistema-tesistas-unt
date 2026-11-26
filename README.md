@@ -1,3 +1,13 @@
+---
+title: Sistema de Tesistas Ing. Industrial UNT
+emoji: 🎓
+colorFrom: blue
+colorTo: yellow
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Sistema de Gestión de Tesistas — Ingeniería Industrial UNT
 
 Plataforma institucional web de la **Escuela Profesional de Ingeniería Industrial** de la **Universidad Nacional de Trujillo (UNT)** para la gestión de expedientes de titulación, control del auditorio de sustentaciones, buzón de consultas con notas de voz, padrón de egresados y repositorio multi-universidad en tiempo real.

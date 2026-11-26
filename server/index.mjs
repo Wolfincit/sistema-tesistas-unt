@@ -34,8 +34,10 @@ import {
   getNotificationsForMatricula,
   markNotificationRead,
   dispatchPushNotification,
-  runThursdayRemindersCheck
+  runThursdayRemindersCheck,
+  hydratePushStateFromTurso
 } from './pushEngine.mjs';
+import { getTursoConfigInfo } from './tursoEngine.mjs';
 import {
   saveOAuthCredentials,
   buildOAuthAuthUrl,
@@ -651,7 +653,14 @@ if (isDirectRun) {
     if (req.url === '/healthz') {
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ status: 'ok', service: 'sistema-tesistas-unt' }));
+      res.end(
+        JSON.stringify({
+          status: 'ok',
+          service: 'sistema-tesistas-unt',
+          turso: getTursoConfigInfo(),
+          emailReady: Boolean(getEmailStatus().serverTransportReady)
+        })
+      );
       return;
     }
 
@@ -698,8 +707,9 @@ if (isDirectRun) {
 
   server.listen(PORT, HOST, () => {
     console.log(`✅ Sistema de Gestión de Tesistas UNT listo en http://${HOST}:${PORT}`);
-    // Activar Seguro Automático al arrancar: auto-recupera llaves/Drive si cambió o se reinició el servidor
+    // Activar Seguro Automático al arrancar: auto-recupera llaves/Drive y sincroniza estado desde Turso
     autoHealDriveConnection().catch(() => {});
+    hydratePushStateFromTurso().catch(() => {});
     // Revisión periódica automática de recordatorios de víspera de jueves (cada 6h en servidor 24/7)
     const runReminders = async () => {
       try {

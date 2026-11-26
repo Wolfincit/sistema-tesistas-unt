@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { isTursoConfigured, tursoGetJson, tursoSetJson } from './tursoEngine.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1008,8 +1009,24 @@ function enqueueDriveSync(dbSnapshot) {
 }
 
 let lastDrivePullAt = 0;
+let lastTursoPullAt = 0;
 export async function getDbState({ forceDrivePull = false, origin = '' } = {}) {
   await autoHealDriveConnection(origin);
+
+  // Prioridad 1: Persistencia permanente en Turso (sin pausa por vacaciones, sin tarjeta)
+  if (isTursoConfigured() && (forceDrivePull || !dbMemoryCache || Date.now() - lastTursoPullAt > 10000)) {
+    lastTursoPullAt = Date.now();
+    const remoteTurso = await tursoGetJson('db_collections');
+    if (remoteTurso && typeof remoteTurso === 'object' && remoteTurso.collections) {
+      dbMemoryCache = {
+        version: remoteTurso.version || 1,
+        updatedAt: remoteTurso.updatedAt || new Date().toISOString(),
+        collections: remoteTurso.collections || {}
+      };
+      writeJsonSafe(LOCAL_DB_PATH, dbMemoryCache);
+    }
+  }
+
   const cfg = loadConfig();
   if (isDriveReadyWithFolder() && cfg.dbFileId && (forceDrivePull || Date.now() - lastDrivePullAt > 12000)) {
     lastDrivePullAt = Date.now();
@@ -1018,7 +1035,11 @@ export async function getDbState({ forceDrivePull = false, origin = '' } = {}) {
   const db = loadLocalDb();
   return {
     updatedAt: db.updatedAt,
-    storageMode: isDriveReadyWithFolder() ? 'google-drive' : 'local-server',
+    storageMode: isTursoConfigured()
+      ? 'turso-cloud'
+      : isDriveReadyWithFolder()
+      ? 'google-drive'
+      : 'local-server',
     collections: db.collections || {}
   };
 }
@@ -1042,6 +1063,8 @@ export async function saveDbCollection(collectionName, value) {
     'historialDespachos',
     'sustentacionesJueves',
     'instruccionesSustentacion',
+    'dudasSinResponder',
+    'configColacion',
     'emailConfig'
   ]);
   if (!allowed.has(collectionName)) {
@@ -1053,9 +1076,22 @@ export async function saveDbCollection(collectionName, value) {
   db.updatedAt = new Date().toISOString();
   writeJsonSafe(LOCAL_DB_PATH, db);
 
+  // Persistencia directa en Turso si está configurado
+  if (isTursoConfigured()) {
+    await tursoSetJson('db_collections', db);
+  }
+
   // Sincronización en cola atómica hacia _BD_Sistema_Tesistas_UNT.json en Google Drive
   await enqueueDriveSync(JSON.parse(JSON.stringify(db)));
-  return { ok: true, updatedAt: db.updatedAt, storageMode: isDriveReadyWithFolder() ? 'google-drive' : 'local-server' };
+  return {
+    ok: true,
+    updatedAt: db.updatedAt,
+    storageMode: isTursoConfigured()
+      ? 'turso-cloud'
+      : isDriveReadyWithFolder()
+      ? 'google-drive'
+      : 'local-server'
+  };
 }
 
 // ======================================================

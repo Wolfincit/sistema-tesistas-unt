@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { isTursoConfigured, tursoGetJson, tursoSetJson } from './tursoEngine.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,8 +45,48 @@ function readJson(filePath, fallback) {
   }
 }
 
+const TURSO_FILE_MAP = {
+  [VAPID_FILE]: 'push_vapid',
+  [SUBS_FILE]: 'push_subscriptions',
+  [NOTIFS_FILE]: 'push_notifications_log',
+  [REMINDERS_FILE]: 'push_reminders_sent'
+};
+
 function writeJson(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  const tursoKey = TURSO_FILE_MAP[filePath];
+  if (tursoKey && isTursoConfigured()) {
+    tursoSetJson(tursoKey, data).catch(() => {});
+  }
+}
+
+export async function hydratePushStateFromTurso() {
+  if (!isTursoConfigured()) return false;
+  try {
+    const [remoteVapid, remoteSubs, remoteNotifs, remoteReminders] = await Promise.all([
+      tursoGetJson('push_vapid'),
+      tursoGetJson('push_subscriptions'),
+      tursoGetJson('push_notifications_log'),
+      tursoGetJson('push_reminders_sent')
+    ]);
+    if (remoteVapid?.publicKey && remoteVapid?.privateKeyPem) {
+      vapidCache = remoteVapid;
+      fs.writeFileSync(VAPID_FILE, JSON.stringify(remoteVapid, null, 2), 'utf-8');
+    }
+    if (Array.isArray(remoteSubs)) {
+      fs.writeFileSync(SUBS_FILE, JSON.stringify(remoteSubs, null, 2), 'utf-8');
+    }
+    if (Array.isArray(remoteNotifs)) {
+      fs.writeFileSync(NOTIFS_FILE, JSON.stringify(remoteNotifs, null, 2), 'utf-8');
+    }
+    if (remoteReminders && typeof remoteReminders === 'object') {
+      fs.writeFileSync(REMINDERS_FILE, JSON.stringify(remoteReminders, null, 2), 'utf-8');
+    }
+    return true;
+  } catch (err) {
+    console.warn('[Push Turso] No se pudo hidratar estado push:', err.message);
+    return false;
+  }
 }
 
 // ======================================================
