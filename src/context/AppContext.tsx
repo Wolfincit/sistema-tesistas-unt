@@ -246,7 +246,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (Array.isArray(c.correosAutorizados)) storageService.set('unt_industrial_correos_autorizados', c.correosAutorizados);
         if (Array.isArray(c.cuentasSecretaria)) storageService.set('unt_industrial_cuentas_secretaria_v1', c.cuentasSecretaria);
         if (Array.isArray(c.comunicados)) storageService.set('unt_industrial_comunicados_generales', c.comunicados);
-        if (Array.isArray(c.faqs)) storageService.set('unt_industrial_faqs_v1', c.faqs);
+        if (Array.isArray(c.faqs)) storageService.set('unt_industrial_faqs_v3', c.faqs);
+        if (Array.isArray(c.seguimientoLogistico)) storageService.set('unt_industrial_seguimiento_logistico_v3', c.seguimientoLogistico);
+        if (Array.isArray(c.directorioJurado)) storageService.set('unt_industrial_directorio_jurado_v3', c.directorioJurado);
+        if (Array.isArray(c.sustentacionesJueves)) storageService.set('unt_industrial_sustentaciones_jueves_v2', c.sustentacionesJueves);
+        if (Array.isArray(c.historialDespachos)) storageService.set('unt_industrial_historial_despachos_v1', c.historialDespachos);
+        if (Array.isArray(c.instruccionesSustentacion)) storageService.set('unt_industrial_instrucciones_pasos_v3', c.instruccionesSustentacion);
+        if (Array.isArray(c.dudasSinResponder)) storageService.set('unt_industrial_dudas_pendientes_v1', c.dudasSinResponder);
+        if (c.configColacion && typeof c.configColacion === 'object') storageService.set('unt_industrial_config_colacion_v1', c.configColacion);
       }
 
       const [res, blq, hab, docs, slotsMap, defSlots, fmts, cons, corrs, secs, coms, faqsList] = await Promise.all([

@@ -3,6 +3,8 @@ import { AppProvider, useApp } from './context/AppContext';
 import { Header } from './components/common/Header';
 import { Footer } from './components/common/Footer';
 import { ToastContainer } from './components/common/Toast';
+import { PwaInstallBanner } from './components/common/PwaInstallBanner';
+import { pushClientService } from './services/pushClientService';
 import { LoginPage } from './pages/LoginPage';
 import { TesisRepositoryPage } from './pages/TesisRepositoryPage';
 import { InstruccionesSustentacionPage } from './pages/InstruccionesSustentacionPage';
@@ -12,8 +14,22 @@ import { HelpCircle } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const { usuario } = useApp();
-  const [vistaActual, setVistaActual] = useState<string>('repositorio');
+  const [vistaActual, setVistaActual] = useState<string>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const v = params.get('vista');
+      if (v === 'instrucciones' || v === 'preguntas-frecuentes') return v;
+    } catch {
+      // Silencioso
+    }
+    return 'repositorio';
+  });
   const [modalLoginAbierto, setModalLoginAbierto] = useState<boolean>(false);
+
+  // Registrar Service Worker PWA al iniciar para habilitar instalación y notificaciones push
+  useEffect(() => {
+    pushClientService.registerServiceWorker().catch(() => {});
+  }, []);
 
   // Cuando la Secretaria inicia sesión: quitar el repositorio y mostrar directamente su panel
   useEffect(() => {
@@ -34,6 +50,8 @@ const AppContent: React.FC = () => {
         onCambiarVista={(v) => setVistaActual(v)}
         onAbrirLogin={() => setModalLoginAbierto(true)}
       />
+
+      {!usuario && <PwaInstallBanner />}
 
       <div className="flex-1 flex flex-col min-w-0">
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">

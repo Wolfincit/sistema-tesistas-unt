@@ -27,6 +27,16 @@ import {
   dispatchAnnouncementEmail
 } from './emailEngine.mjs';
 import {
+  getVapidPublicKey,
+  registerPushSubscription,
+  unregisterPushSubscription,
+  getSubscriptionsStats,
+  getNotificationsForMatricula,
+  markNotificationRead,
+  dispatchPushNotification,
+  runThursdayRemindersCheck
+} from './pushEngine.mjs';
+import {
   saveOAuthCredentials,
   buildOAuthAuthUrl,
   handleOAuthCallback,
@@ -68,7 +78,8 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.woff': 'font/woff',
-  '.pdf': 'application/pdf'
+  '.pdf': 'application/pdf',
+  '.webmanifest': 'application/manifest+json; charset=utf-8'
 };
 
 const rateLimitMap = new Map();
@@ -545,6 +556,92 @@ export async function handleApiRequest(req, res) {
     return true;
   }
 
+  // ======================================================
+  // API NOTIFICACIONES WEB PUSH (PWA CELULARES + BANDEJA)
+  // ======================================================
+  if (urlObj.pathname === '/api/push/public-key' && req.method === 'GET') {
+    try {
+      sendJson(res, 200, getVapidPublicKey());
+    } catch (err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/push/stats' && req.method === 'GET') {
+    try {
+      sendJson(res, 200, getSubscriptionsStats());
+    } catch (err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/push/subscribe' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const out = registerPushSubscription(body);
+      sendJson(res, 200, out);
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/push/unsubscribe' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const out = unregisterPushSubscription(body?.endpoint);
+      sendJson(res, 200, out);
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/push/notify' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const out = await dispatchPushNotification(body || {});
+      sendJson(res, 200, out);
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/push/notifications' && req.method === 'GET') {
+    try {
+      const matricula = urlObj.searchParams.get('matricula') || '';
+      sendJson(res, 200, { items: getNotificationsForMatricula(matricula) });
+    } catch (err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/push/notifications/read' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      sendJson(res, 200, markNotificationRead(body?.id));
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/push/check-reminders' && req.method === 'POST') {
+    try {
+      const db = await getDbState(false);
+      const susts = db?.collections?.sustentacionesJueves || [];
+      const out = await runThursdayRemindersCheck(susts);
+      sendJson(res, 200, out);
+    } catch (err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
   return false;
 }
 
@@ -564,7 +661,8 @@ if (isDirectRun) {
         req.url.startsWith('/api/drive/') ||
         req.url.startsWith('/api/db/') ||
         req.url.startsWith('/api/files/') ||
-        req.url.startsWith('/api/correo/'))
+        req.url.startsWith('/api/correo/') ||
+        req.url.startsWith('/api/push/'))
     ) {
       const handled = await handleApiRequest(req, res);
       if (handled) return;
@@ -590,7 +688,7 @@ if (isDirectRun) {
     res.setHeader('Content-Type', MIME_TYPES[ext] || 'application/octet-stream');
     if (safePath.includes('assets')) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    } else if (ext === '.html') {
+    } else if (ext === '.html' || safePath.endsWith('sw.js') || ext === '.webmanifest') {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
@@ -602,5 +700,17 @@ if (isDirectRun) {
     console.log(`✅ Sistema de Gestión de Tesistas UNT listo en http://${HOST}:${PORT}`);
     // Activar Seguro Automático al arrancar: auto-recupera llaves/Drive si cambió o se reinició el servidor
     autoHealDriveConnection().catch(() => {});
+    // Revisión periódica automática de recordatorios de víspera de jueves (cada 6h en servidor 24/7)
+    const runReminders = async () => {
+      try {
+        const db = await getDbState(false);
+        const susts = db?.collections?.sustentacionesJueves || [];
+        await runThursdayRemindersCheck(susts);
+      } catch {
+        // Silencioso
+      }
+    };
+    setTimeout(runReminders, 15000);
+    setInterval(runReminders, 6 * 3600 * 1000);
   });
 }

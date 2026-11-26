@@ -3,13 +3,16 @@
  * Escuela Profesional de Ingeniería Industrial — Universidad Nacional de Trujillo (Srta. Celia)
  */
 
-export type EstacionLogisticaId = 1 | 2 | 3 | 4 | 5 | 6;
+export type EstacionLogisticaId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type SemaforoEstadoId = 'operativo' | 'atencion' | 'incidencia';
+export type TipoTramiteId = 'titulado' | 'bachiller';
 
 export interface EstacionLogisticaMeta {
   id: EstacionLogisticaId;
   codigo: string;
   nombre: string;
+  corto: string;
+  fase: 'sustentacion' | 'colacion';
   responsable: string;
   tipoFlujo: 'INTERNO_ESCUELA' | 'EXTERNO_FACULTAD' | 'EXTERNO_JURADO' | 'ACTO_PUBLICO' | 'EXTERNO_URAA';
   modalidad: 'Físico en Escuela' | 'Físico / Derivación Externa' | 'Mixto (Físico + Virtual)' | 'Virtual (Plataforma UNT)';
@@ -21,62 +24,98 @@ export const ESTACIONES_LOGISTICAS: EstacionLogisticaMeta[] = [
   {
     id: 1,
     codigo: 'EST-01',
-    nombre: 'Recepción y Cotejo Físico en Escuela',
+    nombre: 'Recibido en Escuela',
+    corto: '1. Recibido',
+    fase: 'sustentacion',
     responsable: 'Secretaría de Escuela (Srta. Celia)',
     tipoFlujo: 'INTERNO_ESCUELA',
-    modalidad: 'Físico en Escuela',
+    modalidad: 'Mixto (Físico + Virtual)',
     slaDiasMax: 2,
-    descripcion: 'Recepción física del FUT, voucher TUPA, reporte Turnitin (<20%), constancia de prácticas, resolución de proyecto y 3 ejemplares de tesis.'
+    descripcion: 'Recepción del expediente remitido por Mesa de Partes (FUT Opción 29 / Proyecto) y registro en la matriz de la Escuela.'
   },
   {
     id: 2,
     codigo: 'EST-02',
-    nombre: 'Emisión de Resolución de Jurado en Decanato',
-    responsable: 'Decanato / Facultad de Ingeniería (Externo)',
+    nombre: 'En Decanato (Resolución)',
+    corto: '2. Decanato',
+    fase: 'sustentacion',
+    responsable: 'Decanato / Facultad de Ingeniería',
     tipoFlujo: 'EXTERNO_FACULTAD',
-    modalidad: 'Físico / Derivación Externa',
+    modalidad: 'Virtual (Plataforma UNT)',
     slaDiasMax: 7,
-    descripcion: 'Trámite externo a la Escuela: emisión y firma de la Resolución Decanal que designa Presidente, Secretario y Vocal.'
+    descripcion: 'Emisión y firma de la Resolución Decanal de nombramiento de Jurado Evaluador (o nueva resolución por Cambio de Título).'
   },
   {
     id: 3,
     codigo: 'EST-03',
-    nombre: 'Revisión y Dictamen del Jurado Evaluador',
-    responsable: 'Jurado Evaluador (3 Ingenieros Docentes)',
+    nombre: 'Revisión de Jurado (10 días)',
+    corto: '3. Jurado',
+    fase: 'sustentacion',
+    responsable: 'Jurado Evaluador (Presidente, Secretario, Vocal)',
     tipoFlujo: 'EXTERNO_JURADO',
     modalidad: 'Mixto (Físico + Virtual)',
-    slaDiasMax: 21,
-    descripcion: 'Revisión de los 3 ejemplares por Presidente, Secretario y Vocal, levantamiento de observaciones del tesista y firma de conformidad.'
+    slaDiasMax: 10,
+    descripcion: 'Revisión del borrador por el jurado, levantamiento de observaciones y firma física del Dictamen de Aprobación con evidencias.'
   },
   {
     id: 4,
     codigo: 'EST-04',
-    nombre: 'Programación Jueves (11:00 - 1:00 p.m.) y Difusión de Flyer',
-    responsable: 'Secretaría de Escuela (Srta. Celia)',
-    tipoFlujo: 'INTERNO_ESCUELA',
-    modalidad: 'Mixto (Físico + Virtual)',
-    slaDiasMax: 3,
-    descripcion: 'Asignación de fecha en el calendario de los días jueves (11:00 a.m. a 1:00 p.m.) y despacho de citación + flyer por correo al tesista y jurado.'
+    nombre: 'Listo Jueves (Sustentación)',
+    corto: '4. Jueves',
+    fase: 'sustentacion',
+    responsable: 'Secretaría de Escuela y Jurado Evaluador',
+    tipoFlujo: 'ACTO_PUBLICO',
+    modalidad: 'Físico en Escuela',
+    slaDiasMax: 7,
+    descripcion: 'Programado para día jueves (11:00 a.m. - 1:00 p.m.) en Auditorio o Aula II-4. Entregar empastados 48 h antes y asistir 1 h antes.'
   },
   {
     id: 5,
     codigo: 'EST-05',
-    nombre: 'Sustentación Pública y Firma de Acta',
-    responsable: 'Jurado Evaluador y Dirección de Escuela',
-    tipoFlujo: 'ACTO_PUBLICO',
-    modalidad: 'Físico en Escuela',
-    slaDiasMax: 1,
-    descripcion: 'Defensa pública el día jueves de 11:00 a.m. a 1:00 p.m., deliberación y firma física del Acta de Sustentación.'
+    nombre: 'Turnitin 2 y Comité de Ética',
+    corto: '5. Ética',
+    fase: 'colacion',
+    responsable: 'Asesor y Comité de Ética de la Facultad',
+    tipoFlujo: 'EXTERNO_FACULTAD',
+    modalidad: 'Virtual (Plataforma UNT)',
+    slaDiasMax: 10,
+    descripcion: '2do Turnitin con recibo con depósito del asesor + recibo S/ 87.60 + declaración jurada al Comité de Ética para Constancia de Originalidad.'
   },
   {
     id: 6,
     codigo: 'EST-06',
-    nombre: 'Carpeta Digital URAA y Repositorio Biblioteca UNT',
-    responsable: 'URAA / Biblioteca Central UNT (Externo)',
+    nombre: 'Repositorio UNT (Ing. Valerio)',
+    corto: '6. Repositorio',
+    fase: 'colacion',
+    responsable: 'Biblioteca de Ingeniería (Ing. Valerio Ynfantes)',
+    tipoFlujo: 'EXTERNO_FACULTAD',
+    modalidad: 'Virtual (Plataforma UNT)',
+    slaDiasMax: 10,
+    descripcion: 'Envío del PDF final + 4 anexos (Carta de Autorización, Declaración Jurada, Acta de Aprobación y Constancia de Originalidad) a vynfantes@unitru.edu.pe para obtener el URL.'
+  },
+  {
+    id: 7,
+    codigo: 'EST-07',
+    nombre: 'Carpeta Digital URA / Facultad',
+    corto: '7. URA',
+    fase: 'colacion',
+    responsable: 'Escuela, Facultad y URAA (tramites-uraa.unitru.edu.pe)',
     tipoFlujo: 'EXTERNO_URAA',
     modalidad: 'Virtual (Plataforma UNT)',
     slaDiasMax: 15,
-    descripcion: 'Trámite virtual final en tramites-uraa.unitru.edu.pe y publicación en repositorio.unitru.edu.pe para emisión del diploma.'
+    descripcion: 'Subida de carpeta en URA (pago S/ 275.90 Cód. 005-166-17 para Título o S/ 273 para Bachiller), validación Escuela → Facultad → URAA y entrega de 2 empastados finales.'
+  },
+  {
+    id: 8,
+    codigo: 'EST-08',
+    nombre: 'Listo para Colación',
+    corto: '8. Colación',
+    fase: 'colacion',
+    responsable: 'URAA y Secretaría General (SUNEDU)',
+    tipoFlujo: 'EXTERNO_URAA',
+    modalidad: 'Físico / Derivación Externa',
+    slaDiasMax: 0,
+    descripcion: 'Expediente aprobado y apto para la ceremonia de colación y posterior registro ante SUNEDU por Secretaría General.'
   }
 ];
 
@@ -86,6 +125,8 @@ export interface SeguimientoTesisItem {
   tesistaNombre: string;
   tesistaCorreo: string;
   tesistaTelefono?: string;
+  tipoTramite?: TipoTramiteId; // 'titulado' (default) | 'bachiller' (ruta rápida sin Ética ni Repositorio)
+  sede?: 'Trujillo' | 'Valle Jequetepeque' | 'Huamachuco';
   tituloTesis: string;
   lineaInvestigacion: string;
   asesor: string;
@@ -101,6 +142,11 @@ export interface SeguimientoTesisItem {
   motivoRetrasoExterno?: string;
   notasSecretaria: string;
   fechaSustentacionProgramada?: string; // YYYY-MM-DD (Jueves)
+  flyerEnviado?: boolean;
+  cambioTituloActivo?: boolean;
+  desaprobadoFecha?: string; // YYYY-MM-DD — activa conteo automático de 30 días calendario
+  urlRepositorio?: string;
+  codigoUra?: string;
   requisitosFisicos: {
     futFisico: boolean;
     voucherTupa: boolean;
@@ -109,6 +155,24 @@ export interface SeguimientoTesisItem {
     resolucionProyecto: boolean;
     tresBorradoresJurado: boolean;
   };
+}
+
+export interface DudaTesistaPendiente {
+  id: string;
+  codigoMatricula?: string;
+  tesistaNombre?: string;
+  pregunta: string;
+  categoriaSugerida: string;
+  fechaHora: string;
+  estado: 'pendiente' | 'respondida';
+  respuestaOficial?: string;
+  fechaRespuesta?: string;
+}
+
+export interface ConfigColacion {
+  nombreColacion: string;
+  fechaLimiteCarpeta: string; // YYYY-MM-DD
+  fechaCeremonia: string;     // YYYY-MM-DD
 }
 
 export interface IngenieroJuradoItem {

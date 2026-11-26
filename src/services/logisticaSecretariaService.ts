@@ -4,6 +4,9 @@ import {
   SustentacionJuevesItem,
   DespachoChatAnuncioItem,
   InstruccionPasoItem,
+  DudaTesistaPendiente,
+  ConfigColacion,
+  ESTACIONES_LOGISTICAS,
   INITIAL_SEGUIMIENTO_LOGISTICO,
   INITIAL_DIRECTORIO_JURADO,
   INITIAL_SUSTENTACIONES_JUEVES,
@@ -12,13 +15,22 @@ import {
 } from '../data/mockLogisticaSecretaria';
 import { storageService } from './storageService';
 import { driveApiService } from './driveApiService';
+import { pushClientService } from './pushClientService';
 
-const SEGUIMIENTO_KEY = 'unt_industrial_seguimiento_logistico_v3';
-const JURADO_KEY = 'unt_industrial_directorio_jurado_v3';
-const SUSTENTACIONES_JUEVES_KEY = 'unt_industrial_sustentaciones_jueves_v2';
-const HISTORIAL_DESPACHOS_KEY = 'unt_industrial_historial_despachos_v1';
-const INSTRUCCIONES_PASOS_KEY = 'unt_industrial_instrucciones_pasos_v3';
-const TITULO_SUSTENTACIONES_KEY = 'unt_industrial_titulo_sustentaciones_v1';
+export const SEGUIMIENTO_KEY = 'unt_industrial_seguimiento_logistico_v3';
+export const JURADO_KEY = 'unt_industrial_directorio_jurado_v3';
+export const SUSTENTACIONES_JUEVES_KEY = 'unt_industrial_sustentaciones_jueves_v2';
+export const HISTORIAL_DESPACHOS_KEY = 'unt_industrial_historial_despachos_v1';
+export const INSTRUCCIONES_PASOS_KEY = 'unt_industrial_instrucciones_pasos_v3';
+export const TITULO_SUSTENTACIONES_KEY = 'unt_industrial_titulo_sustentaciones_v1';
+export const DUDAS_PENDIENTES_KEY = 'unt_industrial_dudas_pendientes_v1';
+export const CONFIG_COLACION_KEY = 'unt_industrial_config_colacion_v1';
+
+const DEFAULT_CONFIG_COLACION: ConfigColacion = {
+  nombreColacion: 'Colación Ordinaria — Ing. Industrial UNT',
+  fechaLimiteCarpeta: '2026-12-15',
+  fechaCeremonia: '2027-01-20'
+};
 
 export interface EmailConfigStatus {
   configured: boolean;
@@ -85,6 +97,80 @@ export const logisticaSecretariaService = {
 
   saveTituloSustentaciones(datos: { titulo: string; subtitulo: string; horario: string }): void {
     storageService.set(TITULO_SUSTENTACIONES_KEY, datos);
+  },
+
+  getDudasPendientes(): DudaTesistaPendiente[] {
+    return storageService.get<DudaTesistaPendiente[]>(DUDAS_PENDIENTES_KEY, []);
+  },
+
+  async saveDudasPendientes(items: DudaTesistaPendiente[]): Promise<void> {
+    storageService.set(DUDAS_PENDIENTES_KEY, items);
+    await driveApiService.saveCollection('dudasSinResponder', items);
+  },
+
+  async registrarDudaTesista(params: {
+    codigoMatricula?: string;
+    tesistaNombre?: string;
+    pregunta: string;
+    categoriaSugerida?: string;
+  }): Promise<DudaTesistaPendiente> {
+    const actuales = this.getDudasPendientes();
+    const nueva: DudaTesistaPendiente = {
+      id: `duda-${Date.now()}`,
+      codigoMatricula: params.codigoMatricula?.replace(/\D/g, '').slice(0, 10) || undefined,
+      tesistaNombre: params.tesistaNombre?.trim() || undefined,
+      pregunta: params.pregunta.trim(),
+      categoriaSugerida: params.categoriaSugerida?.trim() || 'Trámite',
+      fechaHora: new Date().toLocaleString('es-PE', { hour12: false }),
+      estado: 'pendiente'
+    };
+    await this.saveDudasPendientes([nueva, ...actuales]);
+    pushClientService.notifySecretaria({
+      title: '💬 Nueva duda de tesista sin respuesta oficial',
+      body: nueva.pregunta.slice(0, 110),
+      url: '/',
+      tag: nueva.id
+    });
+    return nueva;
+  },
+
+  getConfigColacion(): ConfigColacion {
+    return storageService.get<ConfigColacion>(CONFIG_COLACION_KEY, DEFAULT_CONFIG_COLACION);
+  },
+
+  async saveConfigColacion(cfg: ConfigColacion): Promise<void> {
+    storageService.set(CONFIG_COLACION_KEY, cfg);
+    await driveApiService.saveCollection('configColacion', cfg);
+  },
+
+  async notificarCambioEtapaAutomatico(item: SeguimientoTesisItem): Promise<number> {
+    const estMeta = ESTACIONES_LOGISTICAS.find((e) => e.id === item.estacionActual);
+    const nombreEtapa = estMeta ? estMeta.nombre : `Etapa ${item.estacionActual}`;
+    const tituloCorto = item.tituloTesis.length > 72 ? `${item.tituloTesis.slice(0, 69)}...` : item.tituloTesis;
+    const prefijo =
+      item.semaforo === 'incidencia'
+        ? '⚠️ Atención en tu tesis'
+        : item.estacionActual === 4
+        ? '🎓 ¡Tu tesis ya está lista para sustentar!'
+        : item.estacionActual === 8
+        ? '🎉 ¡Tu expediente está listo para Colación!'
+        : `🎓 ¡Tu tesis avanzó a ${nombreEtapa}!`;
+
+    const cuerpo =
+      item.semaforo === 'incidencia' && item.notasSecretaria
+        ? `${item.notasSecretaria} · "${tituloCorto}"`
+        : `${estMeta?.descripcion || 'Revisa tu siguiente paso oficial en el sistema.'} · "${tituloCorto}"`;
+
+    const res = await pushClientService.notifyThesisUpdate({
+      codigoMatricula: item.codigoMatricula,
+      title: prefijo,
+      body: cuerpo.slice(0, 220),
+      url: '/',
+      tag: `tesis-${item.codigoMatricula}-est-${item.estacionActual}`,
+      tipo: item.semaforo === 'incidencia' ? 'observacion' : 'estado',
+      urgente: true
+    });
+    return res.pushedCount;
   },
 
   async getEmailStatus(): Promise<EmailConfigStatus> {

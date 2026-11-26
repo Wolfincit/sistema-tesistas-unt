@@ -1,10 +1,20 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   SustentacionJuevesItem,
   InstruccionPasoItem,
-  SeguimientoTesisItem
+  SeguimientoTesisItem,
+  ESTACIONES_LOGISTICAS
 } from '../data/mockLogisticaSecretaria';
+import {
+  predecirSiguientePasoOficial,
+  calcularDiasRestantesDesaprobado
+} from '../data/officialKnowledgeBase';
 import { logisticaSecretariaService } from '../services/logisticaSecretariaService';
+import {
+  pushClientService,
+  NotificacionTesisItem
+} from '../services/pushClientService';
+import { AsistentePredictivoOficial } from '../components/tesista/AsistentePredictivoOficial';
 import { useApp } from '../context/AppContext';
 import {
   FileText,
@@ -25,7 +35,14 @@ import {
   X,
   Search,
   Package,
-  Building2
+  Building2,
+  Bell,
+  BellRing,
+  ShieldCheck,
+  BookOpen,
+  GraduationCap,
+  AlertTriangle,
+  Sparkles
 } from 'lucide-react';
 
 const ICONOS_DISPONIBLES: {
@@ -44,11 +61,17 @@ const ICONOS_DISPONIBLES: {
 ];
 
 const PASOS_COURIER = [
-  { id: 1, titulo: '1. Recibido', Icon: Package },
-  { id: 2, titulo: '2. En Decanato', Icon: Building2 },
-  { id: 3, titulo: '3. En Jurado', Icon: Users },
-  { id: 4, titulo: '4. Listo Jueves', Icon: Award }
+  { id: 1, titulo: '1. Recibido', fase: 'sustentacion' as const, Icon: Package },
+  { id: 2, titulo: '2. Decanato', fase: 'sustentacion' as const, Icon: Building2 },
+  { id: 3, titulo: '3. Jurado (10d)', fase: 'sustentacion' as const, Icon: Users },
+  { id: 4, titulo: '4. Jueves', fase: 'sustentacion' as const, Icon: Award },
+  { id: 5, titulo: '5. Ética', fase: 'colacion' as const, Icon: ShieldCheck },
+  { id: 6, titulo: '6. Repositorio', fase: 'colacion' as const, Icon: BookOpen },
+  { id: 7, titulo: '7. Carpeta URA', fase: 'colacion' as const, Icon: FileText },
+  { id: 8, titulo: '8. Colación', fase: 'colacion' as const, Icon: GraduationCap }
 ];
+
+const MI_MATRICULA_KEY = 'unt_mi_matricula_guardada_v1';
 
 interface InstruccionesSustentacionPageProps {
   /** Solo true cuando se abre desde la pestaña 2 exclusiva del panel de Secretaría */
@@ -75,9 +98,55 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
     logisticaSecretariaService.getTituloSustentaciones()
   );
 
-  // Rastreador Tipo Olva Courier: exige el código de matrícula completo de 10 dígitos (ej. 1511300223)
-  const [busquedaCourier, setBusquedaCourier] = useState<string>('');
+  // Rastreador Tipo Olva Courier: recuerda la matrícula en este celular para abrir directo
+  const [busquedaCourier, setBusquedaCourier] = useState<string>(() => {
+    try {
+      return localStorage.getItem(MI_MATRICULA_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
   const codigoLimpio = busquedaCourier.replace(/\D/g, '').slice(0, 10);
+  const [notifsTesista, setNotifsTesista] = useState<NotificacionTesisItem[]>([]);
+  const [pushActivoLocal, setPushActivoLocal] = useState<boolean>(false);
+  const [activandoPush, setActivandoPush] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (codigoLimpio.length === 10) {
+      try {
+        localStorage.setItem(MI_MATRICULA_KEY, codigoLimpio);
+      } catch {
+        // Silencioso
+      }
+      pushClientService.getNotifications(codigoLimpio).then(setNotifsTesista).catch(() => {});
+    } else {
+      setNotifsTesista([]);
+    }
+  }, [codigoLimpio]);
+
+  const handleActivarAlertasTesista = async (tesistaNombre: string) => {
+    if (codigoLimpio.length !== 10) return;
+    setActivandoPush(true);
+    try {
+      const res = await pushClientService.subscribeDevice({
+        codigoMatricula: codigoLimpio,
+        rol: 'tesista',
+        nombre: tesistaNombre
+      });
+      if (res.ok) {
+        setPushActivoLocal(true);
+        agregarToast(
+          'success',
+          '¡Avisos activados en tu celular!',
+          'Te notificaremos automáticamente cuando tu tesis cambie de etapa o se acerque tu sustentación.'
+        );
+      } else {
+        agregarToast('warning', 'Activa alertas', res.reason || 'Permite notificaciones en tu navegador.');
+      }
+    } finally {
+      setActivandoPush(false);
+    }
+  };
 
   const resultadosCourier = useMemo(() => {
     if (codigoLimpio.length !== 10) return [];
@@ -337,12 +406,20 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
             <div className="space-y-3">
               {resultadosCourier.length > 0 ? (
                 resultadosCourier.map((item) => {
-                  const pasoActual = item.estacionActual > 4 ? 4 : item.estacionActual;
+                  const pasoActual = item.estacionActual;
+                  const esBachiller = item.tipoTramite === 'bachiller';
                   const sem = item.semaforo || (pasoActual >= 4 ? 'operativo' : 'atencion');
+                  const estMeta = ESTACIONES_LOGISTICAS.find((e) => e.id === pasoActual);
+                  const prediccion = predecirSiguientePasoOficial(item);
+                  const diasDesaprobado = calcularDiasRestantesDesaprobado(item.desaprobadoFecha);
+                  const pasosVisibles = esBachiller
+                    ? PASOS_COURIER.filter((p) => p.id === 1 || p.id === 7 || p.id === 8)
+                    : PASOS_COURIER;
+
                   const semBadge =
                     sem === 'operativo'
                       ? {
-                          texto: 'Listo para Sustentar',
+                          texto: pasoActual === 8 ? 'Listo para Colación' : 'Al día / Listo',
                           clase: 'bg-emerald-100 text-emerald-900 border-emerald-300',
                           notaClase: 'bg-emerald-50 border-emerald-200 text-emerald-950'
                         }
@@ -353,16 +430,17 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                           notaClase: 'bg-rose-50 border-rose-200 text-rose-950'
                         }
                       : {
-                          texto: 'En Proceso',
+                          texto: estMeta ? estMeta.nombre : 'En Proceso',
                           clase: 'bg-amber-100 text-amber-950 border-amber-300',
                           notaClase: 'bg-amber-50 border-amber-200 text-amber-950'
                         };
+
                   return (
                     <div
                       key={item.id}
                       className="bg-white text-slate-800 rounded-2xl p-5 shadow-md space-y-4 animate-in fade-in"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                      <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-slate-100">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-sm font-black text-slate-900">
@@ -376,27 +454,79 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                             >
                               {semBadge.texto}
                             </span>
+                            {esBachiller && (
+                              <span className="px-2 py-0.5 rounded-full bg-teal-100 text-teal-900 text-[11px] font-extrabold">
+                                Ruta Rápida Bachiller
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-slate-500 italic mt-0.5">
                             "{item.tituloTesis}"
                           </div>
                         </div>
-                        {item.fechaSustentacionProgramada && (
-                          <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
-                            📅 Jueves {item.fechaSustentacionProgramada} (11:00 a.m. - 1:00 p.m.)
-                          </span>
-                        )}
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          {item.fechaSustentacionProgramada && (
+                            <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs">
+                              📅 Jueves {item.fechaSustentacionProgramada} (11:00 a.m. - 1:00 p.m.)
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            disabled={activandoPush}
+                            onClick={() => handleActivarAlertasTesista(item.tesistaNombre)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                              pushActivoLocal
+                                ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                                : 'bg-[#082F64] hover:bg-[#0C4D96] text-white shadow-xs'
+                            }`}
+                          >
+                            {pushActivoLocal ? (
+                              <>
+                                <BellRing className="w-3.5 h-3.5 text-emerald-700" />
+                                <span>Avisos activos</span>
+                              </>
+                            ) : (
+                              <>
+                                <Bell className="w-3.5 h-3.5 text-amber-300" />
+                                <span>{activandoPush ? 'Activando...' : 'Activar avisos en este celular'}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Barra Visual Secuencial Tipo Olva Courier (4 íconos grandes) */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                        {PASOS_COURIER.map(({ id, titulo, Icon }) => {
+                      {/* Alertas especiales oficiales (Cambio de Título / 30 días reprogramación) */}
+                      {item.cambioTituloActivo && (
+                        <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-950 flex items-start gap-2.5">
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          <div>
+                            <strong>Cambio de Título en trámite:</strong> No puedes sustentar hasta contar con la nueva resolución de Decanato (FUT + S/ 5.00 Cód. 005-166-01 + carta del jurado).
+                          </div>
+                        </div>
+                      )}
+
+                      {diasDesaprobado !== null && (
+                        <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 flex items-start gap-2.5">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <strong>Plazo oficial de reprogramación (30 días):</strong>{' '}
+                            {diasDesaprobado > 0
+                              ? `Faltan ${diasDesaprobado} días calendario para quedar habilitado a reprogramar con tu jurado.`
+                              : 'Ya cumpliste los 30 días; coordina fecha con tu jurado y avisa a Secretaría 48 h antes.'}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Barra Visual Completa de 8 Etapas (Fase 1 Sustentación + Fase 2 Colación) */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {pasosVisibles.map(({ id, titulo, Icon }) => {
                           const completado = pasoActual > id;
                           const activo = pasoActual === id;
                           return (
                             <div
                               key={id}
-                              className={`p-3 rounded-2xl border-2 flex flex-col items-center text-center gap-1.5 transition-all ${
+                              className={`p-2.5 rounded-xl border-2 flex flex-col items-center text-center gap-1 transition-all ${
                                 activo
                                   ? 'border-[#082F64] bg-blue-50 text-[#082F64] font-black shadow-xs'
                                   : completado
@@ -405,7 +535,7 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                               }`}
                             >
                               <div
-                                className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                                className={`w-8 h-8 rounded-full flex items-center justify-center ${
                                   activo
                                     ? 'bg-[#082F64] text-amber-300'
                                     : completado
@@ -414,15 +544,59 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                                 }`}
                               >
                                 {completado ? (
-                                  <CheckCircle2 className="w-5 h-5" />
+                                  <CheckCircle2 className="w-4 h-4" />
                                 ) : (
-                                  <Icon className="w-5 h-5" />
+                                  <Icon className="w-4 h-4" />
                                 )}
                               </div>
-                              <span className="text-xs">{titulo}</span>
+                              <span className="text-[11px] leading-tight">{titulo}</span>
                             </div>
                           );
                         })}
+                      </div>
+
+                      {/* Tarjeta Predictiva Oficial: "Tu Siguiente Paso Exacto" */}
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-[#082F64]">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                            Tu Siguiente Paso Oficial
+                          </span>
+                          <span className="text-[10px] font-semibold text-slate-500">
+                            Fuente: {prediccion.fuenteOficial}
+                          </span>
+                        </div>
+                        <h4 className="text-xs sm:text-sm font-black text-slate-900">
+                          {prediccion.titulo}
+                        </h4>
+                        <ul className="space-y-1 text-xs text-slate-700 list-disc pl-4">
+                          {prediccion.acciones.map((acc, idx) => (
+                            <li key={idx}>{acc}</li>
+                          ))}
+                        </ul>
+                        <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+                          {prediccion.costosOficiales && (
+                            <span className="px-2.5 py-1 rounded-lg bg-amber-100 text-amber-950 font-bold">
+                              💳 {prediccion.costosOficiales}
+                            </span>
+                          )}
+                          {prediccion.correoDestino && (
+                            <span className="px-2.5 py-1 rounded-lg bg-blue-100 text-[#082F64] font-mono font-bold">
+                              ✉️ {prediccion.correoDestino}
+                            </span>
+                          )}
+                          {prediccion.linkUrl && (
+                            <a
+                              href={prediccion.linkUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#082F64] text-white font-bold hover:bg-[#0C4D96]"
+                            >
+                              <span>{prediccion.linkTexto || 'Abrir enlace oficial'}</span>
+                              <ExternalLink className="w-3 h-3 text-amber-300" />
+                            </a>
+                          )}
+                        </div>
                       </div>
 
                       {item.notasSecretaria && (
@@ -430,17 +604,51 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
                           <strong>Nota de Secretaría:</strong> {item.notasSecretaria}
                         </div>
                       )}
+
+                      {/* Bandeja de avisos recientes recibidos para esta matrícula */}
+                      {notifsTesista.length > 0 && (
+                        <div className="p-3.5 rounded-xl bg-blue-50/50 border border-blue-200 space-y-2">
+                          <div className="text-[11px] font-black text-[#082F64] flex items-center gap-1.5">
+                            <BellRing className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Avisos recientes de tu trámite ({notifsTesista.length})</span>
+                          </div>
+                          <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                            {notifsTesista.slice(0, 4).map((n) => (
+                              <div
+                                key={n.id}
+                                className="p-2.5 rounded-lg bg-white border border-blue-100 text-xs"
+                              >
+                                <div className="font-bold text-slate-900">{n.title}</div>
+                                <div className="text-slate-600 text-[11px] mt-0.5">{n.body}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })
               ) : (
                 <div className="p-3.5 rounded-xl bg-white/10 text-xs text-blue-100">
-                  No se encontró ese código o apellido en seguimiento.
+                  No se encontró esa matrícula en seguimiento todavía. Si recién enviaste tu trámite por Mesa de Partes, pronto aparecerá aquí.
                 </div>
               )}
             </div>
           )}
         </div>
+      )}
+
+      {/* ASISTENTE PREDICTIVO OFICIAL DE DUDAS (MITIGA 3-6 CONSULTAS DIARIAS A SECRETARÍA) */}
+      {!puedeEditar && (
+        <AsistentePredictivoOficial
+          codigoMatricula={resultadosCourier[0]?.codigoMatricula}
+          tesistaNombre={resultadosCourier[0]?.tesistaNombre}
+          preguntasSugeridasIds={
+            resultadosCourier[0]
+              ? predecirSiguientePasoOficial(resultadosCourier[0]).preguntasSugeridasIds
+              : undefined
+          }
+        />
       )}
 
       {/* =====================================================================

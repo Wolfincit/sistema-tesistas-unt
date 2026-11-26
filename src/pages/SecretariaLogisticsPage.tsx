@@ -2,15 +2,25 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   EstacionLogisticaId,
   SemaforoEstadoId,
+  TipoTramiteId,
   SeguimientoTesisItem,
   IngenieroJuradoItem,
   SustentacionJuevesItem,
-  DespachoChatAnuncioItem
+  DespachoChatAnuncioItem,
+  DudaTesistaPendiente,
+  ConfigColacion
 } from '../data/mockLogisticaSecretaria';
 import {
   logisticaSecretariaService,
   EmailConfigStatus
 } from '../services/logisticaSecretariaService';
+import { pushClientService, PushStatsInfo } from '../services/pushClientService';
+import {
+  generarFlyerOficialPng,
+  construirTextoWhatsAppDocentes
+} from '../utils/flyerGenerator';
+import { SecretariaHoyTab } from '../components/secretaria/SecretariaHoyTab';
+import { SecretariaColacionTab } from '../components/secretaria/SecretariaColacionTab';
 import { InstruccionesSustentacionPage } from './InstruccionesSustentacionPage';
 import { useApp } from '../context/AppContext';
 import {
@@ -32,17 +42,28 @@ import {
   X,
   AlertTriangle,
   LayoutGrid,
-  Table2
+  Table2,
+  Sparkles,
+  GraduationCap,
+  Download,
+  MessageCircle,
+  ChevronDown,
+  ChevronUp,
+  BellRing
 } from 'lucide-react';
 
 const sanitizeText = (val: string): string =>
   val.replace(/<[^>]*>?/gm, '').replace(/[<>]/g, '');
 
-const ETAPAS_SIMPLES: { id: EstacionLogisticaId; nombre: string; corto: string; color: string }[] = [
-  { id: 1, nombre: '1. Recibido', corto: '1. Recibido', color: 'bg-slate-800 text-white' },
-  { id: 2, nombre: '2. En Decanato', corto: '2. Decanato', color: 'bg-amber-500 text-slate-950' },
-  { id: 3, nombre: '3. En Jurado (10d)', corto: '3. Jurado', color: 'bg-blue-600 text-white' },
-  { id: 4, nombre: '4. Listo Jueves', corto: '4. Jueves', color: 'bg-emerald-600 text-white' }
+const ETAPAS_SIMPLES: { id: EstacionLogisticaId; nombre: string; corto: string; color: string; fase: 'sustentacion' | 'colacion' }[] = [
+  { id: 1, nombre: '1. Recibido', corto: '1. Recibido', color: 'bg-slate-800 text-white', fase: 'sustentacion' },
+  { id: 2, nombre: '2. En Decanato', corto: '2. Decanato', color: 'bg-amber-500 text-slate-950', fase: 'sustentacion' },
+  { id: 3, nombre: '3. En Jurado (10d)', corto: '3. Jurado', color: 'bg-blue-600 text-white', fase: 'sustentacion' },
+  { id: 4, nombre: '4. Listo Jueves', corto: '4. Jueves', color: 'bg-emerald-600 text-white', fase: 'sustentacion' },
+  { id: 5, nombre: '5. Turnitin 2 y Ética', corto: '5. Ética', color: 'bg-violet-600 text-white', fase: 'colacion' },
+  { id: 6, nombre: '6. Repositorio (Valerio)', corto: '6. Repo', color: 'bg-cyan-700 text-white', fase: 'colacion' },
+  { id: 7, nombre: '7. Carpeta URA', corto: '7. URA', color: 'bg-indigo-700 text-white', fase: 'colacion' },
+  { id: 8, nombre: '8. Listo Colación', corto: '8. Colación', color: 'bg-emerald-700 text-white', fase: 'colacion' }
 ];
 
 const SEMAFORO_META: Record<
@@ -76,13 +97,29 @@ export const resolverSemaforo = (item: SeguimientoTesisItem): SemaforoEstadoId =
 };
 
 export const SecretariaLogisticsPage: React.FC = () => {
-  const { usuario, agregarToast } = useApp();
-  const [tab, setTab] = useState<'seguimiento' | 'instrucciones' | 'despacho' | 'calendario'>('seguimiento');
+  const { usuario, agregarToast, agregarFaq } = useApp();
+  const [tab, setTab] = useState<'hoy' | 'seguimiento' | 'instrucciones' | 'despacho' | 'calendario' | 'colacion'>('hoy');
 
   // Estados sincronizados en todo el sistema
   const [seguimientos, setSeguimientos] = useState<SeguimientoTesisItem[]>(() =>
     logisticaSecretariaService.getSeguimientos()
   );
+  const [dudasPendientes, setDudasPendientes] = useState<DudaTesistaPendiente[]>(() =>
+    logisticaSecretariaService.getDudasPendientes()
+  );
+  const [configColacion, setConfigColacion] = useState<ConfigColacion>(() =>
+    logisticaSecretariaService.getConfigColacion()
+  );
+  const [pushStats, setPushStats] = useState<PushStatsInfo>({
+    totalDispositivos: 0,
+    tesistasSuscritos: 0,
+    matriculasActivas: [],
+    secretariaSuscrita: false
+  });
+
+  useEffect(() => {
+    pushClientService.getStats().then(setPushStats).catch(() => {});
+  }, []);
   const [directorioJurado, setDirectorioJurado] = useState<IngenieroJuradoItem[]>(() =>
     logisticaSecretariaService.getDirectorioJurado()
   );
@@ -174,6 +211,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [formEstacion, setFormEstacion] = useState<EstacionLogisticaId>(1);
   const [formSemaforo, setFormSemaforo] = useState<SemaforoEstadoId>('atencion');
   const [formNotas, setFormNotas] = useState<string>('');
+  const [formTipoTramite, setFormTipoTramite] = useState<TipoTramiteId>('titulado');
+  const [formSede, setFormSede] = useState<'Trujillo' | 'Valle Jequetepeque' | 'Huamachuco'>('Trujillo');
+  const [formCambioTitulo, setFormCambioTitulo] = useState<boolean>(false);
+  const [formDesaprobadoFecha, setFormDesaprobadoFecha] = useState<string>('');
+  const [mostrarAvanzadoModal, setMostrarAvanzadoModal] = useState<boolean>(false);
 
   const marcarFeedbackGuardado = (id: string) => {
     setGuardadoRecienteId(id);
@@ -193,9 +235,14 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setFormPresidente(item.juradoPresidente);
       setFormSecretario(item.juradoSecretario);
       setFormVocal(item.juradoVocal);
-      setFormEstacion((item.estacionActual > 4 ? 4 : item.estacionActual) as EstacionLogisticaId);
+      setFormEstacion(item.estacionActual);
       setFormSemaforo(resolverSemaforo(item));
       setFormNotas(item.notasSecretaria);
+      setFormTipoTramite(item.tipoTramite || 'titulado');
+      setFormSede(item.sede || 'Trujillo');
+      setFormCambioTitulo(Boolean(item.cambioTituloActivo));
+      setFormDesaprobadoFecha(item.desaprobadoFecha || '');
+      setMostrarAvanzadoModal(Boolean(item.tipoTramite === 'bachiller' || item.cambioTituloActivo || item.desaprobadoFecha));
     } else {
       setEditandoSeg(null);
       setFormNombre('');
@@ -209,6 +256,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setFormEstacion(1);
       setFormSemaforo('atencion');
       setFormNotas('');
+      setFormTipoTramite('titulado');
+      setFormSede('Trujillo');
+      setFormCambioTitulo(false);
+      setFormDesaprobadoFecha('');
+      setMostrarAvanzadoModal(false);
     }
     setModalSeguimientoAbierto(true);
   };
@@ -226,25 +278,38 @@ export const SecretariaLogisticsPage: React.FC = () => {
     }
     if (!formNombre.trim() || !formCorreo.trim()) return;
 
+    const estacionFinal: EstacionLogisticaId =
+      formTipoTramite === 'bachiller' && formEstacion < 7 ? 7 : formEstacion;
+    const semaforoFinal: SemaforoEstadoId = formCambioTitulo ? 'incidencia' : formSemaforo;
+
     const nuevo: SeguimientoTesisItem = {
       id: editandoSeg ? editandoSeg.id : `seg-${Date.now()}`,
       codigoMatricula: matriculaDigits,
       tesistaNombre: sanitizeText(formNombre.trim()),
       tesistaCorreo: sanitizeText(formCorreo.trim().toLowerCase()),
-      tituloTesis: sanitizeText(formTitulo.trim() || 'Tesis en seguimiento'),
+      tipoTramite: formTipoTramite,
+      sede: formSede,
+      tituloTesis: sanitizeText(
+        formTitulo.trim() || (formTipoTramite === 'bachiller' ? 'Carpeta de Grado de Bachiller' : 'Tesis en seguimiento')
+      ),
       lineaInvestigacion: editandoSeg?.lineaInvestigacion || 'Ingeniería Industrial',
       asesor: sanitizeText(formAsesor.trim()),
       juradoPresidente: sanitizeText(formPresidente.trim()),
       juradoSecretario: sanitizeText(formSecretario.trim()),
       juradoVocal: sanitizeText(formVocal.trim()),
-      estacionActual: formEstacion,
-      semaforo: formSemaforo,
+      estacionActual: estacionFinal,
+      semaforo: semaforoFinal,
       fechaIngresoEstacion: new Date().toISOString().slice(0, 10),
       fechaInicioTramite: editandoSeg?.fechaInicioTramite || new Date().toISOString().slice(0, 10),
       ubicacionFisica: 'En seguimiento',
-      esCuelloBotellaExterno: formSemaforo === 'incidencia',
+      esCuelloBotellaExterno: semaforoFinal === 'incidencia',
       notasSecretaria: sanitizeText(formNotas.trim()),
       fechaSustentacionProgramada: editandoSeg?.fechaSustentacionProgramada,
+      flyerEnviado: editandoSeg?.flyerEnviado,
+      cambioTituloActivo: formCambioTitulo,
+      desaprobadoFecha: formDesaprobadoFecha || undefined,
+      urlRepositorio: editandoSeg?.urlRepositorio,
+      codigoUra: editandoSeg?.codigoUra,
       requisitosFisicos: editandoSeg?.requisitosFisicos || {
         futFisico: true,
         voucherTupa: true,
@@ -263,34 +328,149 @@ export const SecretariaLogisticsPage: React.FC = () => {
     await logisticaSecretariaService.saveSeguimientos(actualizados);
     setModalSeguimientoAbierto(false);
     marcarFeedbackGuardado(nuevo.id);
+    logisticaSecretariaService.notificarCambioEtapaAutomatico(nuevo).catch(() => {});
     agregarToast(
       'success',
-      editandoSeg ? 'Guardado' : 'Tesista Agregado',
-      `${nuevo.tesistaNombre} quedó actualizado en la Matriz y en Correos.`
+      editandoSeg ? 'Guardado y notificado' : 'Tesista Agregado',
+      `${nuevo.tesistaNombre} quedó actualizado en el sistema.`
     );
   };
 
   const handleCambiarEtapaDirecto = async (id: string, nuevaEtapa: EstacionLogisticaId) => {
+    let actualizadoRef: SeguimientoTesisItem | null = null;
+    const hoyIso = new Date().toISOString().slice(0, 10);
     const actualizados = seguimientos.map((s) => {
       if (s.id !== id) return s;
       const nuevoSemaforo: SemaforoEstadoId =
-        nuevaEtapa === 4 ? 'operativo' : s.semaforo === 'incidencia' ? 'incidencia' : 'atencion';
-      return { ...s, estacionActual: nuevaEtapa, semaforo: nuevoSemaforo };
+        nuevaEtapa === 4 || nuevaEtapa === 8
+          ? 'operativo'
+          : s.semaforo === 'incidencia'
+          ? 'incidencia'
+          : 'atencion';
+      const next: SeguimientoTesisItem = {
+        ...s,
+        estacionActual: nuevaEtapa,
+        semaforo: nuevoSemaforo,
+        fechaIngresoEstacion: hoyIso
+      };
+      actualizadoRef = next;
+      return next;
     });
     setSeguimientos(actualizados);
     marcarFeedbackGuardado(id);
     await logisticaSecretariaService.saveSeguimientos(actualizados);
+    if (actualizadoRef) {
+      const pushed = await logisticaSecretariaService.notificarCambioEtapaAutomatico(actualizadoRef);
+      agregarToast(
+        'success',
+        'Etapa actualizada y avisada',
+        pushed > 0
+          ? `Se envió notificación automática al celular del tesista (${pushed} dispositivo${pushed > 1 ? 's' : ''}).`
+          : 'Aviso registrado en la bandeja del tesista (le llegará al celular cuando active alertas).'
+      );
+    }
   };
 
   const handleCambiarSemaforoDirecto = async (id: string, nuevoSemaforo: SemaforoEstadoId) => {
-    const actualizados = seguimientos.map((s) =>
-      s.id === id
-        ? { ...s, semaforo: nuevoSemaforo, esCuelloBotellaExterno: nuevoSemaforo === 'incidencia' }
-        : s
-    );
+    let actualizadoRef: SeguimientoTesisItem | null = null;
+    const actualizados = seguimientos.map((s) => {
+      if (s.id !== id) return s;
+      const next = { ...s, semaforo: nuevoSemaforo, esCuelloBotellaExterno: nuevoSemaforo === 'incidencia' };
+      actualizadoRef = next;
+      return next;
+    });
     setSeguimientos(actualizados);
     marcarFeedbackGuardado(id);
     await logisticaSecretariaService.saveSeguimientos(actualizados);
+    if (actualizadoRef && nuevoSemaforo === 'incidencia') {
+      logisticaSecretariaService.notificarCambioEtapaAutomatico(actualizadoRef).catch(() => {});
+    }
+  };
+
+  const handleMoverLoteColacion = async (ids: string[], nuevaEtapa: EstacionLogisticaId) => {
+    const idSet = new Set(ids);
+    const hoyIso = new Date().toISOString().slice(0, 10);
+    const movidos: SeguimientoTesisItem[] = [];
+    const actualizados = seguimientos.map((s) => {
+      if (!idSet.has(s.id)) return s;
+      const next: SeguimientoTesisItem = {
+        ...s,
+        estacionActual: nuevaEtapa,
+        semaforo: nuevaEtapa === 8 ? 'operativo' : s.semaforo === 'incidencia' ? 'incidencia' : 'atencion',
+        fechaIngresoEstacion: hoyIso
+      };
+      movidos.push(next);
+      return next;
+    });
+    setSeguimientos(actualizados);
+    await logisticaSecretariaService.saveSeguimientos(actualizados);
+    await Promise.all(movidos.map((m) => logisticaSecretariaService.notificarCambioEtapaAutomatico(m)));
+    agregarToast(
+      'success',
+      'Avance en bloque completado',
+      `${movidos.length} expediente${movidos.length > 1 ? 's' : ''} movidos y notificados automáticamente.`
+    );
+  };
+
+  const handleActualizarDatosColacion = async (
+    id: string,
+    patch: { urlRepositorio?: string; codigoUra?: string; tipoTramite?: TipoTramiteId }
+  ) => {
+    const actualizados = seguimientos.map((s) => (s.id === id ? { ...s, ...patch } : s));
+    setSeguimientos(actualizados);
+    await logisticaSecretariaService.saveSeguimientos(actualizados);
+    agregarToast('success', 'Datos actualizados', 'Se guardó la referencia de Repositorio / URA.');
+  };
+
+  const handleResponderYGuardarDuda = async (duda: DudaTesistaPendiente, respuesta: string) => {
+    await agregarFaq({
+      pregunta: duda.pregunta,
+      respuesta,
+      categoria: duda.categoriaSugerida || 'Trámite'
+    });
+    const actualizadas: DudaTesistaPendiente[] = dudasPendientes.map((d) =>
+      d.id === duda.id
+        ? {
+            ...d,
+            estado: 'respondida',
+            respuestaOficial: respuesta,
+            fechaRespuesta: new Date().toLocaleString('es-PE', { hour12: false })
+          }
+        : d
+    );
+    setDudasPendientes(actualizadas);
+    await logisticaSecretariaService.saveDudasPendientes(actualizadas);
+
+    if (duda.codigoMatricula && duda.codigoMatricula.length === 10) {
+      await pushClientService.notifyThesisUpdate({
+        codigoMatricula: duda.codigoMatricula,
+        title: '💬 Secretaría respondió tu consulta oficial',
+        body: `${respuesta.slice(0, 160)}`,
+        url: '/',
+        tag: `duda-${duda.id}`,
+        tipo: 'respuesta',
+        urgente: true
+      });
+    }
+    agregarToast(
+      'success',
+      'Respondida y guardada para siempre',
+      'Se agregó a Preguntas Frecuentes para que el sistema la responda solo la próxima vez.'
+    );
+  };
+
+  const handleActivarPushSecretaria = async () => {
+    const res = await pushClientService.subscribeDevice({
+      rol: 'secretaria',
+      nombre: usuario?.nombre || 'Srta. Celia'
+    });
+    if (res.ok) {
+      const stats = await pushClientService.getStats();
+      setPushStats(stats);
+      agregarToast('success', 'Alertas activadas', 'Recibirás avisos automáticos en este equipo cuando llegue una duda nueva o víspera de jueves.');
+    } else {
+      agregarToast('warning', 'No se pudo activar', res.reason || 'Verifica los permisos de notificación del navegador.');
+    }
   };
 
   const handleActualizarNotaDirecto = async (id: string, nuevaNota: string) => {
@@ -327,6 +507,9 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [nuevoTesistaCorreo, setNuevoTesistaCorreo] = useState<string>('');
   const [nuevoIngNombre, setNuevoIngNombre] = useState<string>('');
   const [nuevoIngCorreo, setNuevoIngCorreo] = useState<string>('');
+  const [whatsappDocentesTexto, setWhatsappDocentesTexto] = useState<string>('');
+  const [generandoFlyer, setGenerandoFlyer] = useState<boolean>(false);
+  const [tesistaDespachoActivoId, setTesistaDespachoActivoId] = useState<string>('');
 
   const handleSubirFlyerImagen = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -339,13 +522,22 @@ export const SecretariaLogisticsPage: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const prepararDespachoParaTesistaYJurado = (seg: SeguimientoTesisItem, fechaJueves?: string) => {
-    const fechaStr = fechaJueves || seg.fechaSustentacionProgramada || 'Jueves';
+  const prepararDespachoParaTesistaYJurado = async (
+    seg: SeguimientoTesisItem,
+    fechaJueves?: string,
+    horarioJueves?: string,
+    lugarJueves?: string
+  ) => {
+    const fechaStr = fechaJueves || seg.fechaSustentacionProgramada || '2026-11-26';
+    const horarioStr = horarioJueves || '11:00 a.m. - 1:00 p.m.';
+    const lugarStr = lugarJueves || 'Auditorio de Ingeniería Industrial UNT';
+
+    setTesistaDespachoActivoId(seg.id);
     setAsuntoChat(
-      `Sustentación de Tesis: ${seg.tesistaNombre} (${fechaStr} · 11:00 a.m. - 1:00 p.m.)`
+      `Sustentación de Tesis: ${seg.tesistaNombre} (${fechaStr} · ${horarioStr})`
     );
     setMensajeChat(
-      `Estimados miembros del Jurado y Tesista ${seg.tesistaNombre}:\n\nSe remite el flyer y citación para la sustentación de la tesis "${seg.tituloTesis}", programada para el día jueves ${fechaStr} de 11:00 a.m. a 1:00 p.m.\n\nJurado:\n- Presidente: ${seg.juradoPresidente}\n- Secretario: ${seg.juradoSecretario}\n- Vocal: ${seg.juradoVocal}\n\nAtentamente,\nSrta. Celia — Secretaría de Escuela de Ingeniería Industrial UNT`
+      `Estimados miembros del Jurado y Tesista ${seg.tesistaNombre}:\n\nSe remite el flyer y citación oficial para la sustentación pública de la tesis "${seg.tituloTesis}", programada para el día jueves ${fechaStr} en horario ${horarioStr} (${lugarStr}).\n\nJurado:\n- Presidente: ${seg.juradoPresidente}\n- Secretario: ${seg.juradoSecretario}\n- Vocal: ${seg.juradoVocal}\n\nAtentamente,\nSrta. Celia — Secretaría de Escuela de Ingeniería Industrial UNT`
     );
 
     if (seg.tesistaCorreo) {
@@ -367,7 +559,31 @@ export const SecretariaLogisticsPage: React.FC = () => {
       .map((ing) => ing.correo.toLowerCase());
     setJuradoChecks(correosJuradoMatch);
 
+    const flyerInput = {
+      tesistaNombre: seg.tesistaNombre,
+      tituloTesis: seg.tituloTesis,
+      fechaJueves: fechaStr,
+      horario: horarioStr,
+      lugar: lugarStr,
+      juradoPresidente: seg.juradoPresidente,
+      juradoSecretario: seg.juradoSecretario,
+      juradoVocal: seg.juradoVocal,
+      asesor: seg.asesor
+    };
+    setWhatsappDocentesTexto(construirTextoWhatsAppDocentes(flyerInput));
     setTab('despacho');
+
+    // Generar automáticamente el flyer oficial PNG sin abrir Canva
+    setGenerandoFlyer(true);
+    try {
+      const generado = await generarFlyerOficialPng(flyerInput);
+      setFlyerPreview(generado.dataUrl);
+      setFlyerNombre(generado.fileName);
+    } catch {
+      // Puede subir uno manual si falla canvas
+    } finally {
+      setGenerandoFlyer(false);
+    }
   };
 
   const handleEnviarAnuncioYFlyer = async (e: React.FormEvent) => {
@@ -437,11 +653,40 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setHistorialChat(nuevoHistorial);
       await logisticaSecretariaService.saveHistorialDespachos(nuevoHistorial);
 
+      // Marcar flyerEnviado y notificar automáticamente al celular de cada tesista destinatario
+      const tesistasNotif = seguimientos.filter(
+        (s) =>
+          listaTesistasFinal.includes(s.tesistaCorreo.toLowerCase()) ||
+          (tesistaDespachoActivoId && s.id === tesistaDespachoActivoId)
+      );
+      if (tesistasNotif.length > 0) {
+        const idsMarcados = new Set(tesistasNotif.map((t) => t.id));
+        const segActualizados = seguimientos.map((s) =>
+          idsMarcados.has(s.id) ? { ...s, flyerEnviado: true } : s
+        );
+        setSeguimientos(segActualizados);
+        await logisticaSecretariaService.saveSeguimientos(segActualizados);
+
+        await Promise.all(
+          tesistasNotif.map((t) =>
+            pushClientService.notifyThesisUpdate({
+              codigoMatricula: t.codigoMatricula,
+              title: '📢 ¡Tu sustentación ya tiene citación y flyer oficial!',
+              body: `${asuntoChat}. Recuerda llegar 1 hora antes con vestimenta formal y tus diapositivas.`,
+              url: '/',
+              tag: `flyer-${t.codigoMatricula}`,
+              tipo: 'sustentacion',
+              urgente: true
+            })
+          )
+        );
+      }
+
       setConfirmacionEnvio({
         destinatarios: todosDestinatarios,
         fechaHora
       });
-      agregarToast('success', 'Correo Enviado', res.message);
+      agregarToast('success', 'Despacho y Aviso Completados', res.message);
     } catch (err: any) {
       agregarToast('error', 'No se pudo enviar desde el servidor', err?.message || 'Error de envío.');
     } finally {
@@ -605,59 +850,183 @@ export const SecretariaLogisticsPage: React.FC = () => {
   }, [anioCalendario, mesCalendario]);
 
   const correoYaVinculado = Boolean(emailStatus.senderEmail);
+  const dudasSinResponderCount = useMemo(
+    () => dudasPendientes.filter((d) => d.estado === 'pendiente').length,
+    [dudasPendientes]
+  );
 
   return (
     <div className="space-y-5">
-      {/* Selector Simple y Secuencial de las 4 Pestañas Exclusivas de la Srta. Celia */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-2.5 shadow-2xs flex flex-wrap items-center gap-2">
+      {/* Navegación Serena de 5 Módulos: Hoy · Trámites · Jueves y Flyers · Colación · Instrucciones */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-2 shadow-2xs flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setTab('hoy')}
+          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'hoy'
+            ? 'bg-[#082F64] text-white shadow-xs'
+            : 'text-slate-600 hover:bg-slate-100'
+            }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span>Hoy</span>
+          {dudasSinResponderCount > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black leading-none">
+              {dudasSinResponderCount}
+            </span>
+          )}
+        </button>
+
         <button
           type="button"
           onClick={() => setTab('seguimiento')}
-          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'seguimiento'
+          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'seguimiento'
             ? 'bg-[#082F64] text-white shadow-xs'
             : 'text-slate-600 hover:bg-slate-100'
             }`}
         >
           <ClipboardList className="w-4 h-4 text-amber-300" />
-          <span>1. Seguimiento ({seguimientos.length})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setTab('instrucciones')}
-          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'instrucciones'
-            ? 'bg-[#082F64] text-white shadow-xs'
-            : 'text-slate-600 hover:bg-slate-100'
-            }`}
-        >
-          <Edit3 className="w-4 h-4 text-amber-300" />
-          <span>2. Instrucciones (Editar y Publicar)</span>
+          <span>Trámites ({seguimientos.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => setTab('despacho')}
-          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'despacho'
+          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'despacho' || tab === 'calendario'
             ? 'bg-[#082F64] text-white shadow-xs'
             : 'text-slate-600 hover:bg-slate-100'
             }`}
         >
           <Send className="w-4 h-4 text-amber-300" />
-          <span>3. Flyers y Correos</span>
+          <span>Jueves y Flyers</span>
         </button>
 
         <button
           type="button"
-          onClick={() => setTab('calendario')}
-          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'calendario'
+          onClick={() => setTab('colacion')}
+          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'colacion'
             ? 'bg-[#082F64] text-white shadow-xs'
             : 'text-slate-600 hover:bg-slate-100'
             }`}
         >
-          <Calendar className="w-4 h-4 text-amber-300" />
-          <span>4. Calendario (Jueves 11:00 - 1:00)</span>
+          <GraduationCap className="w-4 h-4 text-amber-300" />
+          <span>Colación</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTab('instrucciones')}
+          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'instrucciones'
+            ? 'bg-[#082F64] text-white shadow-xs'
+            : 'text-slate-600 hover:bg-slate-100'
+            }`}
+        >
+          <Edit3 className="w-4 h-4 text-amber-300" />
+          <span>Guías</span>
         </button>
       </div>
+
+      {/* Sub-barra limpia dentro de Jueves y Flyers para alternar entre Despacho 1-Clic y Calendario */}
+      {(tab === 'despacho' || tab === 'calendario') && (
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200 w-fit">
+          <button
+            type="button"
+            onClick={() => setTab('despacho')}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+              tab === 'despacho' ? 'bg-white text-[#082F64] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Preparar Flyer y Correos (1 Clic)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('calendario')}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+              tab === 'calendario' ? 'bg-white text-[#082F64] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            <span>Agenda de Jueves (11:00 - 1:00)</span>
+          </button>
+        </div>
+      )}
+
+      {/* =====================================================================
+          0. PORTADA "HOY": MÁXIMO 3 PENDIENTES CLAVE SIN SOBRECARGA VISUAL
+         ===================================================================== */}
+      {tab === 'hoy' && (
+        <SecretariaHoyTab
+          seguimientos={seguimientos}
+          sustentaciones={sustentaciones}
+          dudasPendientes={dudasPendientes}
+          configColacion={configColacion}
+          pushStats={pushStats}
+          onPrepararJueves={(seg, sust) => {
+            if (seg) {
+              prepararDespachoParaTesistaYJurado(seg, sust?.fecha, sust?.horario, sust?.aulaOAuditorio);
+            } else if (sust) {
+              prepararDespachoParaTesistaYJurado(
+                {
+                  id: sust.tesistaId || sust.id,
+                  codigoMatricula: sust.tesistaCodigo || '',
+                  tesistaNombre: sust.tesistaNombre,
+                  tesistaCorreo: sust.tesistaCorreo || '',
+                  tituloTesis: sust.tituloTesis,
+                  lineaInvestigacion: 'Ingeniería Industrial',
+                  asesor: sust.asesor || '',
+                  juradoPresidente: sust.juradoPresidente,
+                  juradoSecretario: sust.juradoSecretario,
+                  juradoVocal: sust.juradoVocal,
+                  estacionActual: 4,
+                  fechaIngresoEstacion: sust.fecha,
+                  fechaInicioTramite: sust.fecha,
+                  ubicacionFisica: sust.aulaOAuditorio,
+                  esCuelloBotellaExterno: false,
+                  notasSecretaria: '',
+                  fechaSustentacionProgramada: sust.fecha,
+                  requisitosFisicos: {
+                    futFisico: true,
+                    voucherTupa: true,
+                    reporteTurnitin: true,
+                    constanciaPracticas: true,
+                    resolucionProyecto: true,
+                    tresBorradoresJurado: true
+                  }
+                },
+                sust.fecha,
+                sust.horario,
+                sust.aulaOAuditorio
+              );
+            } else {
+              setTab('despacho');
+            }
+          }}
+          onIrATramitesConFiltro={(f) => {
+            setFiltroSemaforo(f);
+            setTab('seguimiento');
+          }}
+          onIrAColacion={() => setTab('colacion')}
+          onResponderYGuardarDuda={handleResponderYGuardarDuda}
+          onActivarPushSecretaria={handleActivarPushSecretaria}
+        />
+      )}
+
+      {/* =====================================================================
+          4. MODO COLACIÓN MASIVO (ÉTICA · REPOSITORIO · URA · 100+ EXPEDIENTES)
+         ===================================================================== */}
+      {tab === 'colacion' && (
+        <SecretariaColacionTab
+          seguimientos={seguimientos}
+          configColacion={configColacion}
+          onGuardarConfigColacion={async (cfg) => {
+            setConfigColacion(cfg);
+            await logisticaSecretariaService.saveConfigColacion(cfg);
+            agregarToast('success', 'Fechas actualizadas', 'Se guardó el cronograma de colación.');
+          }}
+          onMoverLoteEtapa={handleMoverLoteColacion}
+          onActualizarDatosColacion={handleActualizarDatosColacion}
+        />
+      )}
 
       {/* =====================================================================
           2. EDITOR EXCLUSIVO DE INSTRUCCIONES (SOLO PARA LA SECRETARÍA)
@@ -795,7 +1164,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-200 text-xs">
                     {seguimientosFiltrados.map((item) => {
-                      const etapaActual = (item.estacionActual > 4 ? 4 : item.estacionActual) as EstacionLogisticaId;
+                      const etapaActual = item.estacionActual;
                       const sem = resolverSemaforo(item);
                       const semMeta = SEMAFORO_META[sem];
                       const guardadoAhora = guardadoRecienteId === item.id;
@@ -874,28 +1243,65 @@ export const SecretariaLogisticsPage: React.FC = () => {
                             </div>
                           </td>
 
-                          {/* Columna 4: Selector de Etapa en 1 Clic */}
+                          {/* Columna 4: Selector de Etapa en 1 Clic (8 Etapas: Sustentación 1-4 + Colación 5-8) */}
                           <td className="py-3.5 px-3.5 align-top">
-                            <div className="grid grid-cols-2 gap-1.5">
-                              {ETAPAS_SIMPLES.map((et) => {
-                                const activo = etapaActual === et.id;
-                                const completado = etapaActual > et.id;
-                                return (
-                                  <button
-                                    key={et.id}
-                                    type="button"
-                                    onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
-                                    className={`py-1.5 px-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer truncate ${activo
-                                      ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
-                                      : completado
-                                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                      }`}
-                                  >
-                                    {et.corto}
-                                  </button>
-                                );
-                              })}
+                            <div className="space-y-1.5">
+                              <div className="grid grid-cols-2 gap-1">
+                                {ETAPAS_SIMPLES.filter((e) => e.fase === 'sustentacion').map((et) => {
+                                  const activo = etapaActual === et.id;
+                                  const completado = etapaActual > et.id;
+                                  return (
+                                    <button
+                                      key={et.id}
+                                      type="button"
+                                      onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
+                                      className={`py-1.5 px-2 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer truncate ${activo
+                                        ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
+                                        : completado
+                                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                        }`}
+                                    >
+                                      {et.corto}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <div className="grid grid-cols-2 gap-1 pt-1 border-t border-slate-100">
+                                {ETAPAS_SIMPLES.filter((e) => e.fase === 'colacion').map((et) => {
+                                  const activo = etapaActual === et.id;
+                                  const completado = etapaActual > et.id;
+                                  return (
+                                    <button
+                                      key={et.id}
+                                      type="button"
+                                      onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
+                                      className={`py-1.5 px-2 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer truncate ${activo
+                                        ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
+                                        : completado
+                                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                          : 'bg-slate-50 text-slate-500 border border-slate-200/70 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                      {et.corto}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1 text-[9px] text-slate-400">
+                                <BellRing className="w-2.5 h-2.5 text-emerald-500" />
+                                <span>Clic avisa al celular del tesista</span>
+                                {item.tipoTramite === 'bachiller' && (
+                                  <span className="px-1.5 py-0.5 rounded bg-teal-100 text-teal-900 font-bold">
+                                    Bachiller
+                                  </span>
+                                )}
+                                {item.cambioTituloActivo && (
+                                  <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-bold">
+                                    Cambio Título
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </td>
 
@@ -983,7 +1389,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
             /* VISTA 2: TARJETAS VISUALES */
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {seguimientosFiltrados.map((item) => {
-                const etapaActual = item.estacionActual > 4 ? 4 : item.estacionActual;
+                const etapaActual = item.estacionActual;
                 const sem = resolverSemaforo(item);
                 const semMeta = SEMAFORO_META[sem];
                 return (
@@ -1127,6 +1533,79 @@ export const SecretariaLogisticsPage: React.FC = () => {
       {tab === 'despacho' && (
         <div className="space-y-4">
           {/* Guía de Flujo Visual 1 -> 2 -> 3 + Tuerca Discreta de Correo */}
+          {/* Barra "Preparar Jueves en 1 Clic" (reemplaza Canva + selección manual + WhatsApp) */}
+          {sustentaciones.length > 0 && (
+            <div className="bg-gradient-to-r from-[#082F64] to-[#0C4D96] rounded-2xl p-4 text-white shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-black text-amber-300 uppercase tracking-wider">
+                  Rutina de Martes en 1 Clic (Sin abrir Canva)
+                </div>
+                <div className="text-xs text-blue-100 mt-0.5">
+                  Elige una sustentación programada: genera el Flyer oficial PNG, marca jurado + copias (Elmo, Estela, Rosita) y arma el recordatorio de WhatsApp.
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {sustentaciones.slice(0, 3).map((sust) => (
+                  <button
+                    key={sust.id}
+                    type="button"
+                    onClick={() => {
+                      const seg = seguimientos.find(
+                        (s) =>
+                          s.id === sust.tesistaId ||
+                          (sust.tesistaCodigo && s.codigoMatricula === sust.tesistaCodigo)
+                      );
+                      prepararDespachoParaTesistaYJurado(
+                        seg || {
+                          id: sust.tesistaId || sust.id,
+                          codigoMatricula: sust.tesistaCodigo || '',
+                          tesistaNombre: sust.tesistaNombre,
+                          tesistaCorreo: sust.tesistaCorreo || '',
+                          tituloTesis: sust.tituloTesis,
+                          lineaInvestigacion: 'Ingeniería Industrial',
+                          asesor: sust.asesor || '',
+                          juradoPresidente: sust.juradoPresidente,
+                          juradoSecretario: sust.juradoSecretario,
+                          juradoVocal: sust.juradoVocal,
+                          estacionActual: 4,
+                          fechaIngresoEstacion: sust.fecha,
+                          fechaInicioTramite: sust.fecha,
+                          ubicacionFisica: sust.aulaOAuditorio,
+                          esCuelloBotellaExterno: false,
+                          notasSecretaria: '',
+                          fechaSustentacionProgramada: sust.fecha,
+                          requisitosFisicos: {
+                            futFisico: true,
+                            voucherTupa: true,
+                            reporteTurnitin: true,
+                            constanciaPracticas: true,
+                            resolucionProyecto: true,
+                            tresBorradoresJurado: true
+                          }
+                        },
+                        sust.fecha,
+                        sust.horario,
+                        sust.aulaOAuditorio
+                      );
+                    }}
+                    className="px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{sust.tesistaNombre.split(' ').slice(0, 2).join(' ')} ({sust.fecha.slice(5)})</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!emailStatus.serverTransportReady && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 flex flex-wrap items-center justify-between gap-2">
+              <span>
+                <strong>Aviso de correo saliente:</strong> el remitente <code>{emailStatus.senderEmail}</code> está pre-vinculado, pero el servidor aún guarda en registro interno + aviso Push hasta activar la clave HTTPS (Brevo/Resend/OAuth) en el servidor.
+              </span>
+            </div>
+          )}
+
           <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs">
               <div className="flex items-center gap-2">
@@ -1204,8 +1683,16 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         alt="Flyer cargado"
                         className="max-h-64 w-auto mx-auto rounded-xl border border-slate-200 shadow-xs"
                       />
-                      <div className="flex items-center justify-center gap-3 pt-1">
+                      <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                         <span className="font-mono text-[11px] text-slate-600">{flyerNombre}</span>
+                        <a
+                          href={flyerPreview}
+                          download={flyerNombre || 'Flyer_Sustentacion_UNT.png'}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#082F64] text-white font-bold cursor-pointer"
+                        >
+                          <Download className="w-3 h-3 text-amber-300" />
+                          <span>Descargar para Facebook</span>
+                        </a>
                         <button
                           type="button"
                           onClick={() => {
@@ -1219,7 +1706,42 @@ export const SecretariaLogisticsPage: React.FC = () => {
                       </div>
                     </div>
                   )}
+                  {generandoFlyer && (
+                    <div className="text-xs font-bold text-[#082F64]">
+                      Generando Flyer oficial de Ingeniería Industrial UNT...
+                    </div>
+                  )}
                 </div>
+
+                {whatsappDocentesTexto && (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-emerald-900">
+                      <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span className="font-bold">Recordatorio listo para el grupo de WhatsApp de docentes</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(whatsappDocentesTexto);
+                          agregarToast('success', 'Copiado', 'Texto de recordatorio copiado para pegar en WhatsApp.');
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 font-bold cursor-pointer"
+                      >
+                        Copiar texto
+                      </button>
+                      <a
+                        href={`https://wa.me/?text=${encodeURIComponent(whatsappDocentesTexto)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold inline-flex items-center gap-1"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>Abrir WhatsApp</span>
+                      </a>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Asunto:</label>
@@ -2004,6 +2526,71 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   onChange={(e) => setFormNotas(e.target.value)}
                   className="w-full p-2 rounded-xl border border-slate-300"
                 />
+              </div>
+
+              {/* Opciones especiales ocultas tras un clic para no abrumar el registro rápido */}
+              <div className="border-t border-slate-100 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setMostrarAvanzadoModal((v) => !v)}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#0C4D96] hover:underline cursor-pointer"
+                >
+                  {mostrarAvanzadoModal ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  <span>Opciones especiales (Bachiller, Sede, Cambio de Título o Plazo 30 días)</span>
+                </button>
+
+                {mostrarAvanzadoModal && (
+                  <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Tipo de trámite:</label>
+                        <select
+                          value={formTipoTramite}
+                          onChange={(e) => setFormTipoTramite(e.target.value as TipoTramiteId)}
+                          className="w-full p-2 rounded-lg border border-slate-300 bg-white font-semibold"
+                        >
+                          <option value="titulado">Titulado (Tesis completa)</option>
+                          <option value="bachiller">Bachiller / Graduado (sin Ética ni Repo)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-1">Sede:</label>
+                        <select
+                          value={formSede}
+                          onChange={(e) => setFormSede(e.target.value as 'Trujillo' | 'Valle Jequetepeque' | 'Huamachuco')}
+                          className="w-full p-2 rounded-lg border border-slate-300 bg-white font-semibold"
+                        >
+                          <option value="Trujillo">Trujillo (Sede Central)</option>
+                          <option value="Valle Jequetepeque">Valle Jequetepeque</option>
+                          <option value="Huamachuco">Huamachuco</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-center">
+                      <label className="flex items-center gap-2 p-2 rounded-lg bg-white border border-slate-200 cursor-pointer font-semibold text-rose-800">
+                        <input
+                          type="checkbox"
+                          checked={formCambioTitulo}
+                          onChange={(e) => setFormCambioTitulo(e.target.checked)}
+                          className="accent-rose-600"
+                        />
+                        <span>Trámite de Cambio de Título pendiente</span>
+                      </label>
+                      <div>
+                        <label className="block font-bold text-slate-700 mb-0.5 text-[11px]">
+                          Si desaprobó (activa 30 días):
+                        </label>
+                        <input
+                          type="date"
+                          value={formDesaprobadoFecha}
+                          onChange={(e) => setFormDesaprobadoFecha(e.target.value)}
+                          className="w-full p-1.5 rounded-lg border border-slate-300 bg-white text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">

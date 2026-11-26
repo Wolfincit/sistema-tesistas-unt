@@ -9,3 +9,8 @@ server/.drive-config.json
 server/.email-config.json
 server/.local-db.json
 server/.local-uploads/
+server/.push-vapid.json
+server/.push-subscriptions.json
+server/.notificaciones-log.json
+server/.push-reminders-sent.json
+server/.render-deploy-hook

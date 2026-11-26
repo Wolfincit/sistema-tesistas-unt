@@ -96,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
                     }`}
                   >
                     <ClipboardList className="w-3.5 h-3.5" />
-                    <span>Instrucciones</span>
+                    <span>Mi Tesis y Guías</span>
                   </button>
                 </>
               ) : (
