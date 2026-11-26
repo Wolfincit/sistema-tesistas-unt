@@ -968,11 +968,13 @@ export const SecretariaLogisticsPage: React.FC = () => {
   };
 
   // =========================================================
-  // 3. CALENDARIO COMPACTO (JUEVES 11:00 A.M. - 1:00 P.M.)
+  // 3. CALENDARIO COMPACTO (HASTA 3 SUSTENTACIONES POR DÍA)
   // =========================================================
+  const MAX_SUSTENTACIONES_POR_DIA = 3;
   const [mesCalendario, setMesCalendario] = useState<number>(10);
   const [anioCalendario, setAnioCalendario] = useState<number>(2026);
   const [fechaJuevesActiva, setFechaJuevesActiva] = useState<string>('2026-11-26');
+  const [calSustEditId, setCalSustEditId] = useState<string>('');
 
   const [calTesistaId, setCalTesistaId] = useState<string>('');
   const [calTesistaNombre, setCalTesistaNombre] = useState<string>('');
@@ -987,27 +989,71 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [calSecretario, setCalSecretario] = useState<string>('');
   const [calVocal, setCalVocal] = useState<string>('');
   const [calHorario, setCalHorario] = useState<string>('11:00 a.m.');
+  const [calLugar, setCalLugar] = useState<string>('Auditorio de la Escuela de Ingeniería Industrial');
 
-  const seleccionarFechaCalendario = (fechaIso: string) => {
+  const cargarSustentacionEnFormulario = (item: SustentacionJuevesItem) => {
+    setCalSustEditId(item.id);
+    setCalTesistaId(item.tesistaId || '');
+    setCalTesistaNombre(item.tesistaNombre);
+    setCalTesistaCodigo(item.tesistaCodigo);
+    setCalTesistaCorreo(item.tesistaCorreo);
+    setCalTesista2Nombre(item.tesista2Nombre || '');
+    setCalTesista2Codigo(item.tesista2Codigo || '');
+    setCalTesista2Correo(item.tesista2Correo || '');
+    setCalTituloTesis(item.tituloTesis);
+    setCalAsesor(item.asesor);
+    setCalPresidente(item.juradoPresidente);
+    setCalSecretario(item.juradoSecretario);
+    setCalVocal(item.juradoVocal);
+    setCalHorario(item.horario || '11:00 a.m.');
+    setCalLugar(item.aulaOAuditorio || 'Auditorio de la Escuela de Ingeniería Industrial');
+  };
+
+  const iniciarNuevaSustentacionEnFecha = (fechaIso: string) => {
+    const delDia = sustentaciones.filter((s) => s.fecha === fechaIso);
+    if (delDia.length >= MAX_SUSTENTACIONES_POR_DIA) {
+      agregarToast('warning', 'Cupo completo (3/3)', `Ya hay ${MAX_SUSTENTACIONES_POR_DIA} sustentaciones agendadas el ${fechaIso}.`);
+      return;
+    }
     setFechaJuevesActiva(fechaIso);
-    const existente = sustentaciones.find((s) => s.fecha === fechaIso);
+    setCalSustEditId('');
+    setCalTesistaId('');
+    setCalTesistaNombre('');
+    setCalTesistaCodigo('');
+    setCalTesistaCorreo('');
+    setCalTesista2Nombre('');
+    setCalTesista2Codigo('');
+    setCalTesista2Correo('');
+    setCalTituloTesis('');
+    setCalAsesor('');
+    setCalPresidente('');
+    setCalSecretario('');
+    setCalVocal('');
+    setCalHorario('11:00 a.m.');
+    setCalLugar(
+      delDia.length === 0
+        ? 'Auditorio de la Escuela de Ingeniería Industrial'
+        : delDia.length === 1
+        ? 'Aula II-6'
+        : 'Aula II-4'
+    );
+  };
+
+  const seleccionarFechaCalendario = (fechaIso: string, sustId?: string) => {
+    setFechaJuevesActiva(fechaIso);
+    const delDia = sustentaciones.filter((s) => s.fecha === fechaIso);
+    const existente = sustId ? delDia.find((s) => s.id === sustId) : delDia[0];
     if (existente) {
-      setCalTesistaId(existente.tesistaId || '');
-      setCalTesistaNombre(existente.tesistaNombre);
-      setCalTesistaCodigo(existente.tesistaCodigo);
-      setCalTesistaCorreo(existente.tesistaCorreo);
-      setCalTesista2Nombre(existente.tesista2Nombre || '');
-      setCalTesista2Codigo(existente.tesista2Codigo || '');
-      setCalTesista2Correo(existente.tesista2Correo || '');
-      setCalTituloTesis(existente.tituloTesis);
-      setCalAsesor(existente.asesor);
-      setCalPresidente(existente.juradoPresidente);
-      setCalSecretario(existente.juradoSecretario);
-      setCalVocal(existente.juradoVocal);
-      setCalHorario(existente.horario || '11:00 a.m.');
-    } else if (seguimientos[0]) {
-      cargarTesistaEnCalendario(seguimientos[0].id);
+      cargarSustentacionEnFormulario(existente);
+    } else {
+      setCalSustEditId('');
+      setCalLugar('Auditorio de la Escuela de Ingeniería Industrial');
       setCalHorario('11:00 a.m.');
+      if (seguimientos[0]) {
+        cargarTesistaEnCalendario(seguimientos[0].id);
+      } else {
+        iniciarNuevaSustentacionEnFecha(fechaIso);
+      }
     }
   };
 
@@ -1029,11 +1075,24 @@ export const SecretariaLogisticsPage: React.FC = () => {
     }
   };
 
-  const handleGuardarSustentacionJueves = async (e: React.FormEvent) => {
+  const handleGuardarSustentacionJueves = async (e: React.FormEvent): Promise<boolean> => {
     e.preventDefault();
-    if (!calTesistaNombre.trim()) return;
+    if (!calTesistaNombre.trim()) return false;
 
-    const existenteIdx = sustentaciones.findIndex((s) => s.fecha === fechaJuevesActiva);
+    const existenteIdx = calSustEditId
+      ? sustentaciones.findIndex((s) => s.id === calSustEditId)
+      : -1;
+    const delDiaActual = sustentaciones.filter((s) => s.fecha === fechaJuevesActiva);
+
+    if (existenteIdx < 0 && delDiaActual.length >= MAX_SUSTENTACIONES_POR_DIA) {
+      agregarToast(
+        'warning',
+        'Límite alcanzado (máx. 3 por día)',
+        `El ${fechaJuevesActiva} ya tiene ${MAX_SUSTENTACIONES_POR_DIA} sustentaciones agendadas. Elige otra fecha o edita una existente.`
+      );
+      return false;
+    }
+
     const registro: SustentacionJuevesItem = {
       id: existenteIdx >= 0 ? sustentaciones[existenteIdx].id : `jue-${Date.now()}`,
       fecha: fechaJuevesActiva,
@@ -1050,7 +1109,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
       juradoPresidente: calPresidente.trim(),
       juradoSecretario: calSecretario.trim(),
       juradoVocal: calVocal.trim(),
-      aulaOAuditorio: 'Auditorio de la Escuela de Ingeniería Industrial',
+      aulaOAuditorio: calLugar.trim() || 'Auditorio de la Escuela de Ingeniería Industrial',
       estado: 'Programada'
     };
 
@@ -1060,6 +1119,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
         : [...sustentaciones, registro].sort((a, b) => a.fecha.localeCompare(b.fecha));
 
     setSustentaciones(nuevas);
+    setCalSustEditId(registro.id);
     await logisticaSecretariaService.saveSustentacionesJueves(nuevas);
 
     if (calTesistaId) {
@@ -1106,18 +1166,29 @@ export const SecretariaLogisticsPage: React.FC = () => {
       );
     }
 
-    agregarToast('success', 'Fecha Guardada', `Sustentación agendada para el ${fechaJuevesActiva}.`);
+    const totalDia = nuevas.filter((s) => s.fecha === fechaJuevesActiva).length;
+    agregarToast(
+      'success',
+      'Fecha Guardada',
+      `Sustentación agendada para el ${fechaJuevesActiva} (${totalDia}/${MAX_SUSTENTACIONES_POR_DIA} cupos usados).`
+    );
+    return true;
   };
 
-  const handleEliminarSustentacionFecha = async (fechaIso: string) => {
+  const handleEliminarSustentacionPorId = async (sustId: string, fechaIso: string) => {
     registrarPuntoRetroceso({
       label: `Quitar sustentación del ${fechaIso}`,
       sustentaciones: [...sustentaciones]
     });
-    const nuevas = sustentaciones.filter((s) => s.fecha !== fechaIso);
+    const nuevas = sustentaciones.filter((s) => s.id !== sustId);
     setSustentaciones(nuevas);
+    if (calSustEditId === sustId) {
+      const restante = nuevas.find((s) => s.fecha === fechaIso);
+      if (restante) cargarSustentacionEnFormulario(restante);
+      else setCalSustEditId('');
+    }
     await logisticaSecretariaService.saveSustentacionesJueves(nuevas);
-    agregarToast('info', 'Fecha Liberada', `Se quitó la sustentación del ${fechaIso}.`);
+    agregarToast('info', 'Sustentación quitada', `Se liberó un cupo del ${fechaIso}.`);
   };
 
   const conteosSemaforo = useMemo(() => {
@@ -1857,7 +1928,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
-              {sustentaciones.slice(0, 3).map((sust) => (
+              {sustentaciones.slice(0, 6).map((sust) => (
                 <button
                   key={sust.id}
                   type="button"
@@ -2770,7 +2841,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
               {diasDelMes.map((celda, idx) => {
                 if (!celda.dia) return <div key={`empty-${idx}`} className="h-10" />;
-                const programada = sustentaciones.find((s) => s.fecha === celda.fechaIso);
+                const delDia = sustentaciones.filter((s) => s.fecha === celda.fechaIso);
+                const programada = delDia[0];
                 const seleccionada = fechaJuevesActiva === celda.fechaIso;
 
                 return (
@@ -2780,7 +2852,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                     onClick={() => seleccionarFechaCalendario(celda.fechaIso)}
                     className={`h-10 rounded-xl border flex flex-col items-center justify-center transition-all cursor-pointer ${seleccionada
                       ? 'bg-[#082F64] text-white border-[#082F64] ring-2 ring-amber-400 font-black'
-                      : programada
+                      : delDia.length > 0
                         ? 'bg-amber-100 border-amber-400 text-amber-950 font-bold'
                         : celda.esJueves
                           ? 'bg-blue-50/80 border-blue-200 text-unt-blue font-bold hover:bg-blue-100'
@@ -2788,9 +2860,15 @@ export const SecretariaLogisticsPage: React.FC = () => {
                       }`}
                   >
                     <span className="text-xs leading-none">{celda.dia}</span>
-                    {programada && (
-                      <span className="text-[8px] font-bold truncate max-w-[38px] mt-0.5 px-1 rounded bg-emerald-600 text-white">
-                        {programada.tesistaNombre.split(' ')[0]}
+                    {delDia.length > 0 && (
+                      <span
+                        className={`text-[8px] font-bold truncate max-w-[42px] mt-0.5 px-1 rounded text-white ${
+                          delDia.length >= MAX_SUSTENTACIONES_POR_DIA ? 'bg-rose-600' : 'bg-emerald-600'
+                        }`}
+                      >
+                        {delDia.length === 1
+                          ? programada.tesistaNombre.split(' ')[0]
+                          : `${delDia.length}/${MAX_SUSTENTACIONES_POR_DIA}`}
                       </span>
                     )}
                   </button>
@@ -2799,29 +2877,36 @@ export const SecretariaLogisticsPage: React.FC = () => {
             </div>
 
             {/* Jueves Agendados */}
-            <div className="space-y-1.5 pt-2 border-t border-slate-100 max-h-52 overflow-y-auto">
+            <div className="space-y-1.5 pt-2 border-t border-slate-100 max-h-56 overflow-y-auto">
               {sustentaciones.map((s) => (
                 <div
                   key={s.id}
-                  onClick={() => seleccionarFechaCalendario(s.fecha)}
-                  className={`p-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between gap-2 ${s.fecha === fechaJuevesActiva
-                    ? 'border-unt-blue bg-blue-50/70'
-                    : 'border-slate-200 hover:bg-slate-50'
-                    }`}
+                  onClick={() => seleccionarFechaCalendario(s.fecha, s.id)}
+                  className={`p-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between gap-2 ${
+                    calSustEditId === s.id
+                      ? 'border-[#082F64] bg-blue-50/80 ring-1 ring-[#082F64]/20'
+                      : s.fecha === fechaJuevesActiva
+                      ? 'border-blue-200 bg-blue-50/30'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
                 >
                   <div className="min-w-0">
-                    <div className="font-bold text-slate-900 truncate">{s.tesistaNombre}</div>
-                    <div className="text-[10px] font-mono text-unt-blue">
-                      {s.fecha} · {s.horario}
+                    <div className="font-bold text-slate-900 truncate">
+                      {s.tesistaNombre}
+                      {s.tesista2Nombre ? ` / ${s.tesista2Nombre}` : ''}
+                    </div>
+                    <div className="text-[10px] font-mono text-unt-blue truncate">
+                      {s.fecha} · {s.horario} · {s.aulaOAuditorio || 'Auditorio'}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleEliminarSustentacionFecha(s.fecha);
+                      handleEliminarSustentacionPorId(s.id, s.fecha);
                     }}
-                    className="p-1 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
+                    className="p-1 text-rose-500 hover:bg-rose-50 rounded cursor-pointer shrink-0"
+                    title="Quitar esta sustentación"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -2830,19 +2915,72 @@ export const SecretariaLogisticsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Formulario del Día Seleccionado */}
+          {/* Formulario del Día Seleccionado (hasta 3 sustentaciones el mismo día) */}
           <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-black text-slate-900">
-                Sustentación del {fechaJuevesActiva}
-              </h3>
-              <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 font-bold text-xs">
-                11:00 a.m. - 01:00 p.m.
-              </span>
-            </div>
+            {(() => {
+              const delDia = sustentaciones.filter((s) => s.fecha === fechaJuevesActiva);
+              const lleno = delDia.length >= MAX_SUSTENTACIONES_POR_DIA;
+              return (
+                <div className="space-y-3 pb-3 border-b border-slate-100">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-base font-black text-slate-900">
+                      Sustentaciones del {fechaJuevesActiva}
+                    </h3>
+                    <span
+                      className={`px-3 py-1 rounded-full font-bold text-xs ${
+                        lleno
+                          ? 'bg-rose-100 text-rose-900'
+                          : 'bg-amber-100 text-amber-900'
+                      }`}
+                    >
+                      Cupos del día: {delDia.length} / {MAX_SUSTENTACIONES_POR_DIA}
+                    </span>
+                  </div>
+
+                  {/* Pestañas rápidas de las sustentaciones agendadas en ese mismo día + botón Agregar otra */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {delDia.map((s, idx) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => cargarSustentacionEnFormulario(s)}
+                        className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                          calSustEditId === s.id
+                            ? 'bg-[#082F64] text-white border-[#082F64] shadow-2xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-blue-50'
+                        }`}
+                      >
+                        {idx + 1}. {s.tesistaNombre.split(' ')[0]} ({s.horario})
+                      </button>
+                    ))}
+
+                    {!lleno ? (
+                      <button
+                        type="button"
+                        onClick={() => iniciarNuevaSustentacionEnFecha(fechaJuevesActiva)}
+                        className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${
+                          !calSustEditId
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                            : 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
+                        }`}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>
+                          {delDia.length === 0 ? 'Nueva sustentación' : `Agendar otra (${delDia.length + 1}/3)`}
+                        </span>
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-rose-700 px-2">
+                        Día completo (máx. 3 sustentaciones)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             <form onSubmit={handleGuardarSustentacionJueves} className="space-y-3.5 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Seleccionar Tesista:</label>
                   <select
@@ -2867,6 +3005,22 @@ export const SecretariaLogisticsPage: React.FC = () => {
                     onChange={(e) => setCalHorario(e.target.value)}
                     className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 font-bold"
                   />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Lugar (Auditorio / Aula):</label>
+                  <input
+                    type="text"
+                    list="lista-lugares-unt"
+                    value={calLugar}
+                    onChange={(e) => setCalLugar(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 font-semibold"
+                  />
+                  <datalist id="lista-lugares-unt">
+                    <option value="Auditorio de la Escuela de Ingeniería Industrial" />
+                    <option value="Aula II-6" />
+                    <option value="Aula II-4" />
+                  </datalist>
                 </div>
               </div>
 
@@ -2982,7 +3136,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={async (e) => {
-                    await handleGuardarSustentacionJueves(e as unknown as React.FormEvent);
+                    const guardadoOk = await handleGuardarSustentacionJueves(e as unknown as React.FormEvent);
+                    if (!guardadoOk) return;
                     const segExistente = seguimientos.find((s) => s.id === calTesistaId);
                     await prepararDespachoParaTesistaYJurado(
                       {
@@ -2993,7 +3148,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                           estacionActual: 4 as EstacionLogisticaId,
                           fechaIngresoEstacion: fechaJuevesActiva,
                           fechaInicioTramite: fechaJuevesActiva,
-                          ubicacionFisica: 'Auditorio de la Escuela de Ingeniería Industrial',
+                          ubicacionFisica: calLugar || 'Auditorio de la Escuela de Ingeniería Industrial',
                           esCuelloBotellaExterno: false,
                           notasSecretaria: '',
                           requisitosFisicos: {
@@ -3018,7 +3173,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         fechaSustentacionProgramada: fechaJuevesActiva
                       },
                       fechaJuevesActiva,
-                      calHorario
+                      calHorario,
+                      calLugar
                     );
                   }}
                   className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#082F64] hover:bg-[#0C4D96] text-white font-bold shadow-xs cursor-pointer"
