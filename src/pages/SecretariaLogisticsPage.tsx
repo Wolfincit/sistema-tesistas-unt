@@ -683,6 +683,20 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [generandoFlyer, setGenerandoFlyer] = useState<boolean>(false);
   const [tesistaDespachoActivoId, setTesistaDespachoActivoId] = useState<string>('');
   const [flyerDatosActivos, setFlyerDatosActivos] = useState<FlyerSustentacionInput | null>(null);
+  const [directorFlyerNombre, setDirectorFlyerNombre] = useState<string>(() => {
+    try {
+      return localStorage.getItem('unt_flyer_director_nombre') || 'Ms. Angel Hernández Molina';
+    } catch {
+      return 'Ms. Angel Hernández Molina';
+    }
+  });
+  const [directorFlyerCargo, setDirectorFlyerCargo] = useState<string>(() => {
+    try {
+      return localStorage.getItem('unt_flyer_director_cargo') || 'Director (e) de Escuela de Ingeniería Industrial';
+    } catch {
+      return 'Director (e) de Escuela de Ingeniería Industrial';
+    }
+  });
 
   const agregarCorreoManual = () => {
     const candidatos = inputCorreoManual
@@ -775,7 +789,9 @@ export const SecretariaLogisticsPage: React.FC = () => {
       juradoPresidente: seg.juradoPresidente,
       juradoSecretario: seg.juradoSecretario,
       juradoVocal: seg.juradoVocal,
-      asesor: seg.asesor
+      asesor: seg.asesor,
+      directorNombre: directorFlyerNombre,
+      directorCargo: directorFlyerCargo
     };
     setTab('despacho');
     await regenerarFlyerDesdeDatos(flyerInput, true);
@@ -1946,6 +1962,24 @@ export const SecretariaLogisticsPage: React.FC = () => {
                       </div>
                     </div>
 
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                        Título de la Tesis (se ajusta automáticamente en el flyer)
+                      </label>
+                      <input
+                        type="text"
+                        value={flyerDatosActivos.tituloTesis}
+                        onChange={(e) =>
+                          regenerarFlyerDesdeDatos(
+                            { ...flyerDatosActivos, tituloTesis: e.target.value },
+                            false
+                          )
+                        }
+                        placeholder="Título completo del trabajo de tesis..."
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
+                      />
+                    </div>
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
@@ -1989,6 +2023,51 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         >
                           Aula II-6
                         </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200/70">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                          Director de Escuela (editable)
+                        </label>
+                        <input
+                          type="text"
+                          value={flyerDatosActivos.directorNombre ?? directorFlyerNombre}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDirectorFlyerNombre(val);
+                            try {
+                              localStorage.setItem('unt_flyer_director_nombre', val);
+                            } catch {}
+                            regenerarFlyerDesdeDatos(
+                              { ...flyerDatosActivos, directorNombre: val },
+                              false
+                            );
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                          Cargo del Director
+                        </label>
+                        <input
+                          type="text"
+                          value={flyerDatosActivos.directorCargo ?? directorFlyerCargo}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDirectorFlyerCargo(val);
+                            try {
+                              localStorage.setItem('unt_flyer_director_cargo', val);
+                            } catch {}
+                            regenerarFlyerDesdeDatos(
+                              { ...flyerDatosActivos, directorCargo: val },
+                              false
+                            );
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs"
+                        />
                       </div>
                     </div>
                   </div>

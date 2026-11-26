@@ -26,6 +26,9 @@ export interface FlyerSustentacionInput {
   directorCargo?: string;
 }
 
+const DEFAULT_DIRECTOR_NOMBRE = 'Ms. Angel Hernández Molina';
+const DEFAULT_DIRECTOR_CARGO = 'Director (e) de Escuela de Ingeniería Industrial';
+
 function loadImageSafe(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -140,11 +143,16 @@ export async function generarFlyerOficialPng(data: FlyerSustentacionInput): Prom
     const headerPatchH = esReprog ? 120 : 122;
     ctx.drawImage(templateImg, 990, 0, 36, headerPatchH, 1052, 0, W - 1052, headerPatchH);
 
-    // Limpiar el año "2026" fijo de la esquina inferior derecha copiando la franja limpia adyacente
-    // para estampar el año real dinámicamente según la fecha elegida (2026, 2027, 2028...)
+    // Limpiar el pie del Director y el año "2026" fijo con una banda uniforme suave sin costuras
+    // (preservando la curva azul inferior izquierda) para que Director y Año se actualicen limpio
     const footerPatchY = esReprog ? 814 : 816;
     const footerPatchH = H - footerPatchY;
-    ctx.drawImage(templateImg, 950, footerPatchY, 32, footerPatchH, 982, footerPatchY, W - 982, footerPatchH);
+    const footerGrad = ctx.createLinearGradient(0, footerPatchY, 0, H);
+    footerGrad.addColorStop(0, '#E8E9EC');
+    footerGrad.addColorStop(0.55, '#D8DADF');
+    footerGrad.addColorStop(1, '#C5C8CE');
+    ctx.fillStyle = footerGrad;
+    ctx.fillRect(140, footerPatchY, W - 140, footerPatchH);
   } else {
     ctx.fillStyle = '#ECEAE6';
     ctx.fillRect(0, 0, W, H);
@@ -160,6 +168,16 @@ export async function generarFlyerOficialPng(data: FlyerSustentacionInput): Prom
     const logoCy = esReprog ? 60 : 62;
     ctx.drawImage(logoInd, logoCx - drawW / 2, logoCy - drawH / 2, drawW, drawH);
   }
+
+  // Estampar Director de Escuela dinámico (centrado en la barra inferior)
+  const dirNombre = String(data.directorNombre || DEFAULT_DIRECTOR_NOMBRE).trim();
+  const dirCargo = String(data.directorCargo || DEFAULT_DIRECTOR_CARGO).trim();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#10107A';
+  ctx.font = '800 24px Poppins, "Segoe UI", Arial, sans-serif';
+  ctx.fillText(dirNombre, 640, 847);
+  ctx.font = '800 23px Poppins, "Segoe UI", Arial, sans-serif';
+  ctx.fillText(dirCargo, 640, 879);
 
   // Estampar el año dinámico en la esquina inferior derecha (se actualiza automáticamente según la fecha)
   const anioDinamico = extraerAnio(data.fechaJueves);
@@ -212,7 +230,7 @@ export async function generarFlyerOficialPng(data: FlyerSustentacionInput): Prom
   const NAVY = '#10107A';
   const FONT_SANS = 'Poppins, "Segoe UI", Arial, sans-serif';
 
-  // 2. TÍTULO DE LA TESIS (Centrado, mayúsculas, azul marino negrita, auto-ajustado sin pisar "Día:")
+  // 2. TÍTULO DE LA TESIS (Grande, notorio, negrita azul marino — escala inteligentemente según longitud)
   const tituloLimpio = String(data.tituloTesis || 'Tesis de Ingeniería Industrial')
     .replace(/^[“""]+|[”""]+$/g, '')
     .trim()
@@ -221,24 +239,45 @@ export async function generarFlyerOficialPng(data: FlyerSustentacionInput): Prom
 
   ctx.textAlign = 'center';
   ctx.fillStyle = NAVY;
-  ctx.font = `800 22px ${FONT_SANS}`;
-  let tituloLines = wrapTextLines(ctx, tituloConComillas, coords.titleMaxW, 3);
-  let titleFontSize = 22;
-  let titleLineHeight = 27;
 
-  if (tituloLines.length >= 3) {
-    titleFontSize = 19;
-    titleLineHeight = 22;
+  // Escala automática para que siempre se vea tan grande y notorio como el flyer oficial:
+  // 1 línea -> 30px | 2 líneas -> 26px | 3 líneas -> 24px (o 22px si es muy largo)
+  const titleMaxW = 1005;
+  let titleFontSize = 30;
+  let titleLineHeight = 34;
+  ctx.font = `800 ${titleFontSize}px ${FONT_SANS}`;
+  let tituloLines = wrapTextLines(ctx, tituloConComillas, titleMaxW, 4);
+
+  if (tituloLines.length === 1) {
+    titleFontSize = 30;
+    titleLineHeight = 34;
+  } else {
+    titleFontSize = 26;
+    titleLineHeight = 30;
     ctx.font = `800 ${titleFontSize}px ${FONT_SANS}`;
-    tituloLines = wrapTextLines(ctx, tituloConComillas, coords.titleMaxW, 3);
+    tituloLines = wrapTextLines(ctx, tituloConComillas, titleMaxW, 4);
+
+    if (tituloLines.length === 3) {
+      titleFontSize = 24;
+      titleLineHeight = 27;
+      ctx.font = `800 ${titleFontSize}px ${FONT_SANS}`;
+      tituloLines = wrapTextLines(ctx, tituloConComillas, titleMaxW, 3);
+    } else if (tituloLines.length >= 4) {
+      titleFontSize = 21;
+      titleLineHeight = 24;
+      ctx.font = `800 ${titleFontSize}px ${FONT_SANS}`;
+      tituloLines = wrapTextLines(ctx, tituloConComillas, titleMaxW, 3);
+    }
   }
+
   const startTitleY =
     tituloLines.length === 1
-      ? coords.titleTopY + 34
+      ? coords.titleTopY + 38
       : tituloLines.length === 2
-      ? coords.titleTopY + 22
-      : coords.titleTopY + 12;
+      ? coords.titleTopY + 24
+      : coords.titleTopY + 18;
 
+  ctx.font = `800 ${titleFontSize}px ${FONT_SANS}`;
   tituloLines.forEach((line, idx) => {
     ctx.fillText(line, coords.titleCenterX, startTitleY + idx * titleLineHeight);
   });
