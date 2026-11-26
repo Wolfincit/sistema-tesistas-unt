@@ -35,7 +35,8 @@ import {
   markNotificationRead,
   dispatchPushNotification,
   runThursdayRemindersCheck,
-  hydratePushStateFromTurso
+  hydratePushStateFromTurso,
+  flushPushTursoWrites
 } from './pushEngine.mjs';
 import { getTursoConfigInfo } from './tursoEngine.mjs';
 import {
@@ -561,9 +562,15 @@ export async function handleApiRequest(req, res) {
   // ======================================================
   // API NOTIFICACIONES WEB PUSH (PWA CELULARES + BANDEJA)
   // ======================================================
+  if (urlObj.pathname.startsWith('/api/push/')) {
+    await hydratePushStateFromTurso(false);
+  }
+
   if (urlObj.pathname === '/api/push/public-key' && req.method === 'GET') {
     try {
-      sendJson(res, 200, getVapidPublicKey());
+      const out = getVapidPublicKey();
+      await flushPushTursoWrites();
+      sendJson(res, 200, out);
     } catch (err) {
       sendJson(res, 500, { error: err.message });
     }
@@ -583,6 +590,7 @@ export async function handleApiRequest(req, res) {
     try {
       const body = await readJsonBody(req);
       const out = registerPushSubscription(body);
+      await flushPushTursoWrites();
       sendJson(res, 200, out);
     } catch (err) {
       sendJson(res, 400, { error: err.message });
@@ -594,6 +602,7 @@ export async function handleApiRequest(req, res) {
     try {
       const body = await readJsonBody(req);
       const out = unregisterPushSubscription(body?.endpoint);
+      await flushPushTursoWrites();
       sendJson(res, 200, out);
     } catch (err) {
       sendJson(res, 400, { error: err.message });
@@ -605,6 +614,7 @@ export async function handleApiRequest(req, res) {
     try {
       const body = await readJsonBody(req);
       const out = await dispatchPushNotification(body || {});
+      await flushPushTursoWrites();
       sendJson(res, 200, out);
     } catch (err) {
       sendJson(res, 400, { error: err.message });
@@ -625,18 +635,21 @@ export async function handleApiRequest(req, res) {
   if (urlObj.pathname === '/api/push/notifications/read' && req.method === 'POST') {
     try {
       const body = await readJsonBody(req);
-      sendJson(res, 200, markNotificationRead(body?.id));
+      const out = markNotificationRead(body?.id);
+      await flushPushTursoWrites();
+      sendJson(res, 200, out);
     } catch (err) {
       sendJson(res, 400, { error: err.message });
     }
     return true;
   }
 
-  if (urlObj.pathname === '/api/push/check-reminders' && req.method === 'POST') {
+  if (urlObj.pathname === '/api/push/check-reminders' && (req.method === 'POST' || req.method === 'GET')) {
     try {
-      const db = await getDbState(false);
+      const db = await getDbState({ forceDrivePull: false });
       const susts = db?.collections?.sustentacionesJueves || [];
       const out = await runThursdayRemindersCheck(susts);
+      await flushPushTursoWrites();
       sendJson(res, 200, out);
     } catch (err) {
       sendJson(res, 500, { error: err.message });

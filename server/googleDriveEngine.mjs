@@ -18,6 +18,7 @@
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -25,10 +26,14 @@ import { isTursoConfigured, tursoGetJson, tursoSetJson } from './tursoEngine.mjs
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const RUNTIME_DIR = process.env.VERCEL
+  ? path.join(os.tmpdir(), 'unt-tesistas-runtime')
+  : __dirname;
+if (!fs.existsSync(RUNTIME_DIR)) fs.mkdirSync(RUNTIME_DIR, { recursive: true });
 
-const DRIVE_CONFIG_PATH = path.join(__dirname, '.drive-config.json');
-const LOCAL_DB_PATH = path.join(__dirname, '.local-db.json');
-const LOCAL_UPLOADS_DIR = path.join(__dirname, '.local-uploads');
+const DRIVE_CONFIG_PATH = path.join(RUNTIME_DIR, '.drive-config.json');
+const LOCAL_DB_PATH = path.join(RUNTIME_DIR, '.local-db.json');
+const LOCAL_UPLOADS_DIR = path.join(RUNTIME_DIR, '.local-uploads');
 const LOCAL_FILES_INDEX_PATH = path.join(LOCAL_UPLOADS_DIR, 'files-index.json');
 
 const DB_FILE_NAME = '_BD_Sistema_Tesistas_UNT.json';

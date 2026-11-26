@@ -11,6 +11,7 @@
 
 import tls from 'node:tls';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sendGoogleOAuthMail } from './googleDriveEngine.mjs';
@@ -19,7 +20,11 @@ const DEFAULT_UNT_EMAIL = 'cchau@unitru.edu.pe';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const EMAIL_CONFIG_PATH = path.join(__dirname, '.email-config.json');
+const RUNTIME_DIR = process.env.VERCEL
+  ? path.join(os.tmpdir(), 'unt-tesistas-runtime')
+  : __dirname;
+if (!fs.existsSync(RUNTIME_DIR)) fs.mkdirSync(RUNTIME_DIR, { recursive: true });
+const EMAIL_CONFIG_PATH = path.join(RUNTIME_DIR, '.email-config.json');
 
 function readEmailConfig() {
   try {

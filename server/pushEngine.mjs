@@ -9,6 +9,7 @@
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -16,11 +17,15 @@ import { isTursoConfigured, tursoGetJson, tursoSetJson } from './tursoEngine.mjs
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const RUNTIME_DIR = process.env.VERCEL
+  ? path.join(os.tmpdir(), 'unt-tesistas-runtime')
+  : __dirname;
+if (!fs.existsSync(RUNTIME_DIR)) fs.mkdirSync(RUNTIME_DIR, { recursive: true });
 
-const VAPID_FILE = path.join(__dirname, '.push-vapid.json');
-const SUBS_FILE = path.join(__dirname, '.push-subscriptions.json');
-const NOTIFS_FILE = path.join(__dirname, '.notificaciones-log.json');
-const REMINDERS_FILE = path.join(__dirname, '.push-reminders-sent.json');
+const VAPID_FILE = path.join(RUNTIME_DIR, '.push-vapid.json');
+const SUBS_FILE = path.join(RUNTIME_DIR, '.push-subscriptions.json');
+const NOTIFS_FILE = path.join(RUNTIME_DIR, '.notificaciones-log.json');
+const REMINDERS_FILE = path.join(RUNTIME_DIR, '.push-reminders-sent.json');
 
 function b64urlEncode(buf) {
   return Buffer.from(buf)
@@ -52,16 +57,28 @@ const TURSO_FILE_MAP = {
   [REMINDERS_FILE]: 'push_reminders_sent'
 };
 
+let pendingTursoPushWrites = [];
+let lastPushHydrateAt = 0;
+
 function writeJson(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
   const tursoKey = TURSO_FILE_MAP[filePath];
   if (tursoKey && isTursoConfigured()) {
-    tursoSetJson(tursoKey, data).catch(() => {});
+    const p = tursoSetJson(tursoKey, data).catch(() => {});
+    pendingTursoPushWrites.push(p);
   }
 }
 
-export async function hydratePushStateFromTurso() {
+export async function flushPushTursoWrites() {
+  if (pendingTursoPushWrites.length === 0) return;
+  const batch = pendingTursoPushWrites.splice(0);
+  await Promise.all(batch);
+}
+
+export async function hydratePushStateFromTurso(force = false) {
   if (!isTursoConfigured()) return false;
+  if (!force && Date.now() - lastPushHydrateAt < 10000) return true;
+  lastPushHydrateAt = Date.now();
   try {
     const [remoteVapid, remoteSubs, remoteNotifs, remoteReminders] = await Promise.all([
       tursoGetJson('push_vapid'),
