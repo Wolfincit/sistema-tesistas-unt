@@ -57,9 +57,13 @@ export const SecretariaColacionTab: React.FC<SecretariaColacionTabProps> = ({
   const [filaUra, setFilaUra] = useState<string>('');
 
   const diasRestantes = useMemo(() => {
-    const limite = new Date(`${configColacion.fechaLimiteCarpeta}T23:59:59`);
-    if (isNaN(limite.getTime())) return null;
-    return Math.ceil((limite.getTime() - Date.now()) / (24 * 3600 * 1000));
+    const raw = String(configColacion.fechaLimiteCarpeta || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+    const [y, m, d] = raw.split('-').map(Number);
+    const hoy = new Date();
+    const hoyMid = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    const limMid = new Date(y, m - 1, d);
+    return Math.round((limMid.getTime() - hoyMid.getTime()) / (24 * 3600 * 1000));
   }, [configColacion.fechaLimiteCarpeta]);
 
   // Incluye expedientes ya en etapa >= 4 (listos para pasar a Ética) y todos los de Bachiller
@@ -148,7 +152,11 @@ export const SecretariaColacionTab: React.FC<SecretariaColacionTabProps> = ({
                 }`}
               >
                 <Clock className="w-3.5 h-3.5" />
-                {diasRestantes >= 0
+                {diasRestantes === 0
+                  ? `Cierre HOY (${configColacion.fechaLimiteCarpeta})`
+                  : diasRestantes === 1
+                  ? `Falta 1 día para cierre (${configColacion.fechaLimiteCarpeta})`
+                  : diasRestantes > 1
                   ? `Faltan ${diasRestantes} días para cierre (${configColacion.fechaLimiteCarpeta})`
                   : `Cierre pasado (${configColacion.fechaLimiteCarpeta})`}
               </span>

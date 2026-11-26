@@ -95,10 +95,13 @@ export const SecretariaHoyTab: React.FC<SecretariaHoyTabProps> = ({
   }, [seguimientos]);
 
   const diasParaColacion = useMemo(() => {
-    if (!configColacion.fechaLimiteCarpeta) return null;
-    const limite = new Date(`${configColacion.fechaLimiteCarpeta}T23:59:59`);
-    if (isNaN(limite.getTime())) return null;
-    return Math.ceil((limite.getTime() - Date.now()) / (24 * 3600 * 1000));
+    const raw = String(configColacion.fechaLimiteCarpeta || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+    const [y, m, d] = raw.split('-').map(Number);
+    const hoy = new Date();
+    const hoyMid = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    const limMid = new Date(y, m - 1, d);
+    return Math.round((limMid.getTime() - hoyMid.getTime()) / (24 * 3600 * 1000));
   }, [configColacion.fechaLimiteCarpeta]);
 
   const enColacionCount = useMemo(
@@ -447,7 +450,11 @@ export const SecretariaHoyTab: React.FC<SecretariaHoyTabProps> = ({
                 <span>
                   Cierre carpeta: <strong>{configColacion.fechaLimiteCarpeta}</strong>
                   {diasParaColacion !== null &&
-                    (diasParaColacion >= 0
+                    (diasParaColacion === 0
+                      ? ' (cierre HOY)'
+                      : diasParaColacion === 1
+                      ? ' (falta 1 día)'
+                      : diasParaColacion > 1
                       ? ` (faltan ${diasParaColacion} días)`
                       : ' (plazo vencido)')}
                 </span>
