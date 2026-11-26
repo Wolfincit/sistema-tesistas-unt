@@ -272,6 +272,46 @@ const STOPWORDS = new Set([
   'porfavor', 'favor', 'gracias', 'quiero', 'saber', 'sobre', 'tesis', 'tramite'
 ]);
 
+const SINONIMOS_COMUNES: Record<string, string[]> = {
+  pago: ['tasas', 'interbank', 'voucher', 'costo'],
+  pagar: ['tasas', 'interbank', 'voucher', 'costo'],
+  pagos: ['tasas', 'interbank', 'voucher', 'costo'],
+  precio: ['tasas', 'interbank', 'costo'],
+  cuanto: ['tasas', 'interbank', 'costo', 'auditorio'],
+  banco: ['interbank', 'tasas', 'codigo'],
+  dinero: ['tasas', 'interbank'],
+  plata: ['tasas', 'interbank'],
+  recibo: ['voucher', 'tasas', 'interbank'],
+  voucher: ['tasas', 'interbank', 'recibo'],
+  jale: ['desaprobado', '30 dias'],
+  jalar: ['desaprobado', '30 dias'],
+  reprobe: ['desaprobado', '30 dias'],
+  desaprobe: ['desaprobado', '30 dias'],
+  cambiar: ['cambio de titulo', 'nueva resolucion'],
+  modificar: ['cambio de titulo', 'nueva resolucion'],
+  plagio: ['turnitin', 'etica', 'originalidad'],
+  similitud: ['turnitin', 'etica', 'originalidad'],
+  subir: ['repositorio', 'ura', 'carpeta'],
+  biblioteca: ['repositorio', 'valerio', 'empastados'],
+  valerio: ['repositorio', 'url'],
+  url: ['repositorio', 'valerio'],
+  enlace: ['repositorio', 'valerio', 'drive'],
+  link: ['repositorio', 'drive', 'ura'],
+  diploma: ['ura', 'colacion', 'sunedu', 'bachiller'],
+  graduacion: ['colacion', 'ceremonia', 'ura'],
+  empastado: ['empastados', 'dictamen', 'biblioteca'],
+  anillado: ['borrador', 'empastados', 'dictamen'],
+  hora: ['horario', 'jueves', 'auditorio'],
+  salon: ['auditorio', 'aula'],
+  aula: ['auditorio', 'jueves'],
+  empezar: ['proyecto', 'asesor', 'paso 1'],
+  inicio: ['proyecto', 'asesor', 'fut'],
+  formato: ['formatos', 'fut', 'drive'],
+  plantilla: ['formatos', 'fut', 'drive'],
+  ingles: ['bachiller', '273'],
+  certificado: ['constancia', 'originalidad', 'ingles']
+};
+
 export interface KbSearchResult {
   encontrado: boolean;
   resultados: OfficialKbEntry[];
@@ -279,13 +319,24 @@ export interface KbSearchResult {
 
 export function buscarEnBaseOficial(consulta: string, faqsDinamicas: FaqItem[] = []): KbSearchResult {
   const qNorm = normalizarTextoKb(consulta);
-  if (qNorm.length < 3) {
+  if (qNorm.length < 2) {
     return { encontrado: false, resultados: [] };
   }
 
-  const tokens = qNorm
+  const rawTokens = qNorm
     .split(' ')
     .filter((t) => t.length >= 2 && !STOPWORDS.has(t));
+
+  // Expandir palabras comunes del estudiante con sinónimos oficiales para orientar mejor
+  const tokensExpandidos = new Set<string>(rawTokens);
+  for (const t of rawTokens) {
+    for (const [clave, syns] of Object.entries(SINONIMOS_COMUNES)) {
+      if (t === clave || (t.length >= 4 && clave.startsWith(t.slice(0, 4)))) {
+        syns.forEach((s) => tokensExpandidos.add(s));
+      }
+    }
+  }
+  const tokens = Array.from(tokensExpandidos);
 
   // Unir base oficial fija + respuestas aprobadas por la Srta. Celia en FAQs
   const faqsAsEntries: OfficialKbEntry[] = faqsDinamicas.map((f) => ({

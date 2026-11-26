@@ -176,6 +176,7 @@ export interface ConfigColacion {
   nombreColacion: string;
   fechaLimiteCarpeta: string; // YYYY-MM-DD
   fechaCeremonia: string;     // YYYY-MM-DD
+  whatsappSecretaria?: string; // Número o enlace wa.me configurado por Secretaría
 }
 
 export interface IngenieroJuradoItem {

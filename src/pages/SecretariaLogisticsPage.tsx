@@ -144,6 +144,12 @@ export const SecretariaLogisticsPage: React.FC = () => {
   });
   const [modalCorreoAbierto, setModalCorreoAbierto] = useState<boolean>(false);
   const [cfgEmailInput, setCfgEmailInput] = useState<string>('cchau@unitru.edu.pe');
+  const [cfgWhatsappInput, setCfgWhatsappInput] = useState<string>(() =>
+    logisticaSecretariaService.getConfigColacion().whatsappSecretaria || ''
+  );
+  useEffect(() => {
+    setCfgWhatsappInput(configColacion.whatsappSecretaria || '');
+  }, [configColacion.whatsappSecretaria]);
   const [conectandoGoogleMail, setConectandoGoogleMail] = useState<boolean>(false);
 
   const handleAutorizarCorreoGoogle = async () => {
@@ -3551,7 +3557,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 bg-[#082F64] text-white flex items-center justify-between">
-              <h3 className="text-sm font-bold">Vincular Mi Correo</h3>
+              <h3 className="text-sm font-bold">Vincular Mi Correo y WhatsApp</h3>
               <button
                 type="button"
                 onClick={() => setModalCorreoAbierto(false)}
@@ -3570,8 +3576,21 @@ export const SecretariaLogisticsPage: React.FC = () => {
                     senderName: cfgNameInput
                   });
                   setEmailStatus(st);
+                  const waLimpio = cfgWhatsappInput.trim();
+                  const nuevaConfigColacion: ConfigColacion = {
+                    ...configColacion,
+                    whatsappSecretaria: waLimpio
+                  };
+                  setConfigColacion(nuevaConfigColacion);
+                  await logisticaSecretariaService.saveConfigColacion(nuevaConfigColacion);
                   setModalCorreoAbierto(false);
-                  agregarToast('success', 'Correo Institucional Vinculado', `Remitente activo: ${st.senderEmail}`);
+                  agregarToast(
+                    'success',
+                    'Configuración guardada',
+                    waLimpio
+                      ? `Correo (${st.senderEmail}) y WhatsApp de Secretaría actualizados.`
+                      : `Remitente activo: ${st.senderEmail}`
+                  );
                 } catch (err: any) {
                   agregarToast('error', 'Error', err.message);
                 }
@@ -3629,6 +3648,23 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 />
               </div>
 
+              <div className="pt-2 border-t border-slate-100">
+                <label className="block font-bold text-emerald-800 mb-1 flex items-center gap-1.5">
+                  <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>WhatsApp de Atención al Tesista (opcional):</span>
+                </label>
+                <input
+                  type="text"
+                  value={cfgWhatsappInput}
+                  onChange={(e) => setCfgWhatsappInput(e.target.value)}
+                  placeholder="Ej. 948123456 o https://wa.me/51948123456"
+                  className="w-full p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/30 font-mono"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Aparecerá en el Asistente de Dudas junto a la advertencia de leer primero todos los pasos antes de escribir.
+                </p>
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
@@ -3641,7 +3677,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold cursor-pointer"
                 >
-                  Guardar correo
+                  Guardar cambios
                 </button>
               </div>
             </form>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   buscarEnBaseOficial,
   OFFICIAL_KB_ENTRIES,
@@ -11,10 +11,10 @@ import {
   Sparkles,
   BookCheck,
   ExternalLink,
-  Send,
-  CheckCircle2,
   X,
-  HelpCircle
+  HelpCircle,
+  MessageCircle,
+  AlertTriangle
 } from 'lucide-react';
 
 interface AsistentePredictivoOficialProps {
@@ -23,17 +23,45 @@ interface AsistentePredictivoOficialProps {
   preguntasSugeridasIds?: string[];
 }
 
+export function normalizarUrlWhatsappSecretaria(raw?: string): string {
+  const val = String(raw || '').trim();
+  if (!val) return '';
+  if (/^https?:\/\/(wa\.me|api\.whatsapp\.com|web\.whatsapp\.com)\//i.test(val)) {
+    return val;
+  }
+  const digits = val.replace(/\D/g, '');
+  if (!digits) return '';
+  const conPais = digits.length === 9 ? `51${digits}` : digits;
+  return `https://wa.me/${conPais}`;
+}
+
+const TEMAS_RAPIDOS = [
+  { label: 'Pagos Interbank', query: 'tasas interbank' },
+  { label: 'Proyecto y Asesor', query: 'proyecto asesor' },
+  { label: 'Jurado Evaluador', query: 'jurado' },
+  { label: 'Turnitin y Ética', query: 'turnitin etica' },
+  { label: 'Repositorio UNT', query: 'repositorio valerio' },
+  { label: 'URA y Colación', query: 'ura colacion' },
+  { label: 'Bachiller', query: 'bachiller' },
+  { label: 'Cambio de Título', query: 'cambio de titulo' }
+];
+
 export const AsistentePredictivoOficial: React.FC<AsistentePredictivoOficialProps> = ({
   codigoMatricula,
-  tesistaNombre,
   preguntasSugeridasIds
 }) => {
-  const { faqs, agregarToast } = useApp();
+  const { faqs, cargando } = useApp();
   const [consulta, setConsulta] = useState<string>('');
   const [seleccionada, setSeleccionada] = useState<OfficialKbEntry | null>(null);
-  const [dudaEnviada, setDudaEnviada] = useState<boolean>(false);
-  const [enviandoDuda, setEnviandoDuda] = useState<boolean>(false);
-  const [matriculaManual, setMatriculaManual] = useState<string>(codigoMatricula || '');
+  const [whatsappUrl, setWhatsappUrl] = useState<string>(() =>
+    normalizarUrlWhatsappSecretaria(logisticaSecretariaService.getConfigColacion().whatsappSecretaria)
+  );
+
+  // Refrescar el enlace de WhatsApp cuando termine de sincronizar la BD remota (Turso)
+  useEffect(() => {
+    const cfg = logisticaSecretariaService.getConfigColacion();
+    setWhatsappUrl(normalizarUrlWhatsappSecretaria(cfg.whatsappSecretaria));
+  }, [cargando]);
 
   const sugeridas = useMemo(() => {
     const ids =
@@ -53,31 +81,9 @@ export const AsistentePredictivoOficial: React.FC<AsistentePredictivoOficialProp
   }, [preguntasSugeridasIds]);
 
   const busquedaRes = useMemo(() => {
-    if (consulta.trim().length < 3) return null;
+    if (consulta.trim().length < 2) return null;
     return buscarEnBaseOficial(consulta, faqs);
   }, [consulta, faqs]);
-
-  const handleEnviarASecretaria = async () => {
-    const texto = consulta.trim();
-    if (texto.length < 5) return;
-    setEnviandoDuda(true);
-    try {
-      await logisticaSecretariaService.registrarDudaTesista({
-        codigoMatricula: codigoMatricula || matriculaManual,
-        tesistaNombre,
-        pregunta: texto,
-        categoriaSugerida: 'Trámite'
-      });
-      setDudaEnviada(true);
-      agregarToast(
-        'success',
-        'Consulta enviada a Secretaría',
-        'La Srta. Celia la revisará y te llegará un aviso automático cuando responda.'
-      );
-    } finally {
-      setEnviandoDuda(false);
-    }
-  };
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs space-y-4">
@@ -91,13 +97,13 @@ export const AsistentePredictivoOficial: React.FC<AsistentePredictivoOficialProp
               Asistente Oficial de Dudas de Tesis
             </h3>
             <p className="text-xs text-slate-500">
-              Respuestas verificadas de las Guías Oficiales de la Escuela (Drive) y Secretaría — nunca inventa montos ni pasos.
+              Escribe una palabra común (pagos, Turnitin, jurado, repositorio, URA, bachiller...) y consulta las guías oficiales.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Buscador predictivo */}
+      {/* Buscador orientativo por palabras comunes */}
       <div className="relative">
         <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
         <input
@@ -106,9 +112,8 @@ export const AsistentePredictivoOficial: React.FC<AsistentePredictivoOficialProp
           onChange={(e) => {
             setConsulta(e.target.value);
             setSeleccionada(null);
-            setDudaEnviada(false);
           }}
-          placeholder="Escribe tu duda (ej. cuánto cuesta el auditorio, Turnitin, cambio de título, Bachiller, URA...)"
+          placeholder="Busca por palabra clave (ej. pagos, auditorio, Turnitin, cambio de título, Bachiller, URA...)"
           className="w-full pl-10 pr-9 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-[#082F64] focus:outline-hidden text-xs sm:text-sm font-medium text-slate-800"
         />
         {consulta && (
@@ -117,7 +122,6 @@ export const AsistentePredictivoOficial: React.FC<AsistentePredictivoOficialProp
             onClick={() => {
               setConsulta('');
               setSeleccionada(null);
-              setDudaEnviada(false);
             }}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
           >
@@ -222,51 +226,59 @@ export const AsistentePredictivoOficial: React.FC<AsistentePredictivoOficialProp
         </div>
       )}
 
-      {/* Si NO existe en la base oficial: NO inventar, derivar 1 sola vez a Srta. Celia */}
+      {/* Si no coincide con lo escrito: orientar con temas comunes */}
       {busquedaRes && !busquedaRes.encontrado && (
-        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-3 animate-in fade-in">
-          {dudaEnviada ? (
-            <div className="flex items-center gap-2.5 text-emerald-900 text-xs font-bold">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span>
-                ¡Listo! Enviamos tu duda a la Srta. Celia. Cuando la responda, quedará publicada en Preguntas Frecuentes y recibirás el aviso en tu celular.
-              </span>
+        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 animate-in fade-in">
+          <div className="flex items-start gap-2">
+            <HelpCircle className="w-4 h-4 text-[#082F64] shrink-0 mt-0.5" />
+            <div className="text-xs text-slate-700">
+              <strong>No encontramos resultados con esa palabra.</strong> Prueba tocando uno de los temas comunes:
             </div>
-          ) : (
-            <>
-              <div className="flex items-start gap-2.5">
-                <HelpCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-                <div className="text-xs text-amber-950">
-                  <strong>No encontré esta consulta exacta en las guías oficiales.</strong> Para no darte datos incorrectos, puedes enviársela directo a la Srta. Celia y su respuesta oficial se guardará aquí:
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                {!codigoMatricula && (
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={10}
-                    value={matriculaManual}
-                    onChange={(e) => setMatriculaManual(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    placeholder="Tu matrícula (10 dígitos, opcional)"
-                    className="sm:w-56 px-3 py-2 rounded-xl border border-amber-300 bg-white text-xs font-mono font-bold text-slate-800"
-                  />
-                )}
-                <button
-                  type="button"
-                  disabled={enviandoDuda}
-                  onClick={handleEnviarASecretaria}
-                  className="px-4 py-2 rounded-xl bg-[#082F64] hover:bg-[#0C4D96] disabled:opacity-50 text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Send className="w-3.5 h-3.5 text-amber-300" />
-                  <span>{enviandoDuda ? 'Enviando...' : 'Enviar consulta a Secretaría'}</span>
-                </button>
-              </div>
-            </>
-          )}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {TEMAS_RAPIDOS.map((tema) => (
+              <button
+                key={tema.label}
+                type="button"
+                onClick={() => setConsulta(tema.query)}
+                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-[#082F64] hover:text-[#082F64] text-[11px] font-bold text-slate-700 cursor-pointer transition-colors"
+              >
+                {tema.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
+
+      {/* Bloque de WhatsApp directo a Secretaría con advertencia previa obligatoria */}
+      <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-start gap-2.5 text-xs text-amber-950">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div className="leading-relaxed">
+            <strong className="text-amber-950">Lee primero todos los pasos y procedimientos antes de consultar.</strong>{' '}
+            <span className="text-amber-900">
+              La mayoría de dudas sobre pagos, formatos, Turnitin, Repositorio y URA ya están respondidas aquí. Escribe a Secretaría únicamente si tu caso puntual no figura en las guías.
+            </span>
+          </div>
+        </div>
+
+        {whatsappUrl ? (
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-xs shrink-0 transition-colors"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span>WhatsApp Secretaría</span>
+          </a>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-amber-200 text-[11px] font-semibold text-amber-900 shrink-0">
+            <MessageCircle className="w-3.5 h-3.5 text-slate-400" />
+            <span>WhatsApp aún no configurado</span>
+          </span>
+        )}
+      </div>
     </div>
   );
 };
