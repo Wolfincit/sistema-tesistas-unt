@@ -81,6 +81,11 @@ export function formatearFechaOficialFlyer(iso: string): string {
   return `${dias[dt.getDay()]} ${d} de ${meses[(m - 1) % 12]} de ${y}`;
 }
 
+function extraerAnio(iso: string): string {
+  if (iso && /^\d{4}/.test(iso)) return iso.slice(0, 4);
+  return String(new Date().getFullYear());
+}
+
 function drawFittedSingleLine(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -129,25 +134,39 @@ export async function generarFlyerOficialPng(data: FlyerSustentacionInput): Prom
   // 1. DIBUJAR LA PLANTILLA REAL OFICIAL DE LA ESCUELA A RESOLUCIÓN COMPLETA
   if (templateImg) {
     ctx.drawImage(templateImg, 0, 0, W, H);
+
+    // Limpiar la zona del logo superior derecho copiando una franja limpia exacta de la cabecera
+    // para que no quede ningún rastro ni deformación debajo del logo real transparente
+    const headerPatchH = esReprog ? 120 : 122;
+    ctx.drawImage(templateImg, 990, 0, 36, headerPatchH, 1052, 0, W - 1052, headerPatchH);
+
+    // Limpiar el año "2026" fijo de la esquina inferior derecha copiando la franja limpia adyacente
+    // para estampar el año real dinámicamente según la fecha elegida (2026, 2027, 2028...)
+    const footerPatchY = esReprog ? 814 : 816;
+    const footerPatchH = H - footerPatchY;
+    ctx.drawImage(templateImg, 950, footerPatchY, 32, footerPatchH, 982, footerPatchY, W - 982, footerPatchH);
   } else {
     ctx.fillStyle = '#ECEAE6';
     ctx.fillRect(0, 0, W, H);
   }
 
-  // Superponer el logo real nítido de Ingeniería Industrial UNT en la esquina superior derecha
+  // Superponer el logo real transparente de Ingeniería Industrial UNT respetando su proporción exacta (sin recortar dientes ni deformar)
   if (logoInd) {
+    const natW = logoInd.naturalWidth || 242;
+    const natH = logoInd.naturalHeight || 250;
+    const drawH = 118;
+    const drawW = Math.round(drawH * (natW / natH));
     const logoCx = 1125;
-    const logoCy = esReprog ? 58 : 60;
-    const logoR = 49;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(logoCx, logoCy, logoR, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fill();
-    ctx.clip();
-    ctx.drawImage(logoInd, logoCx - logoR, logoCy - logoR, logoR * 2, logoR * 2);
-    ctx.restore();
+    const logoCy = esReprog ? 60 : 62;
+    ctx.drawImage(logoInd, logoCx - drawW / 2, logoCy - drawH / 2, drawW, drawH);
   }
+
+  // Estampar el año dinámico en la esquina inferior derecha (se actualiza automáticamente según la fecha)
+  const anioDinamico = extraerAnio(data.fechaJueves);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#4B5598';
+  ctx.font = '800 74px Poppins, "Segoe UI", Arial, sans-serif';
+  ctx.fillText(anioDinamico, 1178, 878);
 
   // Coordenadas medidas al píxel exacto sobre cada plantilla 1200x896
   const coords = esReprog
