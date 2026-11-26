@@ -1026,6 +1026,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
             ...s,
             fechaSustentacionProgramada: fechaJuevesActiva,
             estacionActual: 4 as EstacionLogisticaId,
+            asesor: calAsesor.trim() || s.asesor,
             juradoPresidente: calPresidente,
             juradoSecretario: calSecretario,
             juradoVocal: calVocal
@@ -1592,6 +1593,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
                             <span className="px-1.5 py-0.5 rounded bg-slate-100 truncate max-w-[140px]">
                               <strong>J3:</strong> {item.juradoVocal}
                             </span>
+                            {item.asesor && (
+                              <span className="px-1.5 py-0.5 rounded bg-blue-50 text-[#082F64] truncate max-w-[160px]">
+                                <strong>Asesor:</strong> {item.asesor}
+                              </span>
+                            )}
                           </div>
                         </td>
 
@@ -2809,7 +2815,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Jurado 1:</label>
                   <input
@@ -2835,6 +2841,16 @@ export const SecretariaLogisticsPage: React.FC = () => {
                     value={calVocal}
                     onChange={(e) => setCalVocal(e.target.value)}
                     className="w-full p-2 rounded-lg border border-slate-300 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[#082F64] mb-1">Asesor:</label>
+                  <input
+                    list="lista-ingenieros-unt"
+                    value={calAsesor}
+                    onChange={(e) => setCalAsesor(e.target.value)}
+                    placeholder="Nombre del docente asesor"
+                    className="w-full p-2 rounded-lg border border-blue-200 bg-white"
                   />
                 </div>
                 <datalist id="lista-ingenieros-unt">
@@ -3073,11 +3089,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Jurado 1:</label>
                   <input
-                    list="lista-ingenieros-unt"
+                    list="lista-ingenieros-modal"
                     value={formPresidente}
                     onChange={(e) => setFormPresidente(e.target.value)}
                     className="w-full p-2 rounded-xl border border-slate-300"
@@ -3086,7 +3102,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Jurado 2:</label>
                   <input
-                    list="lista-ingenieros-unt"
+                    list="lista-ingenieros-modal"
                     value={formSecretario}
                     onChange={(e) => setFormSecretario(e.target.value)}
                     className="w-full p-2 rounded-xl border border-slate-300"
@@ -3095,12 +3111,27 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Jurado 3:</label>
                   <input
-                    list="lista-ingenieros-unt"
+                    list="lista-ingenieros-modal"
                     value={formVocal}
                     onChange={(e) => setFormVocal(e.target.value)}
                     className="w-full p-2 rounded-xl border border-slate-300"
                   />
                 </div>
+                <div>
+                  <label className="block font-bold text-[#082F64] mb-1">Asesor:</label>
+                  <input
+                    list="lista-ingenieros-modal"
+                    value={formAsesor}
+                    onChange={(e) => setFormAsesor(e.target.value)}
+                    placeholder="Nombre del docente asesor"
+                    className="w-full p-2 rounded-xl border border-blue-200 bg-blue-50/20"
+                  />
+                </div>
+                <datalist id="lista-ingenieros-modal">
+                  {directorioJurado.map((ing) => (
+                    <option key={ing.id} value={ing.nombre} />
+                  ))}
+                </datalist>
               </div>
 
               <div>
