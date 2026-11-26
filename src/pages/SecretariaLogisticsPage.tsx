@@ -706,6 +706,73 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const asuntoInputRef = useRef<HTMLInputElement | null>(null);
   const mensajeTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const copiarImagenFlyerPortapapeles = async (): Promise<boolean> => {
+    if (!flyerPreview) return false;
+    try {
+      const resp = await fetch(flyerPreview);
+      const blob = await resp.blob();
+      const pngBlob = blob.type === 'image/png' ? blob : new Blob([blob], { type: 'image/png' });
+      if (navigator.clipboard && typeof window.ClipboardItem !== 'undefined') {
+        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': pngBlob })]);
+        return true;
+      }
+    } catch {
+      // Navegador sin ClipboardItem de imagen
+    }
+    return false;
+  };
+
+  const handleAbrirWhatsAppConFlyer = async () => {
+    const textoFinal = mensajeChat.trim() || whatsappDocentesTexto;
+    // 1. En celulares / tablets (PWA), intentar compartir nativamente IMAGEN + TEXTO juntos a WhatsApp
+    if (flyerPreview && typeof navigator.share === 'function' && typeof navigator.canShare === 'function') {
+      try {
+        const resp = await fetch(flyerPreview);
+        const blob = await resp.blob();
+        const file = new File([blob], flyerNombre || 'Flyer_Sustentacion_UNT.png', {
+          type: blob.type || 'image/png'
+        });
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: asuntoChat,
+            text: textoFinal
+          });
+          return;
+        }
+      } catch {
+        // Si canceló o no soportó archivos, continúa al flujo de PC
+      }
+    }
+
+    // 2. En PC (Windows): copiar el Flyer PNG al portapapeles y abrir WhatsApp Web con el texto pre-cargado
+    // (WhatsApp Web no permite adjuntar imágenes por URL; con Ctrl+V la pega al instante junto al texto)
+    const imagenCopiada = await copiarImagenFlyerPortapapeles();
+    if (!imagenCopiada && textoFinal) {
+      navigator.clipboard?.writeText(textoFinal).catch(() => {});
+    }
+
+    window.open(
+      `https://web.whatsapp.com/send?text=${encodeURIComponent(textoFinal)}`,
+      '_blank',
+      'noopener,noreferrer'
+    );
+
+    if (imagenCopiada) {
+      agregarToast(
+        'success',
+        'Flyer copiado al portapapeles',
+        'En WhatsApp Web solo presiona Ctrl + V para adjuntar la imagen junto al texto.'
+      );
+    } else {
+      agregarToast(
+        'info',
+        'WhatsApp Web abierto',
+        'El texto ya va cargado; adjunta el flyer con "Descargar para Facebook".'
+      );
+    }
+  };
+
   const insertarIconoEnCursor = (
     el: HTMLInputElement | HTMLTextAreaElement | null,
     valorActual: string,
@@ -2281,46 +2348,49 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   )}
                 </div>
 
-                {(mensajeChat.trim() || whatsappDocentesTexto) && (
+                {(mensajeChat.trim() || whatsappDocentesTexto || flyerPreview) && (
                   <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-emerald-900">
                       <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span className="font-bold">
-                        Listo para WhatsApp (usa exactamente tu texto de abajo con todos sus íconos)
+                        WhatsApp: al abrir se copia el flyer (en PC solo pega con Ctrl + V junto al texto)
                       </span>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {flyerPreview && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const ok = await copiarImagenFlyerPortapapeles();
+                            if (ok) {
+                              agregarToast('success', 'Imagen copiada', 'Pega el flyer en WhatsApp con Ctrl + V.');
+                            } else {
+                              agregarToast('warning', 'Descarga la imagen', 'Tu navegador bloqueó copiar imagen; usa "Descargar para Facebook".');
+                            }
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 font-bold cursor-pointer"
+                        >
+                          Copiar imagen
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
                           const textoFinal = mensajeChat.trim() || whatsappDocentesTexto;
                           navigator.clipboard?.writeText(textoFinal);
-                          agregarToast('success', 'Copiado con íconos intactos', 'Pega en WhatsApp con Ctrl + V.');
+                          agregarToast('success', 'Texto copiado', 'Pega en WhatsApp con Ctrl + V.');
                         }}
                         className="px-2.5 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 font-bold cursor-pointer"
                       >
-                        Copiar texto (Ctrl+V)
+                        Copiar texto
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          const textoFinal = mensajeChat.trim() || whatsappDocentesTexto;
-                          navigator.clipboard?.writeText(textoFinal).catch(() => {});
-                          window.open(
-                            `https://web.whatsapp.com/send?text=${encodeURIComponent(textoFinal)}`,
-                            '_blank',
-                            'noopener,noreferrer'
-                          );
-                          agregarToast(
-                            'info',
-                            'WhatsApp Web abierto',
-                            'También se copió al portapapeles por si prefieres pegarlo con Ctrl + V.'
-                          );
-                        }}
+                        onClick={handleAbrirWhatsAppConFlyer}
                         className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold inline-flex items-center gap-1 cursor-pointer"
                       >
                         <MessageCircle className="w-3.5 h-3.5" />
-                        <span>Abrir en WhatsApp Web</span>
+                        <span>Abrir WhatsApp + Flyer</span>
                       </button>
                     </div>
                   </div>
