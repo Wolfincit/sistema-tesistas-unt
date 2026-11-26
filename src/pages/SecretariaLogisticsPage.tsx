@@ -754,18 +754,16 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [anioCalendario, setAnioCalendario] = useState<number>(2026);
   const [fechaJuevesActiva, setFechaJuevesActiva] = useState<string>('2026-11-26');
 
-  const [calTesistaId, setCalTesistaId] = useState<string>('seg-001');
-  const [calTesistaNombre, setCalTesistaNombre] = useState<string>('Carlos Eduardo Mendoza Villanueva');
-  const [calTesistaCodigo, setCalTesistaCodigo] = useState<string>('1021400219');
-  const [calTesistaCorreo, setCalTesistaCorreo] = useState<string>('tesista.industrial@unitru.edu.pe');
-  const [calTituloTesis, setCalTituloTesis] = useState<string>(
-    'Propuesta de mejora en la gestión logística de almacenes mediante Lean Warehousing para reducir costos operativos en una empresa agroindustrial de La Libertad, 2026'
-  );
-  const [calAsesor, setCalAsesor] = useState<string>('Dr. Ing. Joe Alexis González Vásquez');
-  const [calPresidente, setCalPresidente] = useState<string>('Dr. Ing. Ángel Hernández Molina');
-  const [calSecretario, setCalSecretario] = useState<string>('Mg. Ing. Carlos José Sandoval Reyes');
-  const [calVocal, setCalVocal] = useState<string>('Dr. Ing. Joe Alexis González Vásquez');
-  const [calHorario, setCalHorario] = useState<string>('11:00 a.m. - 01:00 p.m.');
+  const [calTesistaId, setCalTesistaId] = useState<string>('');
+  const [calTesistaNombre, setCalTesistaNombre] = useState<string>('');
+  const [calTesistaCodigo, setCalTesistaCodigo] = useState<string>('');
+  const [calTesistaCorreo, setCalTesistaCorreo] = useState<string>('');
+  const [calTituloTesis, setCalTituloTesis] = useState<string>('');
+  const [calAsesor, setCalAsesor] = useState<string>('');
+  const [calPresidente, setCalPresidente] = useState<string>('');
+  const [calSecretario, setCalSecretario] = useState<string>('');
+  const [calVocal, setCalVocal] = useState<string>('');
+  const [calHorario, setCalHorario] = useState<string>('11:00 a.m.');
 
   const seleccionarFechaCalendario = (fechaIso: string) => {
     setFechaJuevesActiva(fechaIso);

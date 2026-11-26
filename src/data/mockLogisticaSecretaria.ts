@@ -290,115 +290,43 @@ export interface DespachoChatAnuncioItem {
 
 export const INITIAL_DIRECTORIO_JURADO: IngenieroJuradoItem[] = [
   {
-    id: 'ing-01',
-    nombre: 'Dr. Ing. Ángel Hernández Molina',
-    correo: 'ahernandezm@unitru.edu.pe',
-    especialidad: 'Producción, Operaciones y Lean Manufacturing',
-    categoria: 'Docente Principal',
+    id: 'ing-prueba-01',
+    nombre: 'Jurado de Prueba 1',
+    correo: 'gicasasas@unitru.edu.pe',
+    especialidad: 'Correo de prueba — Ingeniería Industrial',
+    categoria: 'Prueba',
     activo: true
   },
   {
-    id: 'ing-02',
-    nombre: 'Mg. Ing. Carlos José Sandoval Reyes',
-    correo: 'csandovalr@unitru.edu.pe',
-    especialidad: 'Gestión de la Calidad y Six Sigma',
-    categoria: 'Docente Asociado',
-    activo: true
-  },
-  {
-    id: 'ing-03',
-    nombre: 'Dr. Ing. Joe Alexis González Vásquez',
-    correo: 'jgonzalezv@unitru.edu.pe',
-    especialidad: 'Logística y Cadena de Suministro',
-    categoria: 'Docente Principal',
-    activo: true
-  },
-  {
-    id: 'ing-04',
-    nombre: 'Dr. Ing. José Manuel Castañeda Meléndez',
-    correo: 'jcastanedam@unitru.edu.pe',
-    especialidad: 'Gestión Estratégica y Proyectos Industriales',
-    categoria: 'Docente Principal',
-    activo: true
-  },
-  {
-    id: 'ing-05',
-    nombre: 'Mg. Ing. Víctor Manuel Sirlopú Vera',
-    correo: 'vsirlopuv@unitru.edu.pe',
-    especialidad: 'Seguridad Industrial y Salud Ocupacional',
-    categoria: 'Docente Asociado',
-    activo: true
-  },
-  {
-    id: 'ing-06',
-    nombre: 'Dr. Ing. Luis Alberto Benites Gutiérrez',
-    correo: 'lbenitesg@unitru.edu.pe',
-    especialidad: 'Ingeniería de Métodos y Ergonomía',
-    categoria: 'Docente Principal',
-    activo: true
-  },
-  {
-    id: 'ing-07',
-    nombre: 'Mg. Ing. Marcos Gregorio Baca López',
-    correo: 'mbacal@unitru.edu.pe',
-    especialidad: 'Planeamiento y Control de Operaciones',
-    categoria: 'Docente Asociado',
-    activo: true
-  },
-  {
-    id: 'ing-08',
-    nombre: 'Mg. Ing. Billy Alexis Ángeles Rojas',
-    correo: 'bangelesr@unitru.edu.pe',
-    especialidad: 'Automatización y Procesos Industriales',
-    categoria: 'Docente Auxiliar',
-    activo: true
-  },
-  {
-    id: 'adm-01',
-    nombre: 'Sr. Elmo (Encargado de Auditorio)',
-    correo: 'auditorio.industrial@unitru.edu.pe',
-    especialidad: 'Apertura de Auditorio Jueves 11:00 a.m.',
-    categoria: 'Copia Martes',
-    activo: true
-  },
-  {
-    id: 'adm-02',
-    nombre: 'Sra. Estela (Departamento Académico)',
-    correo: 'departamento.industrial@unitru.edu.pe',
-    especialidad: 'Difusión a Grupo de Docentes',
-    categoria: 'Copia Martes',
-    activo: true
-  },
-  {
-    id: 'adm-03',
-    nombre: 'Sra. Rosita (Coordinación Administrativa)',
-    correo: 'coordinacion.industrial@unitru.edu.pe',
-    especialidad: 'Conocimiento Administrativo',
-    categoria: 'Copia Martes',
+    id: 'ing-prueba-02',
+    nombre: 'Jurado de Prueba 2 (Carlos)',
+    correo: 'cdchavezas@unitru.edu.pe',
+    especialidad: 'Correo de prueba — Ingeniería Industrial',
+    categoria: 'Prueba',
     activo: true
   }
 ];
 
 export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
   {
-    id: 'seg-001',
-    codigoMatricula: '1511300223',
-    tesistaNombre: 'Carlos Eduardo Mendoza Villanueva',
-    tesistaCorreo: 'tesista.industrial@unitru.edu.pe',
-    tesistaTelefono: '948123456',
-    tituloTesis: 'Propuesta de mejora en la gestión de almacenes mediante Lean Warehousing para reducir costos operativos en una empresa agroindustrial de La Libertad, 2026',
-    lineaInvestigacion: 'Logística y Cadena de Suministro',
-    asesor: 'Dr. Ing. Joe Alexis González Vásquez',
-    juradoPresidente: 'Dr. Ing. Ángel Hernández Molina',
-    juradoSecretario: 'Mg. Ing. Carlos José Sandoval Reyes',
-    juradoVocal: 'Dr. Ing. Joe Alexis González Vásquez',
+    id: 'seg-prueba-01',
+    codigoMatricula: '1511300999',
+    tesistaNombre: 'Tesista de Prueba',
+    tesistaCorreo: 'jpmirandava@unitru.edu.pe',
+    tesistaTelefono: '',
+    tituloTesis: 'Propuesta de mejora de procesos industriales (Registro de Prueba)',
+    lineaInvestigacion: 'Ingeniería Industrial',
+    asesor: 'Jurado de Prueba 2 (Carlos)',
+    juradoPresidente: 'Jurado de Prueba 1',
+    juradoSecretario: 'Jurado de Prueba 2 (Carlos)',
+    juradoVocal: 'Jurado de Prueba 1',
     estacionActual: 4,
     semaforo: 'operativo',
-    fechaIngresoEstacion: '2026-11-18',
-    fechaInicioTramite: '2026-10-15',
-    ubicacionFisica: 'Auditorio Ing. Industrial',
+    fechaIngresoEstacion: '2026-11-26',
+    fechaInicioTramite: '2026-11-20',
+    ubicacionFisica: 'Auditorio de la Escuela de Ingeniería Industrial',
     esCuelloBotellaExterno: false,
-    notasSecretaria: 'Dictamen firmado y 4 empastados entregados. Programado Jueves 11:00 a.m. en Auditorio.',
+    notasSecretaria: 'Registro seguro para pruebas de envío de flyers y notificaciones.',
     fechaSustentacionProgramada: '2026-11-26',
     requisitosFisicos: {
       futFisico: true,
@@ -408,147 +336,27 @@ export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [
       resolucionProyecto: true,
       tresBorradoresJurado: true
     }
-  },
-  {
-    id: 'seg-002',
-    codigoMatricula: '1511300315',
-    tesistaNombre: 'Melina Nayhely Quiñones Mostacero',
-    tesistaCorreo: 'mquinones@unitru.edu.pe',
-    tesistaTelefono: '944987321',
-    tituloTesis: 'Implementación de la metodología Lean Manufacturing en el proceso de arándano para aumentar la productividad de la empresa Agrícola Cerro Prieto S.A.',
-    lineaInvestigacion: 'Producción y Operaciones',
-    asesor: 'Dr. Ing. Ángel Hernández Molina',
-    juradoPresidente: 'Dr. Ing. José Manuel Castañeda Meléndez',
-    juradoSecretario: 'Mg. Ing. Víctor Manuel Sirlopú Vera',
-    juradoVocal: 'Dr. Ing. Ángel Hernández Molina',
-    estacionActual: 3,
-    semaforo: 'atencion',
-    fechaIngresoEstacion: '2026-10-20',
-    fechaInicioTramite: '2026-10-08',
-    ubicacionFisica: 'En revisión del Jurado (Plazo 10 días)',
-    esCuelloBotellaExterno: true,
-    motivoRetrasoExterno: 'En revisión del Jurado Evaluador.',
-    notasSecretaria: 'Jurado 1 y Jurado 3 aprobaron; falta firma de Jurado 2 en el Dictamen físico.',
-    requisitosFisicos: {
-      futFisico: true,
-      voucherTupa: true,
-      reporteTurnitin: true,
-      constanciaPracticas: true,
-      resolucionProyecto: true,
-      tresBorradoresJurado: true
-    }
-  },
-  {
-    id: 'seg-003',
-    codigoMatricula: '1511300342',
-    tesistaNombre: 'Neiser Michel Salas Ríos',
-    tesistaCorreo: 'nsalas@unitru.edu.pe',
-    tesistaTelefono: '949555812',
-    tituloTesis: 'Diseño de un sistema de gestión de seguridad y salud en el trabajo basado en ISO 45001 para reducir riesgos laborales en planta metalmecánica, Trujillo',
-    lineaInvestigacion: 'Seguridad y Salud Ocupacional',
-    asesor: 'Mg. Ing. Víctor Manuel Sirlopú Vera',
-    juradoPresidente: 'Dr. Ing. Luis Alberto Benites Gutiérrez',
-    juradoSecretario: 'Mg. Ing. Marcos Gregorio Baca López',
-    juradoVocal: 'Mg. Ing. Víctor Manuel Sirlopú Vera',
-    estacionActual: 2,
-    semaforo: 'incidencia',
-    fechaIngresoEstacion: '2026-11-08',
-    fechaInicioTramite: '2026-11-07',
-    ubicacionFisica: 'Observado por Cambio de Título',
-    esCuelloBotellaExterno: true,
-    motivoRetrasoExterno: 'Trámite de Cambio de Título en Decanato.',
-    notasSecretaria: 'Jurado observó el título. Debe ingresar FUT + S/ 5.00 + carta del jurado para nueva resolución antes de sustentar.',
-    requisitosFisicos: {
-      futFisico: true,
-      voucherTupa: true,
-      reporteTurnitin: true,
-      constanciaPracticas: true,
-      resolucionProyecto: true,
-      tresBorradoresJurado: true
-    }
-  },
-  {
-    id: 'seg-004',
-    codigoMatricula: '1511300418',
-    tesistaNombre: 'Diego Alonso Carranza Vásquez',
-    tesistaCorreo: 'dcarranza@unitru.edu.pe',
-    tesistaTelefono: '942311709',
-    tituloTesis: 'Aplicación de herramientas Lean Six Sigma para reducir productos no conformes en línea de envasado agroexportador',
-    lineaInvestigacion: 'Gestión de la Calidad',
-    asesor: 'Mg. Ing. Carlos José Sandoval Reyes',
-    juradoPresidente: 'Dr. Ing. Ángel Hernández Molina',
-    juradoSecretario: 'Dr. Ing. Joe Alexis González Vásquez',
-    juradoVocal: 'Mg. Ing. Carlos José Sandoval Reyes',
-    estacionActual: 1,
-    semaforo: 'atencion',
-    fechaIngresoEstacion: '2026-11-21',
-    fechaInicioTramite: '2026-11-21',
-    ubicacionFisica: 'Secretaría de Escuela',
-    esCuelloBotellaExterno: false,
-    notasSecretaria: 'Ingresó 3 archivos PDF por Mesa de Partes (Opción 29 FUT). En emisión de proveído de jurado.',
-    requisitosFisicos: {
-      futFisico: true,
-      voucherTupa: true,
-      reporteTurnitin: true,
-      constanciaPracticas: false,
-      resolucionProyecto: true,
-      tresBorradoresJurado: true
-    }
   }
 ];
 
 export const INITIAL_SUSTENTACIONES_JUEVES: SustentacionJuevesItem[] = [
   {
-    id: 'jue-001',
+    id: 'jue-prueba-01',
     fecha: '2026-11-26',
-    horario: '11:00 a.m. - 01:00 p.m.',
-    tesistaId: 'seg-001',
-    tesistaNombre: 'Carlos Eduardo Mendoza Villanueva',
-    tesistaCodigo: '1511300223',
-    tesistaCorreo: 'tesista.industrial@unitru.edu.pe',
-    tituloTesis: 'Propuesta de mejora en la gestión logística de almacenes mediante Lean Warehousing para reducir costos operativos en una empresa agroindustrial de La Libertad, 2026',
-    asesor: 'Dr. Ing. Joe Alexis González Vásquez',
-    juradoPresidente: 'Dr. Ing. Ángel Hernández Molina',
-    juradoSecretario: 'Mg. Ing. Carlos José Sandoval Reyes',
-    juradoVocal: 'Dr. Ing. Joe Alexis González Vásquez',
-    aulaOAuditorio: 'Auditorio de Ingeniería Industrial UNT',
+    horario: '11:00 a.m.',
+    tesistaId: 'seg-prueba-01',
+    tesistaNombre: 'Tesista de Prueba',
+    tesistaCodigo: '1511300999',
+    tesistaCorreo: 'jpmirandava@unitru.edu.pe',
+    tituloTesis: 'Propuesta de mejora de procesos industriales (Registro de Prueba)',
+    asesor: 'Jurado de Prueba 2 (Carlos)',
+    juradoPresidente: 'Jurado de Prueba 1',
+    juradoSecretario: 'Jurado de Prueba 2 (Carlos)',
+    juradoVocal: 'Jurado de Prueba 1',
+    aulaOAuditorio: 'Auditorio de la Escuela de Ingeniería Industrial',
     estado: 'Programada',
-    observacion: 'Citación y flyer enviados al tesista y a los 3 ingenieros del jurado.'
-  },
-  {
-    id: 'jue-002',
-    fecha: '2026-12-03',
-    horario: '11:00 a.m. - 01:00 p.m.',
-    tesistaId: 'seg-002',
-    tesistaNombre: 'Melina Nayhely Quiñones Mostacero',
-    tesistaCodigo: '1511300315',
-    tesistaCorreo: 'mquinones@unitru.edu.pe',
-    tituloTesis: 'Implementación de la metodología Lean Manufacturing en el proceso de arándano para aumentar la productividad de la empresa Agrícola Cerro Prieto S.A.',
-    asesor: 'Dr. Ing. Ángel Hernández Molina',
-    juradoPresidente: 'Dr. Ing. José Manuel Castañeda Meléndez',
-    juradoSecretario: 'Mg. Ing. Víctor Manuel Sirlopú Vera',
-    juradoVocal: 'Dr. Ing. Ángel Hernández Molina',
-    aulaOAuditorio: 'Auditorio de Ingeniería Industrial UNT',
-    estado: 'Programada',
-    observacion: 'Programada para jueves 11:00 a.m. - 1:00 p.m.'
+    observacion: 'Registro seguro para pruebas.'
   }
 ];
 
-export const INITIAL_HISTORIAL_DESPACHOS: DespachoChatAnuncioItem[] = [
-  {
-    id: 'desp-001',
-    fechaHora: '2026-11-20 10:15',
-    asunto: 'Citación Oficial a Sustentación de Tesis — Jueves 26/11 (11:00 a.m. a 1:00 p.m.)',
-    mensaje: 'Estimados miembros del Jurado Evaluador y Sr. Tesista Carlos Eduardo Mendoza Villanueva:\n\nPor encargo de la Dirección de la Escuela Profesional de Ingeniería Industrial UNT, se les cita a la Sustentación Pública de Tesis programada para el día JUEVES 26 de noviembre de 11:00 a.m. a 1:00 p.m. en el Auditorio de Ingeniería Industrial. Se adjunta el Flyer oficial del acto académico.\n\nAtentamente,\nSrta. Celia — Secretaría de Escuela de Ingeniería Industrial UNT.',
-    tesistasDestinatarios: [
-      { nombre: 'Carlos Eduardo Mendoza Villanueva', correo: 'tesista.industrial@unitru.edu.pe' }
-    ],
-    juradoDestinatarios: [
-      { nombre: 'Dr. Ing. Ángel Hernández Molina (Jurado 1)', correo: 'ahernandezm@unitru.edu.pe' },
-      { nombre: 'Mg. Ing. Carlos José Sandoval Reyes (Jurado 2)', correo: 'csandovalr@unitru.edu.pe' },
-      { nombre: 'Dr. Ing. Joe Alexis González Vásquez (Jurado 3)', correo: 'jgonzalezv@unitru.edu.pe' }
-    ],
-    modoEnvio: 'registro-interno',
-    enviadoPor: 'Srta. Celia (Secretaría Académica)'
-  }
-];
+export const INITIAL_HISTORIAL_DESPACHOS: DespachoChatAnuncioItem[] = [];
