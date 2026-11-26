@@ -74,12 +74,14 @@ const PASOS_COURIER = [
 const MI_MATRICULA_KEY = 'unt_mi_matricula_guardada_v1';
 
 interface InstruccionesSustentacionPageProps {
-  /** Solo true cuando se abre desde la pestaña 2 exclusiva del panel de Secretaría */
+  /** Solo true cuando se abre desde la pestaña exclusiva del panel de Secretaría */
   modoEdicionSecretaria?: boolean;
+  onIrAJuevesSecretaria?: () => void;
 }
 
 export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPageProps> = ({
-  modoEdicionSecretaria = false
+  modoEdicionSecretaria = false,
+  onIrAJuevesSecretaria
 }) => {
   const { usuario, agregarToast } = useApp();
   // ESTRICTO: Solo permite editar si está autenticada la Secretaria Y está en su pestaña exclusiva de edición
@@ -653,26 +655,45 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
 
       {/* =====================================================================
           INSTRUCCIONES PASO A PASO + SUSTENTACIONES PROGRAMADAS
+          (En Secretaría se elimina el editor duplicado de sustentaciones para no confundir con Jueves y Flyers)
          ===================================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* COLUMNA IZQUIERDA (7 cols): PASOS DE INSTRUCCIONES */}
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs space-y-4">
+        <div className={`${puedeEditar ? 'lg:col-span-12' : 'lg:col-span-7'} bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs space-y-4`}>
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            <h2 className="text-base sm:text-lg font-black text-slate-900">
-              {puedeEditar
-                ? 'Editar Instrucciones (Se publican en la Interfaz Principal)'
-                : 'Pasos para Sustentación de Tesis'}
-            </h2>
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-slate-900">
+                {puedeEditar
+                  ? 'Pasos del Trámite que ven los Tesistas'
+                  : 'Pasos para Sustentación de Tesis'}
+              </h2>
+              {puedeEditar && (
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Cualquier cambio aquí se actualiza al instante en la pantalla pública de los alumnos.
+                </p>
+              )}
+            </div>
 
             {puedeEditar && (
-              <button
-                type="button"
-                onClick={() => abrirEditorPaso()}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#082F64] hover:bg-[#0C4D96] text-white text-xs font-bold shadow-2xs cursor-pointer"
-              >
-                <Plus className="w-4 h-4 text-amber-300" />
-                <span>+ Agregar Instrucción</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {onIrAJuevesSecretaria && (
+                  <button
+                    type="button"
+                    onClick={onIrAJuevesSecretaria}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold cursor-pointer"
+                  >
+                    <Calendar className="w-4 h-4 text-[#082F64]" />
+                    <span>Ir a Agenda de Jueves</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => abrirEditorPaso()}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#082F64] hover:bg-[#0C4D96] text-white text-xs font-bold shadow-2xs cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 text-amber-300" />
+                  <span>Agregar Paso</span>
+                </button>
+              </div>
             )}
           </div>
 
@@ -775,7 +796,8 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
           </div>
         </div>
 
-        {/* COLUMNA DERECHA (5 cols): SUSTENTACIONES PROGRAMADAS */}
+        {/* COLUMNA DERECHA (5 cols): SUSTENTACIONES PROGRAMADAS (Solo visible en la vista pública del tesista) */}
+        {!puedeEditar && (
         <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-2xs space-y-4 h-fit">
           <div className="flex items-start justify-between gap-2 pb-3 border-b border-slate-100">
             <div>
@@ -890,6 +912,7 @@ export const InstruccionesSustentacionPage: React.FC<InstruccionesSustentacionPa
             )}
           </div>
         </div>
+        )}
       </div>
 
       {/* MODAL PARA EDITAR / CREAR INSTRUCCIÓN (EXCLUSIVO SECRETARÍA) */}

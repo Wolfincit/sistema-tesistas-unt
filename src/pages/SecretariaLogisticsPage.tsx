@@ -22,6 +22,7 @@ import {
 import { SecretariaHoyTab } from '../components/secretaria/SecretariaHoyTab';
 import { SecretariaColacionTab } from '../components/secretaria/SecretariaColacionTab';
 import { InstruccionesSustentacionPage } from './InstruccionesSustentacionPage';
+import { PreguntasFrecuentesPage } from './PreguntasFrecuentesPage';
 import { useApp } from '../context/AppContext';
 import {
   ClipboardList,
@@ -195,7 +196,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
   // =========================================================
   const [busquedaSeg, setBusquedaSeg] = useState<string>('');
   const [filtroSemaforo, setFiltroSemaforo] = useState<'todos' | SemaforoEstadoId>('todos');
-  const [modoVistaSeg, setModoVistaSeg] = useState<'matriz' | 'tarjetas'>('matriz');
+  const [subTabGuias, setSubTabGuias] = useState<'pasos' | 'faqs'>('pasos');
   const [guardadoRecienteId, setGuardadoRecienteId] = useState<string>('');
   const [modalSeguimientoAbierto, setModalSeguimientoAbierto] = useState<boolean>(false);
   const [editandoSeg, setEditandoSeg] = useState<SeguimientoTesisItem | null>(null);
@@ -921,7 +922,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
             }`}
         >
           <Edit3 className="w-4 h-4 text-amber-300" />
-          <span>Guías</span>
+          <span>Guías y Preguntas</span>
         </button>
       </div>
 
@@ -1029,9 +1030,41 @@ export const SecretariaLogisticsPage: React.FC = () => {
       )}
 
       {/* =====================================================================
-          2. EDITOR EXCLUSIVO DE INSTRUCCIONES (SOLO PARA LA SECRETARÍA)
+          2. GUÍAS Y PREGUNTAS FRECUENTES UNIFICADAS (SIN SALIR DEL PANEL)
          ===================================================================== */}
-      {tab === 'instrucciones' && <InstruccionesSustentacionPage modoEdicionSecretaria={true} />}
+      {tab === 'instrucciones' && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200 w-fit">
+            <button
+              type="button"
+              onClick={() => setSubTabGuias('pasos')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                subTabGuias === 'pasos' ? 'bg-white text-[#082F64] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Pasos del Trámite
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubTabGuias('faqs')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                subTabGuias === 'faqs' ? 'bg-white text-[#082F64] shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Preguntas Frecuentes (Respuestas Oficiales)
+            </button>
+          </div>
+
+          {subTabGuias === 'pasos' ? (
+            <InstruccionesSustentacionPage
+              modoEdicionSecretaria={true}
+              onIrAJuevesSecretaria={() => setTab('calendario')}
+            />
+          ) : (
+            <PreguntasFrecuentesPage />
+          )}
+        </div>
+      )}
 
       {/* =====================================================================
           1. MATRIZ DE TRABAJO INTERACTIVA (ZERO-LEARNING CURVE · SEMÁFORO + 1 CLIC)
@@ -1110,32 +1143,6 @@ export const SecretariaLogisticsPage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Selector de Vista: Matriz (Tabla Interactiva) vs Tarjetas */}
-              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
-                <button
-                  type="button"
-                  onClick={() => setModoVistaSeg('matriz')}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${modoVistaSeg === 'matriz'
-                    ? 'bg-[#082F64] text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                  <Table2 className="w-3.5 h-3.5" />
-                  <span>Matriz</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModoVistaSeg('tarjetas')}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${modoVistaSeg === 'tarjetas'
-                    ? 'bg-[#082F64] text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                >
-                  <LayoutGrid className="w-3.5 h-3.5" />
-                  <span>Tarjetas</span>
-                </button>
-              </div>
-
               <button
                 type="button"
                 onClick={() => abrirModalSeguimiento()}
@@ -1147,9 +1154,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* VISTA 1: MATRIZ DE TRABAJO INTERACTIVA (EDICIÓN EN LÍNEA EN 1 CLIC) */}
-          {modoVistaSeg === 'matriz' ? (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+          {/* TABLA ÚNICA Y LIMPIA DE TRÁMITES (SIN VISTAS DUPLICADAS) */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
@@ -1243,65 +1249,89 @@ export const SecretariaLogisticsPage: React.FC = () => {
                             </div>
                           </td>
 
-                          {/* Columna 4: Selector de Etapa en 1 Clic (8 Etapas: Sustentación 1-4 + Colación 5-8) */}
+                          {/* Columna 4: Solo 4 botones claros según la fase actual del tesista (sin apretar 8 a la vez) */}
                           <td className="py-3.5 px-3.5 align-top">
                             <div className="space-y-1.5">
-                              <div className="grid grid-cols-2 gap-1">
-                                {ETAPAS_SIMPLES.filter((e) => e.fase === 'sustentacion').map((et) => {
-                                  const activo = etapaActual === et.id;
-                                  const completado = etapaActual > et.id;
-                                  return (
+                              {etapaActual <= 4 ? (
+                                <>
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    {ETAPAS_SIMPLES.filter((e) => e.fase === 'sustentacion').map((et) => {
+                                      const activo = etapaActual === et.id;
+                                      const completado = etapaActual > et.id;
+                                      return (
+                                        <button
+                                          key={et.id}
+                                          type="button"
+                                          onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
+                                          className={`py-1.5 px-2.5 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer truncate ${activo
+                                            ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
+                                            : completado
+                                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                            }`}
+                                        >
+                                          {et.corto}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  {etapaActual === 4 && (
                                     <button
-                                      key={et.id}
                                       type="button"
-                                      onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
-                                      className={`py-1.5 px-2 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer truncate ${activo
-                                        ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
-                                        : completado
-                                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                        }`}
+                                      onClick={() => handleCambiarEtapaDirecto(item.id, 5)}
+                                      className="w-full py-1.5 px-2.5 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-900 border border-violet-200 text-[11px] font-extrabold cursor-pointer"
                                     >
-                                      {et.corto}
+                                      Ya sustentó → Pasar a Ética y Colación
                                     </button>
-                                  );
-                                })}
-                              </div>
-                              <div className="grid grid-cols-2 gap-1 pt-1 border-t border-slate-100">
-                                {ETAPAS_SIMPLES.filter((e) => e.fase === 'colacion').map((et) => {
-                                  const activo = etapaActual === et.id;
-                                  const completado = etapaActual > et.id;
-                                  return (
-                                    <button
-                                      key={et.id}
-                                      type="button"
-                                      onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
-                                      className={`py-1.5 px-2 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer truncate ${activo
-                                        ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
-                                        : completado
-                                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                          : 'bg-slate-50 text-slate-500 border border-slate-200/70 hover:bg-slate-100'
-                                        }`}
-                                    >
-                                      {et.corto}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                              <div className="flex flex-wrap items-center gap-1 text-[9px] text-slate-400">
-                                <BellRing className="w-2.5 h-2.5 text-emerald-500" />
-                                <span>Clic avisa al celular del tesista</span>
-                                {item.tipoTramite === 'bachiller' && (
-                                  <span className="px-1.5 py-0.5 rounded bg-teal-100 text-teal-900 font-bold">
-                                    Bachiller
-                                  </span>
-                                )}
-                                {item.cambioTituloActivo && (
-                                  <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-bold">
-                                    Cambio Título
-                                  </span>
-                                )}
-                              </div>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    {ETAPAS_SIMPLES.filter((e) => e.fase === 'colacion').map((et) => {
+                                      const activo = etapaActual === et.id;
+                                      const completado = etapaActual > et.id;
+                                      return (
+                                        <button
+                                          key={et.id}
+                                          type="button"
+                                          onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
+                                          className={`py-1.5 px-2.5 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer truncate ${activo
+                                            ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
+                                            : completado
+                                              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                            }`}
+                                        >
+                                          {et.corto}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCambiarEtapaDirecto(item.id, 4)}
+                                    className="text-[10px] text-slate-400 hover:text-slate-700 font-semibold cursor-pointer"
+                                  >
+                                    ← Volver a fase de sustentación
+                                  </button>
+                                </>
+                              )}
+
+                              {(item.tipoTramite === 'bachiller' || item.cambioTituloActivo) && (
+                                <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                                  {item.tipoTramite === 'bachiller' && (
+                                    <span className="px-1.5 py-0.5 rounded bg-teal-100 text-teal-900 text-[10px] font-bold">
+                                      Bachiller
+                                    </span>
+                                  )}
+                                  {item.cambioTituloActivo && (
+                                    <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold">
+                                      Cambio de Título
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </td>
 
@@ -1385,145 +1415,6 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 </table>
               </div>
             </div>
-          ) : (
-            /* VISTA 2: TARJETAS VISUALES */
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {seguimientosFiltrados.map((item) => {
-                const etapaActual = item.estacionActual;
-                const sem = resolverSemaforo(item);
-                const semMeta = SEMAFORO_META[sem];
-                return (
-                  <div
-                    key={item.id}
-                    className={`bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 ${semMeta.rowBorder}`}
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-black text-slate-900">{item.tesistaNombre}</h3>
-                            <span
-                              className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${semMeta.badge}`}
-                            >
-                              {semMeta.label}
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                            <span className="font-mono font-bold text-slate-700">
-                              {item.codigoMatricula}
-                            </span>
-                            <span>•</span>
-                            <span className="font-mono text-unt-blue">{item.tesistaCorreo}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => abrirModalSeguimiento(item)}
-                            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 cursor-pointer"
-                            title="Editar datos del tesista"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setConfirmarEliminar({
-                                tipo: 'tesista',
-                                id: item.id,
-                                nombre: item.tesistaNombre,
-                                correo: item.tesistaCorreo
-                              })
-                            }
-                            className="p-1.5 rounded-lg border border-rose-200 hover:bg-rose-50 text-rose-600 cursor-pointer"
-                            title="Eliminar tesista"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-slate-700 italic line-clamp-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        "{item.tituloTesis}"
-                      </p>
-
-                      <div className="text-[11px] text-slate-600 grid grid-cols-1 sm:grid-cols-3 gap-1 pt-1">
-                        <div className="truncate">
-                          <strong>Pres.:</strong> {item.juradoPresidente}
-                        </div>
-                        <div className="truncate">
-                          <strong>Sec.:</strong> {item.juradoSecretario}
-                        </div>
-                        <div className="truncate">
-                          <strong>Vocal:</strong> {item.juradoVocal}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                      {ETAPAS_SIMPLES.map((et) => {
-                        const activo = etapaActual === et.id;
-                        const completado = etapaActual > et.id;
-                        return (
-                          <button
-                            key={et.id}
-                            type="button"
-                            onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
-                            className={`py-1.5 px-2 rounded-xl text-[11px] font-bold transition-all cursor-pointer truncate ${activo
-                              ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
-                              : completado
-                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                              }`}
-                          >
-                            {et.nombre}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div>
-                      <textarea
-                        rows={2}
-                        value={item.notasSecretaria}
-                        onChange={(e) => handleActualizarNotaDirecto(item.id, e.target.value)}
-                        placeholder="Apuntes..."
-                        className="w-full p-2.5 rounded-xl bg-amber-50/60 border border-amber-200/80 text-xs text-slate-800 focus:bg-white focus:outline-hidden"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          cargarTesistaEnCalendario(item.id);
-                          setTab('calendario');
-                        }}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold cursor-pointer"
-                      >
-                        <Calendar className="w-3.5 h-3.5 text-unt-blue" />
-                        <span>
-                          {item.fechaSustentacionProgramada
-                            ? `Jueves ${item.fechaSustentacionProgramada}`
-                            : 'Agendar Jueves'}
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => prepararDespachoParaTesistaYJurado(item)}
-                        className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-extrabold cursor-pointer"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                        <span>Enviar Flyer</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       )}
 
@@ -1533,124 +1424,84 @@ export const SecretariaLogisticsPage: React.FC = () => {
       {tab === 'despacho' && (
         <div className="space-y-4">
           {/* Guía de Flujo Visual 1 -> 2 -> 3 + Tuerca Discreta de Correo */}
-          {/* Barra "Preparar Jueves en 1 Clic" (reemplaza Canva + selección manual + WhatsApp) */}
-          {sustentaciones.length > 0 && (
-            <div className="bg-gradient-to-r from-[#082F64] to-[#0C4D96] rounded-2xl p-4 text-white shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-black text-amber-300 uppercase tracking-wider">
-                  Rutina de Martes en 1 Clic (Sin abrir Canva)
-                </div>
-                <div className="text-xs text-blue-100 mt-0.5">
-                  Elige una sustentación programada: genera el Flyer oficial PNG, marca jurado + copias (Elmo, Estela, Rosita) y arma el recordatorio de WhatsApp.
-                </div>
+          {/* UNA SOLA CABECERA LIMPIA: Elegir sustentación en 1 clic + ajuste discreto de correo */}
+          <div className="bg-gradient-to-r from-[#082F64] to-[#0C4D96] rounded-2xl p-4 text-white shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-black text-amber-300 uppercase tracking-wider">
+                Preparar Jueves en 1 Clic
               </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {sustentaciones.slice(0, 3).map((sust) => (
-                  <button
-                    key={sust.id}
-                    type="button"
-                    onClick={() => {
-                      const seg = seguimientos.find(
-                        (s) =>
-                          s.id === sust.tesistaId ||
-                          (sust.tesistaCodigo && s.codigoMatricula === sust.tesistaCodigo)
-                      );
-                      prepararDespachoParaTesistaYJurado(
-                        seg || {
-                          id: sust.tesistaId || sust.id,
-                          codigoMatricula: sust.tesistaCodigo || '',
-                          tesistaNombre: sust.tesistaNombre,
-                          tesistaCorreo: sust.tesistaCorreo || '',
-                          tituloTesis: sust.tituloTesis,
-                          lineaInvestigacion: 'Ingeniería Industrial',
-                          asesor: sust.asesor || '',
-                          juradoPresidente: sust.juradoPresidente,
-                          juradoSecretario: sust.juradoSecretario,
-                          juradoVocal: sust.juradoVocal,
-                          estacionActual: 4,
-                          fechaIngresoEstacion: sust.fecha,
-                          fechaInicioTramite: sust.fecha,
-                          ubicacionFisica: sust.aulaOAuditorio,
-                          esCuelloBotellaExterno: false,
-                          notasSecretaria: '',
-                          fechaSustentacionProgramada: sust.fecha,
-                          requisitosFisicos: {
-                            futFisico: true,
-                            voucherTupa: true,
-                            reporteTurnitin: true,
-                            constanciaPracticas: true,
-                            resolucionProyecto: true,
-                            tresBorradoresJurado: true
-                          }
-                        },
-                        sust.fecha,
-                        sust.horario,
-                        sust.aulaOAuditorio
-                      );
-                    }}
-                    className="px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black inline-flex items-center gap-1.5 cursor-pointer shrink-0"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>{sust.tesistaNombre.split(' ').slice(0, 2).join(' ')} ({sust.fecha.slice(5)})</span>
-                  </button>
-                ))}
+              <div className="text-xs text-blue-100 mt-0.5">
+                Toca el nombre del tesista para armar su flyer oficial, marcar jurados + copias (Elmo, Estela, Rosita) y dejar listo el mensaje de WhatsApp.
               </div>
             </div>
-          )}
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {sustentaciones.slice(0, 3).map((sust) => (
+                <button
+                  key={sust.id}
+                  type="button"
+                  onClick={() => {
+                    const seg = seguimientos.find(
+                      (s) =>
+                        s.id === sust.tesistaId ||
+                        (sust.tesistaCodigo && s.codigoMatricula === sust.tesistaCodigo)
+                    );
+                    prepararDespachoParaTesistaYJurado(
+                      seg || {
+                        id: sust.tesistaId || sust.id,
+                        codigoMatricula: sust.tesistaCodigo || '',
+                        tesistaNombre: sust.tesistaNombre,
+                        tesistaCorreo: sust.tesistaCorreo || '',
+                        tituloTesis: sust.tituloTesis,
+                        lineaInvestigacion: 'Ingeniería Industrial',
+                        asesor: sust.asesor || '',
+                        juradoPresidente: sust.juradoPresidente,
+                        juradoSecretario: sust.juradoSecretario,
+                        juradoVocal: sust.juradoVocal,
+                        estacionActual: 4,
+                        fechaIngresoEstacion: sust.fecha,
+                        fechaInicioTramite: sust.fecha,
+                        ubicacionFisica: sust.aulaOAuditorio,
+                        esCuelloBotellaExterno: false,
+                        notasSecretaria: '',
+                        fechaSustentacionProgramada: sust.fecha,
+                        requisitosFisicos: {
+                          futFisico: true,
+                          voucherTupa: true,
+                          reporteTurnitin: true,
+                          constanciaPracticas: true,
+                          resolucionProyecto: true,
+                          tresBorradoresJurado: true
+                        }
+                      },
+                      sust.fecha,
+                      sust.horario,
+                      sust.aulaOAuditorio
+                    );
+                  }}
+                  className="px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black inline-flex items-center gap-1.5 cursor-pointer shrink-0"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{sust.tesistaNombre.split(' ').slice(0, 2).join(' ')} ({sust.fecha.slice(5)})</span>
+                </button>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => setModalCorreoAbierto(true)}
+                title={`Remitente: ${emailStatus.senderEmail}`}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
 
           {!emailStatus.serverTransportReady && (
-            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950 flex flex-wrap items-center justify-between gap-2">
-              <span>
-                <strong>Aviso de correo saliente:</strong> el remitente <code>{emailStatus.senderEmail}</code> está pre-vinculado, pero el servidor aún guarda en registro interno + aviso Push hasta activar la clave HTTPS (Brevo/Resend/OAuth) en el servidor.
-              </span>
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950">
+              <strong>Nota:</strong> los avisos al celular del tesista y el registro del sistema funcionan de inmediato; la salida externa de correos quedará activa al conectar el servicio de correo en el servidor.
             </div>
           )}
-
-          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-[#082F64] text-amber-300 font-black flex items-center justify-center">
-                  1
-                </span>
-                <span className="font-bold text-slate-800">Sube el flyer o escribe el anuncio</span>
-              </div>
-              <span className="text-slate-300 font-bold">→</span>
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-[#082F64] text-amber-300 font-black flex items-center justify-center">
-                  2
-                </span>
-                <span className="font-bold text-slate-800">Marca los correos con check [✓]</span>
-              </div>
-              <span className="text-slate-300 font-bold">→</span>
-              <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center">
-                  3
-                </span>
-                <span className="font-bold text-emerald-800">Dale a Enviar</span>
-              </div>
-            </div>
-
-            {/* Si ya vinculó su correo, solo queda una tuerca ⚙️ discreta; si no, botón simple de 1 clic */}
-            {correoYaVinculado ? (
-              <button
-                type="button"
-                onClick={() => setModalCorreoAbierto(true)}
-                title={`Correo vinculado: ${emailStatus.senderEmail} (clic para configurar)`}
-                className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 cursor-pointer flex items-center gap-1.5"
-              >
-                <Settings className="w-4 h-4 text-unt-blue" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setModalCorreoAbierto(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-extrabold cursor-pointer"
-              >
-                <Mail className="w-3.5 h-3.5" />
-                <span>Vincular mi correo (1 clic)</span>
-              </button>
-            )}
-          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
             {/* IZQUIERDA (7 cols): PASO 1 (SUBIR FLYER / ANUNCIO) Y PASO 3 (ENVIAR) */}
@@ -1901,91 +1752,20 @@ export const SecretariaLogisticsPage: React.FC = () => {
                               </div>
                             </div>
                           </label>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setConfirmarEliminar({
-                                tipo: 'tesista',
-                                id: s.id,
-                                nombre: s.tesistaNombre,
-                                correo: s.tesistaCorreo
-                              })
-                            }
-                            className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer shrink-0"
-                            title="Eliminar tesista"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
                         </div>
                       );
                     })}
                 </div>
 
-                {/* Añadir Tesista (se añade automáticamente también a Seguimiento) */}
-                <div className="flex items-center gap-1.5 pt-1">
-                  <input
-                    type="text"
-                    value={nuevoTesistaNombre}
-                    onChange={(e) => setNuevoTesistaNombre(e.target.value)}
-                    placeholder="Nombre"
-                    className="w-2/5 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs"
-                  />
+                {/* Correo puntual adicional sin ensuciar el padrón de Trámites */}
+                <div className="pt-1">
                   <input
                     type="email"
                     value={nuevoTesistaCorreo}
                     onChange={(e) => setNuevoTesistaCorreo(e.target.value)}
-                    placeholder="correo@unitru.edu.pe"
-                    className="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-mono"
+                    placeholder="Otro correo puntual opcional (ej. trabajo@empresa.com)..."
+                    className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-xs font-mono"
                   />
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!nuevoTesistaCorreo.includes('@')) return;
-                      const nombreDefault =
-                        nuevoTesistaNombre.trim() || nuevoTesistaCorreo.split('@')[0];
-                      const nuevo: SeguimientoTesisItem = {
-                        id: `seg-${Date.now()}`,
-                        codigoMatricula: `1511${Math.floor(100000 + Math.random() * 900000)}`,
-                        tesistaNombre: nombreDefault,
-                        tesistaCorreo: nuevoTesistaCorreo.trim().toLowerCase(),
-                        tituloTesis: 'Tesis en seguimiento',
-                        lineaInvestigacion: 'Ingeniería Industrial',
-                        asesor: directorioJurado[0]?.nombre || '',
-                        juradoPresidente: directorioJurado[0]?.nombre || '',
-                        juradoSecretario: directorioJurado[1]?.nombre || '',
-                        juradoVocal: directorioJurado[2]?.nombre || '',
-                        estacionActual: 1,
-                        fechaIngresoEstacion: new Date().toISOString().slice(0, 10),
-                        fechaInicioTramite: new Date().toISOString().slice(0, 10),
-                        ubicacionFisica: 'En seguimiento',
-                        esCuelloBotellaExterno: false,
-                        notasSecretaria: '',
-                        requisitosFisicos: {
-                          futFisico: true,
-                          voucherTupa: true,
-                          reporteTurnitin: true,
-                          constanciaPracticas: true,
-                          resolucionProyecto: true,
-                          tresBorradoresJurado: true
-                        }
-                      };
-                      const actualizados = [nuevo, ...seguimientos];
-                      setSeguimientos(actualizados);
-                      await logisticaSecretariaService.saveSeguimientos(actualizados);
-                      setTesistasChecks((prev) => [...prev, nuevo.tesistaCorreo]);
-                      setNuevoTesistaNombre('');
-                      setNuevoTesistaCorreo('');
-                      agregarToast(
-                        'success',
-                        'Tesista Agregado',
-                        `Se agregó a ${nuevo.tesistaNombre} aquí y en Seguimiento.`
-                      );
-                    }}
-                    className="px-2.5 py-1.5 rounded-lg bg-[#082F64] text-white font-bold text-xs cursor-pointer shrink-0"
-                  >
-                    +
-                  </button>
                 </div>
               </div>
 
@@ -2364,10 +2144,52 @@ export const SecretariaLogisticsPage: React.FC = () => {
               <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
                 <button
                   type="submit"
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-[#082F64]" />
+                  <span>Solo Guardar Fecha</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    await handleGuardarSustentacionJueves(e as unknown as React.FormEvent);
+                    const segExistente = seguimientos.find((s) => s.id === calTesistaId);
+                    await prepararDespachoParaTesistaYJurado(
+                      segExistente || {
+                        id: calTesistaId || `seg-${Date.now()}`,
+                        codigoMatricula: calTesistaCodigo,
+                        tesistaNombre: calTesistaNombre,
+                        tesistaCorreo: calTesistaCorreo,
+                        tituloTesis: calTituloTesis,
+                        lineaInvestigacion: 'Ingeniería Industrial',
+                        asesor: calAsesor,
+                        juradoPresidente: calPresidente,
+                        juradoSecretario: calSecretario,
+                        juradoVocal: calVocal,
+                        estacionActual: 4,
+                        fechaIngresoEstacion: fechaJuevesActiva,
+                        fechaInicioTramite: fechaJuevesActiva,
+                        ubicacionFisica: 'Auditorio de Ingeniería Industrial UNT',
+                        esCuelloBotellaExterno: false,
+                        notasSecretaria: '',
+                        fechaSustentacionProgramada: fechaJuevesActiva,
+                        requisitosFisicos: {
+                          futFisico: true,
+                          voucherTupa: true,
+                          reporteTurnitin: true,
+                          constanciaPracticas: true,
+                          resolucionProyecto: true,
+                          tresBorradoresJurado: true
+                        }
+                      },
+                      fechaJuevesActiva,
+                      calHorario
+                    );
+                  }}
                   className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#082F64] hover:bg-[#0C4D96] text-white font-bold shadow-xs cursor-pointer"
                 >
-                  <CheckCircle2 className="w-4 h-4 text-amber-300" />
-                  <span>Guardar en Calendario</span>
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <span>Guardar y Preparar Flyer →</span>
                 </button>
               </div>
             </form>

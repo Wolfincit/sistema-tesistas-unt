@@ -5,9 +5,7 @@ import {
   ShieldCheck,
   Lock,
   BookOpen,
-  ClipboardList,
-  Layers,
-  HelpCircle
+  ClipboardList
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -66,68 +64,34 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Navegación Central:
-              - Público (!usuario): Repositorio de Tesis | Instrucciones
-              - Secretaría (usuario): Panel de Secretaría | Editar Instrucciones | Preguntas Frecuentes (SIN Repositorio) */}
-          {onCambiarVista && (
+          {/* Navegación Central solo para visitantes/tesistas; Secretaría trabaja en un único panel sin distracciones */}
+          {onCambiarVista && !usuario && (
             <nav className="flex items-center gap-1.5 bg-[#051F42]/70 p-1 rounded-xl border border-white/15">
-              {!usuario ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onCambiarVista('repositorio')}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      vistaActual === 'repositorio'
-                        ? 'bg-amber-400 text-slate-950 shadow-xs'
-                        : 'text-blue-100 hover:text-white hover:bg-white/10'
-                    }`}
-                  >
-                    <BookOpen className="w-3.5 h-3.5" />
-                    <span>Repositorio de Tesis</span>
-                  </button>
+              <button
+                type="button"
+                onClick={() => onCambiarVista('repositorio')}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  vistaActual === 'repositorio'
+                    ? 'bg-amber-400 text-slate-950 shadow-xs'
+                    : 'text-blue-100 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Repositorio de Tesis</span>
+              </button>
 
-                  <button
-                    type="button"
-                    onClick={() => onCambiarVista('instrucciones')}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      vistaActual === 'instrucciones'
-                        ? 'bg-amber-400 text-slate-950 shadow-xs'
-                        : 'text-blue-100 hover:text-white hover:bg-white/10'
-                    }`}
-                  >
-                    <ClipboardList className="w-3.5 h-3.5" />
-                    <span>Mi Tesis y Guías</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onCambiarVista('secretaria')}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      vistaActual === 'secretaria'
-                        ? 'bg-amber-400 text-slate-950 shadow-xs'
-                        : 'text-blue-100 hover:text-white hover:bg-white/10'
-                    }`}
-                  >
-                    <Layers className="w-3.5 h-3.5" />
-                    <span>Interfaz de Secretaría</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onCambiarVista('preguntas-frecuentes')}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      vistaActual === 'preguntas-frecuentes'
-                        ? 'bg-amber-400 text-slate-950 shadow-xs'
-                        : 'text-blue-100 hover:text-white hover:bg-white/10'
-                    }`}
-                  >
-                    <HelpCircle className="w-3.5 h-3.5" />
-                    <span>Preguntas Frecuentes</span>
-                  </button>
-                </>
-              )}
+              <button
+                type="button"
+                onClick={() => onCambiarVista('instrucciones')}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  vistaActual === 'instrucciones'
+                    ? 'bg-amber-400 text-slate-950 shadow-xs'
+                    : 'text-blue-100 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <ClipboardList className="w-3.5 h-3.5" />
+                <span>Mi Tesis y Guías</span>
+              </button>
             </nav>
           )}
 

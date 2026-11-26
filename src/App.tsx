@@ -55,20 +55,20 @@ const AppContent: React.FC = () => {
 
       <div className="flex-1 flex flex-col min-w-0">
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-          {/* Si la Secretaria está conectada, NUNCA mostrar el Repositorio */}
+          {/* Vista pública del Tesista */}
           {!usuario && vistaActual === 'repositorio' && <TesisRepositoryPage />}
-          {vistaActual === 'instrucciones' && <InstruccionesSustentacionPage />}
-          {vistaActual === 'preguntas-frecuentes' && <PreguntasFrecuentesPage />}
-          {usuario && (vistaActual === 'secretaria' || vistaActual === 'repositorio') && (
-            <SecretariaLogisticsPage />
-          )}
+          {!usuario && vistaActual === 'instrucciones' && <InstruccionesSustentacionPage />}
+          {!usuario && vistaActual === 'preguntas-frecuentes' && <PreguntasFrecuentesPage />}
+
+          {/* Vista única e ininterrumpida para Secretaría (nunca pierde sus pestañas) */}
+          {usuario && <SecretariaLogisticsPage />}
         </main>
 
         <Footer />
       </div>
 
-      {/* Ícono Flotante '?' abajo a la derecha hacia Preguntas Frecuentes */}
-      {vistaActual !== 'preguntas-frecuentes' && (
+      {/* Ícono Flotante '?' exclusivo para visitantes/tesistas (Secretaría ya lo tiene integrado en su panel) */}
+      {!usuario && vistaActual !== 'preguntas-frecuentes' && (
         <button
           type="button"
           onClick={() => setVistaActual('preguntas-frecuentes')}
