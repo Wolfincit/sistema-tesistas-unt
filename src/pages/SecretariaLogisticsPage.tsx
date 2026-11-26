@@ -680,7 +680,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
     if (res.ok) {
       const stats = await pushClientService.getStats();
       setPushStats(stats);
-      agregarToast('success', 'Alertas activadas', 'Recibirás avisos automáticos en este equipo cuando llegue una duda nueva o víspera de jueves.');
+      if (res.localOnly) {
+        agregarToast('info', 'Notificación probada en PC', res.reason || 'Avisos de escritorio activos.');
+      } else {
+        agregarToast('success', 'Alertas activadas en esta PC', 'Deberías ver ahora mismo el aviso de prueba en Windows.');
+      }
     } else {
       agregarToast('warning', 'No se pudo activar', res.reason || 'Verifica los permisos de notificación del navegador.');
     }

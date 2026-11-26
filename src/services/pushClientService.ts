@@ -67,11 +67,40 @@ export const pushClientService = {
     }
   },
 
+  async showLocalDesktopNotification(title: string, body: string, url = '/'): Promise<boolean> {
+    if (typeof window === 'undefined' || !('Notification' in window)) return false;
+    if (Notification.permission !== 'granted') return false;
+    try {
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        if (reg && typeof reg.showNotification === 'function') {
+          await reg.showNotification(title, {
+            body,
+            icon: '/images/logo-industrial.png',
+            badge: '/images/logo-unt.png',
+            tag: `unt-local-${Date.now()}`,
+            data: { url }
+          });
+          return true;
+        }
+      }
+      new Notification(title, { body, icon: '/images/logo-industrial.png' });
+      return true;
+    } catch {
+      try {
+        new Notification(title, { body, icon: '/images/logo-industrial.png' });
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  },
+
   async subscribeDevice(params: {
     codigoMatricula?: string;
     rol: 'tesista' | 'secretaria';
     nombre?: string;
-  }): Promise<{ ok: boolean; reason?: string }> {
+  }): Promise<{ ok: boolean; localOnly?: boolean; reason?: string }> {
     if (!supportsWebPush()) {
       return {
         ok: false,
@@ -85,11 +114,13 @@ export const pushClientService = {
     if (permission !== 'granted') {
       return {
         ok: false,
-        reason: 'Permiso denegado en el navegador. Puedes habilitarlo desde el ícono de candado en la barra de dirección.'
+        reason: 'Permiso denegado en el navegador. Habilítalo desde el ícono del candado en la barra de dirección.'
       };
     }
 
-    const reg = (await this.registerServiceWorker()) || (await navigator.serviceWorker.ready);
+    // Registrar Service Worker y esperar a que esté ACTIVO (evita error en el primer clic)
+    await this.registerServiceWorker();
+    const reg = await navigator.serviceWorker.ready;
     if (!reg) {
       return { ok: false, reason: 'No se pudo inicializar el servicio de notificaciones (verifica HTTPS).' };
     }
@@ -103,12 +134,31 @@ export const pushClientService = {
       return { ok: false, reason: 'Clave VAPID no disponible en el servidor.' };
     }
 
-    let subscription = await reg.pushManager.getSubscription();
-    if (!subscription) {
-      subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey)
-      });
+    let subscription: PushSubscription | null = null;
+    try {
+      subscription = await reg.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey)
+        });
+      }
+    } catch (err: any) {
+      // En Brave (por defecto) el servicio push en segundo plano viene desactivado,
+      // pero las notificaciones locales de escritorio en Windows SÍ funcionan.
+      await this.showLocalDesktopNotification(
+        '🎓 Notificaciones de escritorio activas — Ing. Industrial UNT',
+        'Los avisos en esta PC funcionan. Si usas Brave y deseas alertas con el navegador cerrado, activa "Servicios de Google para mensajería push" en brave://settings/privacy.'
+      );
+      const errMsg = String(err?.message || err?.name || '');
+      const esBrave = /brave/i.test(navigator.userAgent) || Boolean((navigator as unknown as { brave?: unknown }).brave);
+      return {
+        ok: true,
+        localOnly: true,
+        reason: esBrave
+          ? 'Aviso mostrado en tu PC. En Brave, si deseas alertas con el navegador cerrado, activa "Servicios de Google para mensajería push" en brave://settings/privacy.'
+          : `Aviso local activado (${errMsg || 'servicio push restringido por el navegador'}).`
+      };
     }
 
     const saveRes = await fetch('/api/push/subscribe', {
@@ -126,6 +176,16 @@ export const pushClientService = {
       const err = await saveRes.json().catch(() => ({}));
       return { ok: false, reason: err.error || 'No se pudo registrar este dispositivo.' };
     }
+
+    // Enviar notificación real inmediata de confirmación a Windows / celular
+    await this.showLocalDesktopNotification(
+      params.rol === 'secretaria'
+        ? '🔔 Alertas activadas en esta PC — Secretaría UNT'
+        : '🎓 ¡Alertas activadas para tu tesis — UNT!',
+      params.rol === 'secretaria'
+        ? 'Recibirás avisos automáticos aquí cuando llegue una duda nueva o en víspera de sustentación.'
+        : 'Te avisaremos automáticamente cada vez que tu tesis avance de etapa o tenga fecha de sustentación.'
+    );
 
     return { ok: true };
   },
