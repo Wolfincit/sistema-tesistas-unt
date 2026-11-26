@@ -2207,7 +2207,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         Copiar texto
                       </button>
                       <a
-                        href={`https://wa.me/?text=${encodeURIComponent(whatsappDocentesTexto)}`}
+                        href={`https://api.whatsapp.com/send?text=${encodeURIComponent(whatsappDocentesTexto)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold inline-flex items-center gap-1"
@@ -2220,7 +2220,22 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 )}
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Asunto:</label>
+                  <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
+                    <label className="font-bold text-slate-700">Asunto:</label>
+                    <div className="flex items-center gap-1">
+                      {['📢', '🎓', '📅', '🔔', '✅'].map((ico) => (
+                        <button
+                          key={`as-${ico}`}
+                          type="button"
+                          onClick={() => setAsuntoChat((prev) => `${ico} ${prev}`.trim())}
+                          title={`Insertar ${ico} en el asunto`}
+                          className="px-1.5 py-0.5 rounded-md bg-slate-100 hover:bg-blue-100 text-xs cursor-pointer transition-colors"
+                        >
+                          {ico}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <input
                     type="text"
                     required
@@ -2231,12 +2246,37 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Mensaje o Anuncio:</label>
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
+                    <label className="font-bold text-slate-700">Mensaje o Anuncio:</label>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {['📢', '📅', '⏰', '📍', '🎓', '📄', '👨‍🏫', '✅', '📌', '✨'].map((ico) => (
+                        <button
+                          key={`msg-${ico}`}
+                          type="button"
+                          onClick={() => setMensajeChat((prev) => `${prev}${prev && !prev.endsWith(' ') && !prev.endsWith('\n') ? ' ' : ''}${ico} `)}
+                          title={`Insertar ${ico}`}
+                          className="px-1.5 py-0.5 rounded-md bg-slate-100 hover:bg-blue-100 text-xs cursor-pointer transition-colors"
+                        >
+                          {ico}
+                        </button>
+                      ))}
+                      <a
+                        href={`https://api.whatsapp.com/send?text=${encodeURIComponent(mensajeChat || whatsappDocentesTexto || asuntoChat)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Enviar exactamente este mensaje (con tus íconos) a WhatsApp"
+                        className="ml-1 px-2 py-0.5 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-[10px] font-bold inline-flex items-center gap-1"
+                      >
+                        <MessageCircle className="w-3 h-3" />
+                        <span>Pasar a WhatsApp</span>
+                      </a>
+                    </div>
+                  </div>
                   <textarea
-                    rows={3}
+                    rows={4}
                     value={mensajeChat}
                     onChange={(e) => setMensajeChat(e.target.value)}
-                    placeholder="Escribe aquí el mensaje o anuncio que acompañará al flyer..."
+                    placeholder="Escribe aquí el mensaje o anuncio (puedes usar cualquier ícono o emoji con los botones o Win + .)..."
                     className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white"
                   />
                 </div>

@@ -148,6 +148,25 @@ export function saveEmailConfig({
  * Cliente SMTP sobre TLS nativo (Node.js node:tls) forzando IPv4 (family: 4)
  * y con timeout rápido de conexión para detectar bloqueos de puerto 465 en la nube.
  */
+function encodeMimeHeaderUtf8(text) {
+  const chars = Array.from(String(text || ''));
+  if (chars.length === 0) return '';
+  const chunks = [];
+  let current = '';
+  for (const ch of chars) {
+    if (Buffer.byteLength(current + ch, 'utf-8') > 42 && current.length > 0) {
+      chunks.push(`=?UTF-8?B?${Buffer.from(current, 'utf-8').toString('base64')}?=`);
+      current = ch;
+    } else {
+      current += ch;
+    }
+  }
+  if (current) {
+    chunks.push(`=?UTF-8?B?${Buffer.from(current, 'utf-8').toString('base64')}?=`);
+  }
+  return chunks.join('\r\n ');
+}
+
 function buildMimeMessagePayload({
   fromEmail,
   fromName,
@@ -158,10 +177,10 @@ function buildMimeMessagePayload({
   attachment
 }) {
   const boundary = `----=_UNT_Industrial_Boundary_${Date.now().toString(16)}`;
-  const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, 'utf-8').toString('base64')}?=`;
-  const encodedFromName = `=?UTF-8?B?${Buffer.from(fromName, 'utf-8').toString('base64')}?=`;
+  const encodedSubject = encodeMimeHeaderUtf8(subject);
+  const encodedFromName = encodeMimeHeaderUtf8(fromName);
   const headers = [
-    `From: "${encodedFromName}" <${fromEmail}>`,
+    `From: ${encodedFromName} <${fromEmail}>`,
     `Reply-To: ${replyTo || fromEmail}`,
     `To: ${toList.join(', ')}`,
     `Subject: ${encodedSubject}`,
