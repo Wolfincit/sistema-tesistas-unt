@@ -338,14 +338,16 @@ export function buscarEnBaseOficial(consulta: string, faqsDinamicas: FaqItem[] =
   }
   const tokens = Array.from(tokensExpandidos);
 
-  // Unir base oficial fija + respuestas aprobadas por la Srta. Celia en FAQs
+  // Unir base oficial fija + respuestas aprobadas por la Srta. Celia en FAQs (incluyendo su enlace de Drive)
   const faqsAsEntries: OfficialKbEntry[] = faqsDinamicas.map((f) => ({
     id: f.id,
     categoria: f.categoria || 'Respuesta Oficial Secretaría',
     pregunta: f.pregunta,
     respuesta: f.respuesta,
     palabrasClave: normalizarTextoKb(`${f.pregunta} ${f.categoria || ''}`).split(' ').filter((w) => w.length >= 3),
-    fuenteOficial: `Respuesta Oficial aprobada por Srta. Celia (${f.fechaActualizacion || 'Vigente'})`
+    fuenteOficial: `Respuesta Oficial aprobada por Secretaría (${f.fechaActualizacion || 'Vigente'})`,
+    linkUrl: f.linkUrl,
+    linkTexto: f.linkTexto || (f.linkUrl ? 'Abrir Guía / Formato en Drive' : undefined)
   }));
 
   const universo = [...faqsAsEntries, ...OFFICIAL_KB_ENTRIES];

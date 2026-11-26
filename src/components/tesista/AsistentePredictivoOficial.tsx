@@ -250,14 +250,16 @@ export const AsistentePredictivoOficial: React.FC<AsistentePredictivoOficialProp
         </div>
       )}
 
-      {/* Bloque de WhatsApp directo a Secretaría con advertencia previa obligatoria */}
-      <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Bloque de WhatsApp directo a Secretaría con advertencia firme y obligatoria */}
+      <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-rose-50/70 border-2 border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-start gap-2.5 text-xs text-amber-950">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div className="leading-relaxed">
-            <strong className="text-amber-950">Lee primero todos los pasos y procedimientos antes de consultar.</strong>{' '}
-            <span className="text-amber-900">
-              La mayoría de dudas sobre pagos, formatos, Turnitin, Repositorio y URA ya están respondidas aquí. Escribe a Secretaría únicamente si tu caso puntual no figura en las guías.
+            <strong className="text-amber-950 uppercase tracking-wide text-[11px] block">
+              Obligatorio antes de consultar en ventanilla o por WhatsApp
+            </strong>
+            <span className="text-amber-950">
+              <strong>Lee primero todos los Pasos, Preguntas Frecuentes y abre los enlaces oficiales de Google Drive</strong> publicados en esta página. Todos los procedimientos, tasas y formatos ya están detallados aquí: usa WhatsApp <strong>únicamente</strong> para casos excepcionales que no figuren en las guías.
             </span>
           </div>
         </div>

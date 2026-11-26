@@ -283,5 +283,7 @@ export interface FaqItem {
   pregunta: string;
   respuesta: string;
   categoria?: string;
+  linkUrl?: string;
+  linkTexto?: string;
   fechaActualizacion: string;
 }

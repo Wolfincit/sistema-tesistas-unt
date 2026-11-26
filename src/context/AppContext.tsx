@@ -153,8 +153,8 @@ interface AppContextType {
 
   // Preguntas Frecuentes (Alimentadas y editables por Secretaría)
   faqs: FaqItem[];
-  agregarFaq: (datos: { pregunta: string; respuesta: string; categoria?: string }) => Promise<void>;
-  editarFaq: (id: string, datos: { pregunta: string; respuesta: string; categoria?: string }) => Promise<void>;
+  agregarFaq: (datos: { pregunta: string; respuesta: string; categoria?: string; linkUrl?: string; linkTexto?: string }) => Promise<void>;
+  editarFaq: (id: string, datos: { pregunta: string; respuesta: string; categoria?: string; linkUrl?: string; linkTexto?: string }) => Promise<void>;
   eliminarFaq: (id: string) => Promise<void>;
 
   // Notificaciones
@@ -1299,7 +1299,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const agregarFaq = async (datos: { pregunta: string; respuesta: string; categoria?: string }) => {
+  const agregarFaq = async (datos: { pregunta: string; respuesta: string; categoria?: string; linkUrl?: string; linkTexto?: string }) => {
     try {
       const nueva = await faqService.agregarFaq(datos);
       setFaqs((prev) => [nueva, ...prev]);
@@ -1309,7 +1309,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const editarFaq = async (id: string, datos: { pregunta: string; respuesta: string; categoria?: string }) => {
+  const editarFaq = async (id: string, datos: { pregunta: string; respuesta: string; categoria?: string; linkUrl?: string; linkTexto?: string }) => {
     try {
       const editada = await faqService.editarFaq(id, datos);
       setFaqs((prev) => prev.map((f) => (f.id === id ? editada : f)));
