@@ -4,6 +4,7 @@ import { Header } from './components/common/Header';
 import { Footer } from './components/common/Footer';
 import { ToastContainer } from './components/common/Toast';
 import { PwaInstallBanner } from './components/common/PwaInstallBanner';
+import { SplashScreen } from './components/common/SplashScreen';
 import { pushClientService } from './services/pushClientService';
 import { LoginPage } from './pages/LoginPage';
 import { TesisRepositoryPage } from './pages/TesisRepositoryPage';
@@ -45,6 +46,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F7F9FC] text-slate-800">
+      <SplashScreen durationMs={1650} />
       <Header
         vistaActual={vistaActual}
         onCambiarVista={(v) => setVistaActual(v)}
