@@ -22,8 +22,10 @@ const TITULO_SUSTENTACIONES_KEY = 'unt_industrial_titulo_sustentaciones_v1';
 
 export interface EmailConfigStatus {
   configured: boolean;
+  mode?: 'google-workspace-https' | 'smtp' | 'gmail-direct';
   senderEmail: string;
   senderName: string;
+  appsScriptUrl?: string;
   smtpHost: string;
 }
 
@@ -104,6 +106,7 @@ export const logisticaSecretariaService = {
     senderEmail: string;
     senderName: string;
     appPassword?: string;
+    appsScriptUrl?: string;
     smtpHost?: string;
   }): Promise<EmailConfigStatus> {
     const res = await fetch('/api/correo/config', {

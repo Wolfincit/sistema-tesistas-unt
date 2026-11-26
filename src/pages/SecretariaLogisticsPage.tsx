@@ -104,13 +104,19 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [cfgEmailInput, setCfgEmailInput] = useState<string>('');
   const [cfgNameInput, setCfgNameInput] = useState<string>('Srta. Celia — Secretaría Ing. Industrial UNT');
   const [cfgPassInput, setCfgPassInput] = useState<string>('');
-  const [mostrarOpcionesAvanzadasSmtp, setMostrarOpcionesAvanzadasSmtp] = useState<boolean>(false);
+  const [cfgGasUrlInput, setCfgGasUrlInput] = useState<string>('');
+  const [modoVinculacion, setModoVinculacion] = useState<'directo' | 'workspace' | 'smtp'>('directo');
+  const [codigoGasCopiado, setCodigoGasCopiado] = useState<boolean>(false);
 
   useEffect(() => {
     logisticaSecretariaService.getEmailStatus().then((st) => {
       setEmailStatus(st);
       if (st.senderEmail) setCfgEmailInput(st.senderEmail);
       if (st.senderName) setCfgNameInput(st.senderName);
+      if (st.appsScriptUrl) {
+        setCfgGasUrlInput(st.appsScriptUrl);
+        setModoVinculacion('workspace');
+      }
     });
   }, []);
 
@@ -419,7 +425,18 @@ export const SecretariaLogisticsPage: React.FC = () => {
     const enlaces = construirEnlacesCorreo(todosDestinatarios, asuntoChat, textoMensajeFinal);
     setEnlaceGmailListo(null);
 
-    // Si vinculó su correo en 1 clic (sin clave SMTP), abrir Gmail SÍNCRONAMENTE antes del await para que el navegador NUNCA bloquee la ventana
+    // Si hay un Flyer cargado, copiar la imagen automáticamente al portapapeles para pegarla con Ctrl+V si usa Gmail Web
+    if (flyerPreview && navigator.clipboard && 'write' in navigator.clipboard) {
+      fetch(flyerPreview)
+        .then((r) => r.blob())
+        .then((blob) => {
+          const item = new ClipboardItem({ [blob.type || 'image/png']: blob });
+          navigator.clipboard.write([item]).catch(() => {});
+        })
+        .catch(() => {});
+    }
+
+    // Si vinculó su correo en Modo Directo 1 Clic (sin conector Apps Script ni clave SMTP), abrir Gmail SÍNCRONAMENTE antes del await
     let ventanaAbiertaSincrona = false;
     if (!emailStatus.configured) {
       const win = window.open(enlaces.gmailUrl, '_blank');
@@ -592,13 +609,13 @@ export const SecretariaLogisticsPage: React.FC = () => {
       const segActualizados = seguimientos.map((s) =>
         s.id === calTesistaId
           ? {
-              ...s,
-              fechaSustentacionProgramada: fechaJuevesActiva,
-              estacionActual: 4 as EstacionLogisticaId,
-              juradoPresidente: calPresidente,
-              juradoSecretario: calSecretario,
-              juradoVocal: calVocal
-            }
+            ...s,
+            fechaSustentacionProgramada: fechaJuevesActiva,
+            estacionActual: 4 as EstacionLogisticaId,
+            juradoPresidente: calPresidente,
+            juradoSecretario: calSecretario,
+            juradoVocal: calVocal
+          }
           : s
       );
       setSeguimientos(segActualizados);
@@ -667,11 +684,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setTab('seguimiento')}
-          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            tab === 'seguimiento'
-              ? 'bg-[#082F64] text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
+          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'seguimiento'
+            ? 'bg-[#082F64] text-white shadow-xs'
+            : 'text-slate-600 hover:bg-slate-100'
+            }`}
         >
           <ClipboardList className="w-4 h-4 text-amber-300" />
           <span>1. Seguimiento ({seguimientos.length})</span>
@@ -680,11 +696,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setTab('instrucciones')}
-          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            tab === 'instrucciones'
-              ? 'bg-[#082F64] text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
+          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'instrucciones'
+            ? 'bg-[#082F64] text-white shadow-xs'
+            : 'text-slate-600 hover:bg-slate-100'
+            }`}
         >
           <Edit3 className="w-4 h-4 text-amber-300" />
           <span>2. Instrucciones (Editar y Publicar)</span>
@@ -693,11 +708,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setTab('despacho')}
-          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            tab === 'despacho'
-              ? 'bg-[#082F64] text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
+          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'despacho'
+            ? 'bg-[#082F64] text-white shadow-xs'
+            : 'text-slate-600 hover:bg-slate-100'
+            }`}
         >
           <Send className="w-4 h-4 text-amber-300" />
           <span>3. Flyers y Correos</span>
@@ -706,11 +720,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
         <button
           type="button"
           onClick={() => setTab('calendario')}
-          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            tab === 'calendario'
-              ? 'bg-[#082F64] text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
+          className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${tab === 'calendario'
+            ? 'bg-[#082F64] text-white shadow-xs'
+            : 'text-slate-600 hover:bg-slate-100'
+            }`}
         >
           <Calendar className="w-4 h-4 text-amber-300" />
           <span>4. Calendario (Jueves 11:00 - 1:00)</span>
@@ -755,22 +768,20 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setFiltroSemaforo('todos')}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                    filtroSemaforo === 'todos'
-                      ? 'bg-[#082F64] text-white border-[#082F64]'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${filtroSemaforo === 'todos'
+                    ? 'bg-[#082F64] text-white border-[#082F64]'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
                 >
                   Todos ({conteosSemaforo.todos})
                 </button>
                 <button
                   type="button"
                   onClick={() => setFiltroSemaforo('operativo')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                    filtroSemaforo === 'operativo'
-                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                      : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100'
-                  }`}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${filtroSemaforo === 'operativo'
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                    : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100'
+                    }`}
                 >
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
                   <span>Listo ({conteosSemaforo.operativo})</span>
@@ -778,11 +789,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setFiltroSemaforo('atencion')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                    filtroSemaforo === 'atencion'
-                      ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-2xs'
-                      : 'bg-amber-50 text-amber-950 border-amber-200 hover:bg-amber-100'
-                  }`}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${filtroSemaforo === 'atencion'
+                    ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-2xs'
+                    : 'bg-amber-50 text-amber-950 border-amber-200 hover:bg-amber-100'
+                    }`}
                 >
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white" />
                   <span>En Revisión ({conteosSemaforo.atencion})</span>
@@ -790,11 +800,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setFiltroSemaforo('incidencia')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                    filtroSemaforo === 'incidencia'
-                      ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
-                      : 'bg-rose-50 text-rose-900 border-rose-200 hover:bg-rose-100'
-                  }`}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${filtroSemaforo === 'incidencia'
+                    ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
+                    : 'bg-rose-50 text-rose-900 border-rose-200 hover:bg-rose-100'
+                    }`}
                 >
                   <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
                   <span>Observado ({conteosSemaforo.incidencia})</span>
@@ -808,11 +817,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setModoVistaSeg('matriz')}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                    modoVistaSeg === 'matriz'
-                      ? 'bg-[#082F64] text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${modoVistaSeg === 'matriz'
+                    ? 'bg-[#082F64] text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   <Table2 className="w-3.5 h-3.5" />
                   <span>Matriz</span>
@@ -820,11 +828,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setModoVistaSeg('tarjetas')}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                    modoVistaSeg === 'tarjetas'
-                      ? 'bg-[#082F64] text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${modoVistaSeg === 'tarjetas'
+                    ? 'bg-[#082F64] text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                    }`}
                 >
                   <LayoutGrid className="w-3.5 h-3.5" />
                   <span>Tarjetas</span>
@@ -880,19 +887,18 @@ export const SecretariaLogisticsPage: React.FC = () => {
                                       estadoKey === 'operativo'
                                         ? 'bg-emerald-500'
                                         : estadoKey === 'atencion'
-                                        ? 'bg-amber-500'
-                                        : 'bg-rose-600';
+                                          ? 'bg-amber-500'
+                                          : 'bg-rose-600';
                                     return (
                                       <button
                                         key={estadoKey}
                                         type="button"
                                         onClick={() => handleCambiarSemaforoDirecto(item.id, estadoKey)}
                                         title={SEMAFORO_META[estadoKey].label}
-                                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
-                                          activoSem
-                                            ? 'bg-white shadow-xs ring-2 ring-slate-400 scale-105'
-                                            : 'opacity-40 hover:opacity-90'
-                                        }`}
+                                        className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer ${activoSem
+                                          ? 'bg-white shadow-xs ring-2 ring-slate-400 scale-105'
+                                          : 'opacity-40 hover:opacity-90'
+                                          }`}
                                       >
                                         <span className={`w-3 h-3 rounded-full ${dotColor}`} />
                                       </button>
@@ -950,13 +956,12 @@ export const SecretariaLogisticsPage: React.FC = () => {
                                     key={et.id}
                                     type="button"
                                     onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
-                                    className={`py-1.5 px-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer truncate ${
-                                      activo
-                                        ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
-                                        : completado
+                                    className={`py-1.5 px-2 rounded-xl text-[11px] font-extrabold transition-all cursor-pointer truncate ${activo
+                                      ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
+                                      : completado
                                         ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                         : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                                    }`}
+                                      }`}
                                   >
                                     {et.corto}
                                   </button>
@@ -1130,13 +1135,12 @@ export const SecretariaLogisticsPage: React.FC = () => {
                             key={et.id}
                             type="button"
                             onClick={() => handleCambiarEtapaDirecto(item.id, et.id)}
-                            className={`py-1.5 px-2 rounded-xl text-[11px] font-bold transition-all cursor-pointer truncate ${
-                              activo
-                                ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
-                                : completado
+                            className={`py-1.5 px-2 rounded-xl text-[11px] font-bold transition-all cursor-pointer truncate ${activo
+                              ? `${et.color} shadow-xs ring-2 ring-offset-1 ring-slate-300`
+                              : completado
                                 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                 : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                            }`}
+                              }`}
                           >
                             {et.nombre}
                           </button>
@@ -1434,9 +1438,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
                       return (
                         <div
                           key={s.id}
-                          className={`flex items-center justify-between p-2.5 text-xs ${
-                            marcado ? 'bg-blue-50/80' : 'hover:bg-slate-50'
-                          }`}
+                          className={`flex items-center justify-between p-2.5 text-xs ${marcado ? 'bg-blue-50/80' : 'hover:bg-slate-50'
+                            }`}
                         >
                           <label className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer">
                             <input
@@ -1599,9 +1602,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
                       return (
                         <div
                           key={ing.id}
-                          className={`flex items-center justify-between p-2.5 text-xs ${
-                            marcado ? 'bg-emerald-50/80' : 'hover:bg-slate-50'
-                          }`}
+                          className={`flex items-center justify-between p-2.5 text-xs ${marcado ? 'bg-emerald-50/80' : 'hover:bg-slate-50'
+                            }`}
                         >
                           <label className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer">
                             <input
@@ -1746,9 +1748,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
               {['Dom', 'Lun', 'Mar', 'Mié', 'JUE', 'Vie', 'Sáb'].map((d) => (
                 <div
                   key={d}
-                  className={`py-1.5 font-bold rounded-md ${
-                    d === 'JUE' ? 'bg-[#082F64] text-amber-300' : 'text-slate-400'
-                  }`}
+                  className={`py-1.5 font-bold rounded-md ${d === 'JUE' ? 'bg-[#082F64] text-amber-300' : 'text-slate-400'
+                    }`}
                 >
                   {d}
                 </div>
@@ -1764,15 +1765,14 @@ export const SecretariaLogisticsPage: React.FC = () => {
                     key={celda.fechaIso}
                     type="button"
                     onClick={() => seleccionarFechaCalendario(celda.fechaIso)}
-                    className={`h-10 rounded-xl border flex flex-col items-center justify-center transition-all cursor-pointer ${
-                      seleccionada
-                        ? 'bg-[#082F64] text-white border-[#082F64] ring-2 ring-amber-400 font-black'
-                        : programada
+                    className={`h-10 rounded-xl border flex flex-col items-center justify-center transition-all cursor-pointer ${seleccionada
+                      ? 'bg-[#082F64] text-white border-[#082F64] ring-2 ring-amber-400 font-black'
+                      : programada
                         ? 'bg-amber-100 border-amber-400 text-amber-950 font-bold'
                         : celda.esJueves
-                        ? 'bg-blue-50/80 border-blue-200 text-unt-blue font-bold hover:bg-blue-100'
-                        : 'bg-slate-50/40 border-slate-100 text-slate-400 hover:bg-slate-100'
-                    }`}
+                          ? 'bg-blue-50/80 border-blue-200 text-unt-blue font-bold hover:bg-blue-100'
+                          : 'bg-slate-50/40 border-slate-100 text-slate-400 hover:bg-slate-100'
+                      }`}
                   >
                     <span className="text-xs leading-none">{celda.dia}</span>
                     {programada && (
@@ -1791,11 +1791,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 <div
                   key={s.id}
                   onClick={() => seleccionarFechaCalendario(s.fecha)}
-                  className={`p-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between gap-2 ${
-                    s.fecha === fechaJuevesActiva
-                      ? 'border-unt-blue bg-blue-50/70'
-                      : 'border-slate-200 hover:bg-slate-50'
-                  }`}
+                  className={`p-2.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between gap-2 ${s.fecha === fechaJuevesActiva
+                    ? 'border-unt-blue bg-blue-50/70'
+                    : 'border-slate-200 hover:bg-slate-50'
+                    }`}
                 >
                   <div className="min-w-0">
                     <div className="font-bold text-slate-900 truncate">{s.tesistaNombre}</div>
@@ -2113,18 +2112,18 @@ export const SecretariaLogisticsPage: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL SIMPLE EN 1 CLIC PARA VINCULAR CORREO DE SECRETARÍA */}
+      {/* MODAL PARA VINCULAR CORREO @UNITRU.EDU.PE (3 OPCIONES SIN BLOQUEO DE CONTRASEÑA DE APLICACIÓN) */}
       {modalCorreoAbierto && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
           onClick={() => setModalCorreoAbierto(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 bg-[#082F64] text-white flex items-center justify-between">
-              <h3 className="text-sm font-bold">Vincular Correo de Secretaría</h3>
+              <h3 className="text-sm font-bold">Vincular Correo (@unitru.edu.pe o Gmail)</h3>
               <button
                 type="button"
                 onClick={() => setModalCorreoAbierto(false)}
@@ -2141,50 +2140,149 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   const st = await logisticaSecretariaService.saveEmailConfig({
                     senderEmail: cfgEmailInput,
                     senderName: cfgNameInput,
-                    appPassword: cfgPassInput
+                    appPassword: modoVinculacion === 'smtp' ? cfgPassInput : '',
+                    appsScriptUrl: modoVinculacion === 'workspace' ? cfgGasUrlInput : ''
                   });
                   setEmailStatus(st);
                   setCfgPassInput('');
                   setModalCorreoAbierto(false);
-                  agregarToast('success', 'Correo Vinculado', `Quedó vinculado ${st.senderEmail}.`);
+                  agregarToast(
+                    'success',
+                    'Correo Vinculado',
+                    st.mode === 'google-workspace-https'
+                      ? `Quedó activo el envío automático en 1 clic para ${st.senderEmail}.`
+                      : `Quedó vinculado ${st.senderEmail}.`
+                  );
                 } catch (err: any) {
                   agregarToast('error', 'Error', err.message);
                 }
               }}
-              className="p-5 space-y-3.5 text-xs"
+              className="p-5 space-y-4 text-xs"
             >
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
-                  Tu Correo (@unitru.edu.pe o @gmail.com):
+                  Correo Institucional o Gmail:
                 </label>
                 <input
                   type="email"
                   required
                   value={cfgEmailInput}
                   onChange={(e) => setCfgEmailInput(e.target.value)}
-                  placeholder="secretaria.industrial@unitru.edu.pe"
+                  placeholder="cchau@unitru.edu.pe"
                   className="w-full p-2.5 rounded-xl border border-slate-300 font-mono"
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setMostrarOpcionesAvanzadasSmtp(!mostrarOpcionesAvanzadasSmtp)}
-                className="text-[11px] text-unt-blue font-semibold hover:underline cursor-pointer"
-              >
-                {mostrarOpcionesAvanzadasSmtp
-                  ? 'Ocultar clave SMTP'
-                  : 'Usar clave de aplicación SMTP'}
-              </button>
+              {/* Selector de Modo de Vinculación (Especial para @unitru.edu.pe donde Google bloquea Contraseñas de Aplicación) */}
+              <div className="space-y-2">
+                <label className="block font-bold text-slate-700">
+                  Método de conexión:
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setModoVinculacion('directo')}
+                    className={`py-2 px-2 rounded-lg font-bold text-[11px] cursor-pointer transition-all ${
+                      modoVinculacion === 'directo'
+                        ? 'bg-[#082F64] text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    1. Directo (Sin clave)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModoVinculacion('workspace')}
+                    className={`py-2 px-2 rounded-lg font-bold text-[11px] cursor-pointer transition-all ${
+                      modoVinculacion === 'workspace'
+                        ? 'bg-[#082F64] text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    2. Auto @unitru
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModoVinculacion('smtp')}
+                    className={`py-2 px-2 rounded-lg font-bold text-[11px] cursor-pointer transition-all ${
+                      modoVinculacion === 'smtp'
+                        ? 'bg-[#082F64] text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    3. Clave Gmail
+                  </button>
+                </div>
+              </div>
 
-              {mostrarOpcionesAvanzadasSmtp && (
-                <div>
+              {/* MODO 1: DIRECTO SIN CLAVE (FUNCIONA AL INSTANTE CON @UNITRU.EDU.PE) */}
+              {modoVinculacion === 'directo' && (
+                <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200 text-slate-700 space-y-1">
+                  <div className="font-bold text-[#082F64]">
+                    ✓ Recomendado para @unitru.edu.pe (0 contraseñas)
+                  </div>
+                  <p className="text-[11px] leading-relaxed">
+                    Las cuentas <strong>@unitru.edu.pe</strong> tienen desactivadas las "Contraseñas de aplicación" por la UNT. Con esta opción no necesitas ninguna clave: al enviar, se abre tu correo institucional con todos los destinatarios, asunto y mensaje cargados (y el flyer copiado al portapapeles).
+                  </p>
+                </div>
+              )}
+
+              {/* MODO 2: CONECTOR GOOGLE WORKSPACE (@UNITRU.EDU.PE ENVÍO AUTOMÁTICO SIN CONTRASEÑA DE APLICACIÓN) */}
+              {modoVinculacion === 'workspace' && (
+                <div className="p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200 space-y-2.5">
+                  <div className="font-bold text-emerald-950">
+                    Envío 100% automático desde @unitru.edu.pe (vía Google Apps Script)
+                  </div>
+                  <p className="text-[11px] text-slate-700 leading-snug">
+                    Permite enviar correos y flyers en 1 clic desde tu cuenta <strong>@unitru.edu.pe</strong> sin usar contraseñas de aplicación:
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const scriptCode = `function doPost(e) {\n  var d = JSON.parse(e.postData.contents);\n  var opts = { htmlBody: d.htmlBody, name: d.fromName || 'Secretaría Ing. Industrial UNT' };\n  if (d.flyerBase64) {\n    var blob = Utilities.newBlob(Utilities.base64Decode(d.flyerBase64), d.flyerMime || 'image/png', d.flyerName || 'Flyer_UNT.png');\n    opts.inlineImages = { flyer_unt_cid: blob };\n    opts.attachments = [blob];\n  }\n  MailApp.sendEmail(d.toList.join(','), d.subject, d.textBody || '', opts);\n  return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);\n}`;
+                        navigator.clipboard.writeText(scriptCode);
+                        setCodigoGasCopiado(true);
+                        setTimeout(() => setCodigoGasCopiado(false), 3000);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg bg-[#082F64] text-white font-bold text-[11px] cursor-pointer"
+                    >
+                      {codigoGasCopiado ? '✓ Código copiado' : '1. Copiar código'}
+                    </button>
+                    <a
+                      href="https://script.google.com/home/start"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 text-[#082F64] font-bold text-[11px]"
+                    >
+                      2. Abrir script.google.com ↗
+                    </a>
+                  </div>
+                  <div className="text-[10px] text-slate-600">
+                    En script.google.com: crea un proyecto, pega el código, dale a <strong>Implementar → Nueva implementación → Aplicación web (Acceso: Cualquier persona)</strong> y pega aquí la URL:
+                  </div>
+                  <input
+                    type="url"
+                    value={cfgGasUrlInput}
+                    onChange={(e) => setCfgGasUrlInput(e.target.value)}
+                    placeholder="https://script.google.com/macros/s/.../exec"
+                    className="w-full p-2 rounded-lg border border-emerald-300 bg-white font-mono text-[11px]"
+                  />
+                </div>
+              )}
+
+              {/* MODO 3: CLAVE SMTP (SOLO PARA @GMAIL.COM PERSONAL) */}
+              {modoVinculacion === 'smtp' && (
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                  <div className="text-[11px] text-slate-600">
+                    Solo para cuentas <strong>@gmail.com</strong> personales que tengan habilitada una clave de aplicación de 16 letras:
+                  </div>
                   <input
                     type="password"
                     value={cfgPassInput}
                     onChange={(e) => setCfgPassInput(e.target.value)}
                     placeholder="Clave de 16 letras"
-                    className="w-full p-2 rounded-xl border border-slate-300 font-mono"
+                    className="w-full p-2 rounded-xl border border-slate-300 bg-white font-mono"
                   />
                 </div>
               )}

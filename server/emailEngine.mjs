@@ -23,8 +23,11 @@ function readEmailConfig() {
     if (!fs.existsSync(EMAIL_CONFIG_PATH)) {
       return {
         senderEmail: process.env.UNT_SMTP_EMAIL || '',
-        senderName: process.env.UNT_SMTP_NAME || 'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
+        senderName:
+          process.env.UNT_SMTP_NAME ||
+          'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
         appPassword: process.env.UNT_SMTP_PASSWORD || '',
+        appsScriptUrl: process.env.UNT_GAS_WEBHOOK_URL || '',
         smtpHost: process.env.UNT_SMTP_HOST || 'smtp.gmail.com',
         smtpPort: Number(process.env.UNT_SMTP_PORT || 465)
       };
@@ -32,8 +35,12 @@ function readEmailConfig() {
     const raw = JSON.parse(fs.readFileSync(EMAIL_CONFIG_PATH, 'utf-8'));
     return {
       senderEmail: process.env.UNT_SMTP_EMAIL || raw.senderEmail || '',
-      senderName: process.env.UNT_SMTP_NAME || raw.senderName || 'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
+      senderName:
+        process.env.UNT_SMTP_NAME ||
+        raw.senderName ||
+        'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
       appPassword: process.env.UNT_SMTP_PASSWORD || raw.appPassword || '',
+      appsScriptUrl: process.env.UNT_GAS_WEBHOOK_URL || raw.appsScriptUrl || '',
       smtpHost: process.env.UNT_SMTP_HOST || raw.smtpHost || 'smtp.gmail.com',
       smtpPort: Number(process.env.UNT_SMTP_PORT || raw.smtpPort || 465)
     };
@@ -42,6 +49,7 @@ function readEmailConfig() {
       senderEmail: '',
       senderName: 'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
       appPassword: '',
+      appsScriptUrl: '',
       smtpHost: 'smtp.gmail.com',
       smtpPort: 465
     };
@@ -50,10 +58,17 @@ function readEmailConfig() {
 
 export function getEmailStatus() {
   const cfg = readEmailConfig();
+  const hasGas = Boolean(
+    cfg.appsScriptUrl && cfg.appsScriptUrl.startsWith('https://script.google.com/')
+  );
+  const hasSmtp = Boolean(cfg.senderEmail && cfg.appPassword);
   return {
-    configured: Boolean(cfg.senderEmail && cfg.appPassword),
+    configured: Boolean(hasGas || hasSmtp),
+    mode: hasGas ? 'google-workspace-https' : hasSmtp ? 'smtp' : 'gmail-direct',
     senderEmail: cfg.senderEmail || '',
-    senderName: cfg.senderName || 'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
+    senderName:
+      cfg.senderName || 'Srta. Celia — Secretaría Académica Ing. Industrial UNT',
+    appsScriptUrl: cfg.appsScriptUrl || '',
     smtpHost: cfg.smtpHost || 'smtp.gmail.com'
   };
 }
@@ -66,21 +81,24 @@ export function saveEmailConfig({
   senderEmail,
   senderName,
   appPassword,
+  appsScriptUrl,
   smtpHost = 'smtp.gmail.com',
   smtpPort = 465
 }) {
   const cleanEmail = String(senderEmail || '').trim().toLowerCase();
   const cleanPass = String(appPassword || '').replace(/\s+/g, '').trim();
+  const cleanGasUrl = String(appsScriptUrl || '').trim();
   const cleanName = String(
     senderName || 'Srta. Celia — Secretaría Académica Ing. Industrial UNT'
   ).trim();
   if (!cleanEmail || !cleanEmail.includes('@')) {
-    throw new Error('Ingrese un correo electrónico válido para la Secretaría.');
+    throw new Error('Ingrese un correo electrónico válido.');
   }
   const data = {
     senderEmail: cleanEmail,
     senderName: cleanName,
     appPassword: cleanPass,
+    appsScriptUrl: cleanGasUrl,
     smtpHost: String(smtpHost || 'smtp.gmail.com').trim(),
     smtpPort: Number(smtpPort || 465)
   };
@@ -292,18 +310,10 @@ export async function dispatchAnnouncementEmail({
   }
 
   const cfg = readEmailConfig();
-  const subjectFinal = String(asunto || 'Comunicado Oficial — Escuela de Ingeniería Industrial UNT').trim();
+  const subjectFinal = String(
+    asunto || 'Comunicado Oficial — Escuela de Ingeniería Industrial UNT'
+  ).trim();
   const textFinal = String(mensaje || '').trim();
-
-  if (!cfg.senderEmail || !cfg.appPassword) {
-    return {
-      ok: true,
-      mode: 'assisted-gmail',
-      recipientsCount: todos.length,
-      recipients: todos,
-      message: 'Correo preparado para envío directo desde Gmail Institucional (configure su clave SMTP si desea envío silencioso en 1 clic).'
-    };
-  }
 
   let attachment = null;
   if (flyerDataUrl && flyerDataUrl.startsWith('data:image/')) {
@@ -334,11 +344,61 @@ export async function dispatchAnnouncementEmail({
         }
       </div>
       <div style="background:#f8fafc;padding:14px 24px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;">
-        Enviado por: <strong>${cfg.senderName}</strong> (${cfg.senderEmail})<br/>
+        Enviado por: <strong>${cfg.senderName}</strong> (${cfg.senderEmail || 'industrial@unitru.edu.pe'})<br/>
         Secretaría Académica — Escuela Profesional de Ingeniería Industrial UNT
       </div>
     </div>
   `;
+
+  // 1. VÍA PREFERIDA PARA @unitru.edu.pe Y RENDER CLOUD: Conector Google Workspace (Apps Script HTTPS Puerto 443)
+  if (cfg.appsScriptUrl && cfg.appsScriptUrl.startsWith('https://script.google.com/')) {
+    try {
+      const cleanB64 = attachment
+        ? attachment.base64Data.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '')
+        : '';
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 14000);
+      const gasRes = await fetch(cfg.appsScriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        redirect: 'follow',
+        signal: controller.signal,
+        body: JSON.stringify({
+          toList: todos,
+          subject: subjectFinal,
+          textBody: textFinal,
+          htmlBody,
+          fromName: cfg.senderName,
+          flyerBase64: cleanB64 || undefined,
+          flyerMime: attachment?.mimeType || undefined,
+          flyerName: attachment?.fileName || undefined
+        })
+      });
+      clearTimeout(timer);
+      if (gasRes.ok) {
+        return {
+          ok: true,
+          mode: 'smtp-direct',
+          recipientsCount: todos.length,
+          recipients: todos,
+          message: `Correo enviado directamente desde ${cfg.senderEmail || 'tu cuenta @unitru.edu.pe'} a ${todos.join(', ')}.`
+        };
+      }
+    } catch {
+      // Si falla, continúa a las demás vías sin bloquear
+    }
+  }
+
+  // 2. Si no tiene clave SMTP configurada, usar despacho directo asistido por Gmail Web
+  if (!cfg.senderEmail || !cfg.appPassword) {
+    return {
+      ok: true,
+      mode: 'assisted-gmail',
+      recipientsCount: todos.length,
+      recipients: todos,
+      message: 'Correo preparado para envío directo desde Gmail Institucional.'
+    };
+  }
 
   const smtpPayload = {
     host: cfg.smtpHost,
