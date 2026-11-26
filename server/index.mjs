@@ -591,7 +591,9 @@ if (isDirectRun) {
     if (safePath.includes('assets')) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     } else if (ext === '.html') {
-      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
     }
     fs.createReadStream(filePath).pipe(res);
   });

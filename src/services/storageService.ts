@@ -4,7 +4,7 @@
  */
 
 const SCHEMA_VERSION_KEY = 'unt_industrial_schema_v';
-const CURRENT_SCHEMA_VERSION = '2026.2-prod-clean';
+const CURRENT_SCHEMA_VERSION = '2026.11.25-v4-clean';
 
 const OPERATIONAL_KEYS = [
   'unt_industrial_tesis',
@@ -17,7 +17,15 @@ const OPERATIONAL_KEYS = [
   'unt_industrial_consultas',
   'unt_industrial_comunicados_generales',
   'unt_industrial_correos_autorizados',
-  'unt_industrial_user_session'
+  'unt_industrial_user_session',
+  'unt_industrial_seguimiento_logistico_v1',
+  'unt_industrial_seguimiento_logistico_v2',
+  'unt_industrial_directorio_jurado_v1',
+  'unt_industrial_directorio_jurado_v2',
+  'unt_industrial_instrucciones_pasos_v1',
+  'unt_industrial_instrucciones_pasos_v2',
+  'unt_industrial_faqs_v1',
+  'unt_industrial_faqs_v2'
 ];
 
 export const storageService = {
