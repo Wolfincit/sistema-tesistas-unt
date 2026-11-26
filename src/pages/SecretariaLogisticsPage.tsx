@@ -525,10 +525,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
       const pushed = await logisticaSecretariaService.notificarCambioEtapaAutomatico(actualizadoRef);
       agregarToast(
         'success',
-        'Etapa actualizada y avisada',
+        'Etapa actualizada',
         pushed > 0
-          ? `Se envió notificación automática al celular del tesista (${pushed} dispositivo${pushed > 1 ? 's' : ''}).`
-          : 'Aviso registrado en la bandeja del tesista (le llegará al celular cuando active alertas).'
+          ? `Aviso enviado al celular del tesista (${pushed}).`
+          : 'Guardado y registrado en la bandeja del tesista.'
       );
     }
   };
@@ -1275,6 +1275,9 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   codigoMatricula: sust.tesistaCodigo || '',
                   tesistaNombre: sust.tesistaNombre,
                   tesistaCorreo: sust.tesistaCorreo || '',
+                  tesista2Nombre: sust.tesista2Nombre,
+                  tesista2Codigo: sust.tesista2Codigo,
+                  tesista2Correo: sust.tesista2Correo,
                   tituloTesis: sust.tituloTesis,
                   lineaInvestigacion: 'Ingeniería Industrial',
                   asesor: sust.asesor || '',

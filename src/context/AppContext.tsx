@@ -207,11 +207,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const agregarToast = (tipo: 'success' | 'error' | 'info' | 'warning', titulo: string, mensaje: string) => {
     const id = `toast-${Date.now()}-${Math.random()}`;
     const nuevoToast: ToastMessage = { id, tipo, titulo, mensaje };
-    setToasts((prev) => [...prev.slice(-1), nuevoToast]);
+    // Máximo 1 aviso corrido a la vez (reemplaza el anterior para nunca apilarse ni tapar la pantalla)
+    setToasts([nuevoToast]);
 
+    const duracionMs = tipo === 'error' ? 4000 : 2500;
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3500);
+    }, duracionMs);
   };
 
   const removerToast = (id: string) => {
