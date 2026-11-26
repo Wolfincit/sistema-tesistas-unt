@@ -373,6 +373,9 @@ export async function dispatchAnnouncementEmail({
   }
 
   const cfg = readEmailConfig();
+  await hydrateOAuthFromTurso(false);
+  const oauthStatus = getGoogleOAuthMailStatus();
+  const effectiveSenderEmail = oauthStatus.email || cfg.senderEmail || DEFAULT_UNT_EMAIL;
   const subjectFinal = String(
     asunto || 'Comunicado Oficial — Escuela de Ingeniería Industrial UNT'
   ).trim();
@@ -407,7 +410,7 @@ export async function dispatchAnnouncementEmail({
         }
       </div>
       <div style="background:#f8fafc;padding:14px 24px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;">
-        Enviado por: <strong>${cfg.senderName}</strong> (${cfg.senderEmail || 'industrial@unitru.edu.pe'})<br/>
+        Enviado por: <strong>${cfg.senderName}</strong> (${effectiveSenderEmail})<br/>
         Secretaría Académica — Escuela Profesional de Ingeniería Industrial UNT
       </div>
     </div>
@@ -416,9 +419,9 @@ export async function dispatchAnnouncementEmail({
   // 0. VÍA GOOGLE WORKSPACE OAUTH 2.0 HTTPS (Envía desde la misma cuenta @unitru.edu.pe sin contraseña de aplicación)
   try {
     const rawMime = buildMimeMessagePayload({
-      fromEmail: cfg.senderEmail || DEFAULT_UNT_EMAIL,
+      fromEmail: effectiveSenderEmail,
       fromName: cfg.senderName,
-      replyTo: cfg.senderEmail || DEFAULT_UNT_EMAIL,
+      replyTo: effectiveSenderEmail,
       toList: todos,
       subject: subjectFinal,
       htmlBody,
@@ -436,7 +439,7 @@ export async function dispatchAnnouncementEmail({
         mode: 'smtp-direct',
         recipientsCount: todos.length,
         recipients: todos,
-        message: `Correo enviado directamente desde ${cfg.senderEmail || DEFAULT_UNT_EMAIL} a ${todos.join(', ')}.`
+        message: `Correo enviado directamente desde ${effectiveSenderEmail} a ${todos.join(', ')}.`
       };
     }
   } catch {

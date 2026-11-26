@@ -1678,18 +1678,47 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={enviandoCorreo}
-                  className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm shadow-sm cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>
-                    {enviandoCorreo
-                      ? 'Enviando desde el sistema...'
-                      : `Enviar Ahora (${tesistasChecks.length + juradoChecks.length})`}
-                  </span>
-                </button>
+                {(() => {
+                  const previewDestinatarios = Array.from(
+                    new Set([
+                      ...tesistasChecks,
+                      ...(nuevoTesistaCorreo.trim().includes('@') ? [nuevoTesistaCorreo.trim().toLowerCase()] : []),
+                      ...juradoChecks,
+                      ...(nuevoIngCorreo.trim().includes('@') ? [nuevoIngCorreo.trim().toLowerCase()] : [])
+                    ])
+                  );
+                  return (
+                    <>
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-700">
+                        <span className="font-bold text-slate-900">
+                          Destinatarios exactos ({previewDestinatarios.length}):{' '}
+                        </span>
+                        {previewDestinatarios.length > 0 ? (
+                          <span className="font-mono text-unt-blue break-all">
+                            {previewDestinatarios.join(', ')}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">
+                            Ninguno seleccionado aún (marca checks a la derecha o escribe un correo puntual).
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={enviandoCorreo || previewDestinatarios.length === 0}
+                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm shadow-sm cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        <Send className="w-4 h-4" />
+                        <span>
+                          {enviandoCorreo
+                            ? 'Enviando desde el sistema...'
+                            : `Enviar Ahora (${previewDestinatarios.length})`}
+                        </span>
+                      </button>
+                    </>
+                  );
+                })()}
 
                 {confirmacionEnvio && (
                   <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-xs font-bold text-emerald-950 flex items-center justify-between gap-2 animate-in fade-in">
