@@ -237,41 +237,45 @@ export async function generarFlyerOficialPng(data: FlyerSustentacionInput): Prom
   const NAVY = '#10107A';
   const FONT_SANS = 'Poppins, "Segoe UI", Arial, sans-serif';
 
-  // 2. TÍTULO DE LA TESIS — Ajuste estricto dentro de la caja segura entre "titulado:" y "Día:"
-  // Garantiza matemáticamente que NUNCA pise el texto "Día:" sin importar qué tan largo sea el título
+  // 2. TÍTULO DE LA TESIS — Optimizado para títulos oficiales UNT (hasta ~20 palabras)
+  // Ancho amplio (1020 px, libre del libro izquierdo) + interlineado editorial compacto (1.08)
+  // + caja estricta entre "titulado:" y "Día:" para máxima presencia visual y CERO superposición
   const tituloLimpio = String(data.tituloTesis || 'Tesis de Ingeniería Industrial')
     .replace(/^[“""]+|[”""]+$/g, '')
     .trim()
     .toUpperCase();
   const tituloConComillas = `“${tituloLimpio}”`;
 
-  const boxTop = esReprog ? 296 : 306;
-  const boxBottom = esReprog ? 360 : 368;
+  const boxTop = esReprog ? 293 : 303;
+  const boxBottom = esReprog ? 364 : 371;
   const boxMaxHeight = boxBottom - boxTop;
-  const titleMaxW = 990;
+  const titleMaxW = 1020;
+  const titleCenterX = 658;
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillStyle = NAVY;
 
-  let chosenFontSize = 14;
-  let chosenLineHeight = 16;
+  let chosenFontSize = 15;
+  let chosenLineHeight = 17;
   let chosenLines: string[] = [tituloConComillas];
 
-  for (let size = 28; size >= 13; size -= 1) {
-    const lh = Math.round(size * 1.14);
+  for (let size = 29; size >= 15; size -= 1) {
+    const lh = Math.round(size * 1.09);
     ctx.font = `800 ${size}px ${FONT_SANS}`;
     const wrapped = wrapTextStrict(ctx, tituloConComillas, titleMaxW);
-    if (wrapped.length * lh <= boxMaxHeight) {
+    // Altura visual real de N líneas = (N-1)*lh + size
+    const blockH = (wrapped.length - 1) * lh + size;
+    if (blockH <= boxMaxHeight) {
       chosenFontSize = size;
       chosenLineHeight = lh;
       chosenLines = wrapped;
       break;
     }
-    if (size === 13) {
-      chosenFontSize = 13;
-      chosenLineHeight = 15;
-      const maxFit = Math.max(1, Math.floor(boxMaxHeight / 15));
+    if (size === 15) {
+      chosenFontSize = 15;
+      chosenLineHeight = 17;
+      const maxFit = Math.max(1, Math.floor((boxMaxHeight - 15) / 17) + 1);
       chosenLines = wrapped.slice(0, maxFit);
       if (wrapped.length > maxFit) {
         const lastIdx = chosenLines.length - 1;
@@ -280,12 +284,12 @@ export async function generarFlyerOficialPng(data: FlyerSustentacionInput): Prom
     }
   }
 
-  const totalBlockH = chosenLines.length * chosenLineHeight;
+  const totalBlockH = (chosenLines.length - 1) * chosenLineHeight + chosenFontSize;
   const startTopY = boxTop + Math.max(0, Math.floor((boxMaxHeight - totalBlockH) / 2));
 
   ctx.font = `800 ${chosenFontSize}px ${FONT_SANS}`;
   chosenLines.forEach((line, idx) => {
-    ctx.fillText(line, coords.titleCenterX, startTopY + idx * chosenLineHeight);
+    ctx.fillText(line, titleCenterX, startTopY + idx * chosenLineHeight);
   });
   ctx.textBaseline = 'alphabetic';
 
