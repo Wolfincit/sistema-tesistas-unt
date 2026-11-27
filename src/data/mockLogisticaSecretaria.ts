@@ -5,6 +5,7 @@
 
 export type EstacionLogisticaId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type SemaforoEstadoId = 'operativo' | 'atencion' | 'incidencia';
+export type ResultadoSustentacionId = 'pendiente' | 'aprobado' | 'desaprobado';
 export type TipoTramiteId = 'titulado' | 'bachiller';
 
 export interface EstacionLogisticaMeta {
@@ -137,7 +138,9 @@ export interface SeguimientoTesisItem {
   juradoSecretario: string;
   juradoVocal: string;
   estacionActual: EstacionLogisticaId;
-  semaforo?: SemaforoEstadoId; // 'operativo' (Verde) | 'atencion' (Amarillo) | 'incidencia' (Rojo)
+  semaforo?: SemaforoEstadoId; // Legado opcional por compatibilidad con registros antiguos
+  resultadoTesista1?: ResultadoSustentacionId; // Resultado individual del Tesista 1
+  resultadoTesista2?: ResultadoSustentacionId; // Resultado individual del Tesista 2 (cuando son pareja)
   fechaIngresoEstacion: string; // YYYY-MM-DD
   fechaInicioTramite: string;   // YYYY-MM-DD
   ubicacionFisica: string;

@@ -32,7 +32,7 @@ interface SecretariaHoyTabProps {
   configColacion: ConfigColacion;
   pushStats: PushStatsInfo;
   onPrepararJueves: (seg?: SeguimientoTesisItem, sust?: SustentacionJuevesItem) => void;
-  onIrATramitesConFiltro: (filtro: 'todos' | 'incidencia' | 'atencion' | 'operativo') => void;
+  onIrATramitesConFiltro: (filtro: 'todos' | 'pendiente' | 'aprobado' | 'desaprobado') => void;
   onIrAColacion: () => void;
   onResponderYGuardarDuda: (duda: DudaTesistaPendiente, respuesta: string) => Promise<void>;
   onActivarPushSecretaria: () => Promise<void>;
@@ -85,7 +85,8 @@ export const SecretariaHoyTab: React.FC<SecretariaHoyTabProps> = ({
         const excedeSla = Boolean(meta && meta.slaDiasMax > 0 && dias > meta.slaDiasMax);
         const diasDesaprobado = calcularDiasRestantesDesaprobado(s.desaprobadoFecha);
         const esAlerta =
-          s.semaforo === 'incidencia' ||
+          s.resultadoTesista1 === 'desaprobado' ||
+          s.resultadoTesista2 === 'desaprobado' ||
           s.cambioTituloActivo ||
           excedeSla ||
           (diasDesaprobado !== null && diasDesaprobado <= 5);
@@ -344,7 +345,15 @@ export const SecretariaHoyTab: React.FC<SecretariaHoyTabProps> = ({
 
             <button
               type="button"
-              onClick={() => onIrATramitesConFiltro(expedientesConAlerta.some((x) => x.item.semaforo === 'incidencia') ? 'incidencia' : 'todos')}
+              onClick={() =>
+                onIrATramitesConFiltro(
+                  expedientesConAlerta.some(
+                    (x) => x.item.resultadoTesista1 === 'desaprobado' || x.item.resultadoTesista2 === 'desaprobado'
+                  )
+                    ? 'desaprobado'
+                    : 'todos'
+                )
+              }
               className="w-full py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>Revisar en Trámites</span>

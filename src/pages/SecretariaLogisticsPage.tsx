@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   EstacionLogisticaId,
-  SemaforoEstadoId,
+  ResultadoSustentacionId,
   TipoTramiteId,
   SeguimientoTesisItem,
   IngenieroJuradoItem,
@@ -71,34 +71,10 @@ const ETAPAS_SIMPLES: { id: EstacionLogisticaId; nombre: string; corto: string; 
   { id: 8, nombre: '8. Listo Colación', corto: '8. Colación', color: 'bg-emerald-700 text-white', fase: 'colacion' }
 ];
 
-const SEMAFORO_META: Record<
-  SemaforoEstadoId,
-  { label: string; dot: string; badge: string; rowBorder: string }
-> = {
-  operativo: {
-    label: 'Listo',
-    dot: 'bg-emerald-500',
-    badge: 'bg-emerald-100 text-emerald-900 border-emerald-300',
-    rowBorder: 'border-l-4 border-l-emerald-500'
-  },
-  atencion: {
-    label: 'En Revisión',
-    dot: 'bg-amber-500',
-    badge: 'bg-amber-100 text-amber-950 border-amber-300',
-    rowBorder: 'border-l-4 border-l-amber-500'
-  },
-  incidencia: {
-    label: 'Observado',
-    dot: 'bg-rose-600',
-    badge: 'bg-rose-100 text-rose-900 border-rose-300',
-    rowBorder: 'border-l-4 border-l-rose-600'
-  }
-};
-
-export const resolverSemaforo = (item: SeguimientoTesisItem): SemaforoEstadoId => {
-  if (item.semaforo) return item.semaforo;
-  if (item.estacionActual >= 4) return 'operativo';
-  return 'atencion';
+const nombreCortoTesista = (nombre: string): string => {
+  const partes = String(nombre || '').trim().split(/\s+/).filter(Boolean);
+  if (partes.length <= 2) return partes.join(' ');
+  return `${partes[0]} ${partes[1]}`;
 };
 
 export const SecretariaLogisticsPage: React.FC = () => {
@@ -329,7 +305,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
   // 1. MATRIZ DE TRABAJO INTERACTIVA (ZERO-LEARNING CURVE)
   // =========================================================
   const [busquedaSeg, setBusquedaSeg] = useState<string>('');
-  const [filtroSemaforo, setFiltroSemaforo] = useState<'todos' | SemaforoEstadoId>('todos');
+  const [filtroResultado, setFiltroResultado] = useState<'todos' | ResultadoSustentacionId>('todos');
   const [subTabGuias, setSubTabGuias] = useState<'pasos' | 'faqs'>('pasos');
   const [guardadoRecienteId, setGuardadoRecienteId] = useState<string>('');
   const [modalSeguimientoAbierto, setModalSeguimientoAbierto] = useState<boolean>(false);
@@ -348,7 +324,6 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [formSecretario, setFormSecretario] = useState<string>('');
   const [formVocal, setFormVocal] = useState<string>('');
   const [formEstacion, setFormEstacion] = useState<EstacionLogisticaId>(1);
-  const [formSemaforo, setFormSemaforo] = useState<SemaforoEstadoId>('atencion');
   const [formNotas, setFormNotas] = useState<string>('');
   const [formTipoTramite, setFormTipoTramite] = useState<TipoTramiteId>('titulado');
   const [formSede, setFormSede] = useState<'Trujillo' | 'Valle Jequetepeque' | 'Huamachuco'>('Trujillo');
@@ -379,7 +354,6 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setFormSecretario(item.juradoSecretario);
       setFormVocal(item.juradoVocal);
       setFormEstacion(item.estacionActual);
-      setFormSemaforo(resolverSemaforo(item));
       setFormNotas(item.notasSecretaria);
       setFormTipoTramite(item.tipoTramite || 'titulado');
       setFormSede(item.sede || 'Trujillo');
@@ -401,7 +375,6 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setFormSecretario(directorioJurado[1]?.nombre || '');
       setFormVocal(directorioJurado[2]?.nombre || '');
       setFormEstacion(1);
-      setFormSemaforo('atencion');
       setFormNotas('');
       setFormTipoTramite('titulado');
       setFormSede('Trujillo');
@@ -427,7 +400,6 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
     const estacionFinal: EstacionLogisticaId =
       formTipoTramite === 'bachiller' && formEstacion < 7 ? 7 : formEstacion;
-    const semaforoFinal: SemaforoEstadoId = formCambioTitulo ? 'incidencia' : formSemaforo;
 
     const matricula2Digits = formEnPareja ? formCodigo2.replace(/\D/g, '') : '';
     if (formEnPareja && matricula2Digits.length > 0 && matricula2Digits.length !== 10) {
@@ -458,11 +430,15 @@ export const SecretariaLogisticsPage: React.FC = () => {
       juradoSecretario: sanitizeText(formSecretario.trim()),
       juradoVocal: sanitizeText(formVocal.trim()),
       estacionActual: estacionFinal,
-      semaforo: semaforoFinal,
+      resultadoTesista1: editandoSeg?.resultadoTesista1 || 'pendiente',
+      resultadoTesista2:
+        formEnPareja && formNombre2.trim()
+          ? editandoSeg?.resultadoTesista2 || 'pendiente'
+          : undefined,
       fechaIngresoEstacion: new Date().toISOString().slice(0, 10),
       fechaInicioTramite: editandoSeg?.fechaInicioTramite || new Date().toISOString().slice(0, 10),
       ubicacionFisica: 'En seguimiento',
-      esCuelloBotellaExterno: semaforoFinal === 'incidencia',
+      esCuelloBotellaExterno: Boolean(formCambioTitulo),
       notasSecretaria: sanitizeText(formNotas.trim()),
       fechaSustentacionProgramada: editandoSeg?.fechaSustentacionProgramada,
       flyerEnviado: editandoSeg?.flyerEnviado,
@@ -552,16 +528,9 @@ export const SecretariaLogisticsPage: React.FC = () => {
     const hoyIso = new Date().toISOString().slice(0, 10);
     const actualizados = seguimientos.map((s) => {
       if (s.id !== id) return s;
-      const nuevoSemaforo: SemaforoEstadoId =
-        nuevaEtapa === 4 || nuevaEtapa === 8
-          ? 'operativo'
-          : s.semaforo === 'incidencia'
-            ? 'incidencia'
-            : 'atencion';
       const next: SeguimientoTesisItem = {
         ...s,
         estacionActual: nuevaEtapa,
-        semaforo: nuevoSemaforo,
         fechaIngresoEstacion: hoyIso
       };
       actualizadoRef = next;
@@ -582,24 +551,35 @@ export const SecretariaLogisticsPage: React.FC = () => {
     }
   };
 
-  const handleCambiarSemaforoDirecto = async (id: string, nuevoSemaforo: SemaforoEstadoId) => {
+  const handleCambiarResultadoSustentacion = async (
+    id: string,
+    cual: 1 | 2,
+    nuevoResultado: ResultadoSustentacionId
+  ) => {
     registrarPuntoRetroceso({
-      label: 'Cambio de semáforo',
+      label: 'Cambio de resultado de sustentación',
       seguimientos: [...seguimientos]
     });
-    let actualizadoRef: SeguimientoTesisItem | null = null;
+    const hoyIso = new Date().toISOString().slice(0, 10);
     const actualizados = seguimientos.map((s) => {
       if (s.id !== id) return s;
-      const next = { ...s, semaforo: nuevoSemaforo, esCuelloBotellaExterno: nuevoSemaforo === 'incidencia' };
-      actualizadoRef = next;
-      return next;
+      const r1 = cual === 1 ? nuevoResultado : s.resultadoTesista1 || 'pendiente';
+      const r2 = s.tesista2Nombre
+        ? cual === 2
+          ? nuevoResultado
+          : s.resultadoTesista2 || 'pendiente'
+        : undefined;
+      const hayDesaprobado = r1 === 'desaprobado' || r2 === 'desaprobado';
+      return {
+        ...s,
+        resultadoTesista1: r1,
+        resultadoTesista2: r2,
+        desaprobadoFecha: hayDesaprobado ? s.desaprobadoFecha || hoyIso : undefined
+      };
     });
     setSeguimientos(actualizados);
     marcarFeedbackGuardado(id);
     await logisticaSecretariaService.saveSeguimientos(actualizados);
-    if (actualizadoRef && nuevoSemaforo === 'incidencia') {
-      logisticaSecretariaService.notificarCambioEtapaAutomatico(actualizadoRef).catch(() => { });
-    }
   };
 
   const handleMoverLoteColacion = async (ids: string[], nuevaEtapa: EstacionLogisticaId) => {
@@ -615,7 +595,6 @@ export const SecretariaLogisticsPage: React.FC = () => {
       const next: SeguimientoTesisItem = {
         ...s,
         estacionActual: nuevaEtapa,
-        semaforo: nuevaEtapa === 8 ? 'operativo' : s.semaforo === 'incidencia' ? 'incidencia' : 'atencion',
         fechaIngresoEstacion: hoyIso
       };
       movidos.push(next);
@@ -694,16 +673,6 @@ export const SecretariaLogisticsPage: React.FC = () => {
     } else {
       agregarToast('warning', 'No se pudo activar', res.reason || 'Verifica los permisos de notificación del navegador.');
     }
-  };
-
-  const handleActualizarNotaDirecto = async (id: string, nuevaNota: string) => {
-    const limpia = sanitizeText(nuevaNota);
-    const actualizados = seguimientos.map((s) =>
-      s.id === id ? { ...s, notasSecretaria: limpia } : s
-    );
-    setSeguimientos(actualizados);
-    marcarFeedbackGuardado(id);
-    await logisticaSecretariaService.saveSeguimientos(actualizados);
   };
 
   // =========================================================
@@ -1222,19 +1191,32 @@ export const SecretariaLogisticsPage: React.FC = () => {
     agregarToast('info', 'Sustentación quitada', `Se liberó un cupo del ${fechaIso}.`);
   };
 
-  const conteosSemaforo = useMemo(() => {
-    const c = { todos: seguimientos.length, operativo: 0, atencion: 0, incidencia: 0 };
+  const conteosResultado = useMemo(() => {
+    const c = { todos: seguimientos.length, pendiente: 0, aprobado: 0, desaprobado: 0 };
     seguimientos.forEach((s) => {
-      const sem = resolverSemaforo(s);
-      c[sem] += 1;
+      const r1 = s.resultadoTesista1 || 'pendiente';
+      const r2 = s.tesista2Nombre ? s.resultadoTesista2 || 'pendiente' : null;
+      if (r1 === 'desaprobado' || r2 === 'desaprobado') c.desaprobado += 1;
+      else if (r1 === 'aprobado' && (!r2 || r2 === 'aprobado')) c.aprobado += 1;
+      else c.pendiente += 1;
     });
     return c;
   }, [seguimientos]);
 
   const seguimientosFiltrados = useMemo(() => {
     return seguimientos.filter((s) => {
-      const sem = resolverSemaforo(s);
-      if (filtroSemaforo !== 'todos' && sem !== filtroSemaforo) return false;
+      if (filtroResultado !== 'todos') {
+        const r1 = s.resultadoTesista1 || 'pendiente';
+        const r2 = s.tesista2Nombre ? s.resultadoTesista2 || 'pendiente' : null;
+        if (filtroResultado === 'desaprobado' && r1 !== 'desaprobado' && r2 !== 'desaprobado') return false;
+        if (filtroResultado === 'aprobado' && !(r1 === 'aprobado' && (!r2 || r2 === 'aprobado'))) return false;
+        if (
+          filtroResultado === 'pendiente' &&
+          (r1 === 'desaprobado' || r2 === 'desaprobado' || (r1 === 'aprobado' && (!r2 || r2 === 'aprobado')))
+        ) {
+          return false;
+        }
+      }
       if (!busquedaSeg.trim()) return true;
       const q = busquedaSeg.toLowerCase();
       return (
@@ -1246,7 +1228,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
         s.asesor.toLowerCase().includes(q)
       );
     });
-  }, [seguimientos, busquedaSeg, filtroSemaforo]);
+  }, [seguimientos, busquedaSeg, filtroResultado]);
 
   const nombresMeses = [
     'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -1295,11 +1277,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
               icon: <ClipboardList className="w-4 h-4 shrink-0" />
             },
             {
-              id: 'despacho' as const,
+              id: 'calendario' as const,
               titulo: 'Jueves y Flyers',
-              subtitulo: 'Agenda y correos',
+              subtitulo: 'Agendar y flyers',
               activo: tab === 'despacho' || tab === 'calendario',
-              icon: <Send className="w-4 h-4 shrink-0" />
+              icon: <Calendar className="w-4 h-4 shrink-0" />
             },
             {
               id: 'colacion' as const,
@@ -1396,18 +1378,6 @@ export const SecretariaLogisticsPage: React.FC = () => {
               <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
                 <button
                   type="button"
-                  onClick={() => setTab('despacho')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                    tab === 'despacho'
-                      ? 'bg-[#082F64] text-white shadow-2xs'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>1. Flyer y Correos</span>
-                </button>
-                <button
-                  type="button"
                   onClick={() => setTab('calendario')}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
                     tab === 'calendario'
@@ -1416,7 +1386,19 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   }`}
                 >
                   <Calendar className="w-3.5 h-3.5" />
-                  <span>2. Agenda Jueves</span>
+                  <span>1. Agenda Jueves</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab('despacho')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                    tab === 'despacho'
+                      ? 'bg-[#082F64] text-white shadow-2xs'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>2. Flyer y Correos</span>
                 </button>
               </div>
             )}
@@ -1498,7 +1480,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
             }
           }}
           onIrATramitesConFiltro={(f) => {
-            setFiltroSemaforo(f);
+            setFiltroResultado(f);
             setTab('seguimiento');
           }}
           onIrAColacion={() => setTab('colacion')}
@@ -1587,50 +1569,47 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Semáforos de Filtrado en 1 Clic (Verde / Amarillo / Rojo) */}
+              {/* Filtros rápidos por Resultado de Sustentación */}
               <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setFiltroSemaforo('todos')}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${filtroSemaforo === 'todos'
+                  onClick={() => setFiltroResultado('todos')}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${filtroResultado === 'todos'
                     ? 'bg-[#082F64] text-white border-[#082F64]'
                     : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                     }`}
                 >
-                  Todos ({conteosSemaforo.todos})
+                  Todos ({conteosResultado.todos})
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFiltroSemaforo('operativo')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${filtroSemaforo === 'operativo'
+                  onClick={() => setFiltroResultado('pendiente')}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${filtroResultado === 'pendiente'
+                    ? 'bg-slate-800 text-white border-slate-800 shadow-2xs'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                >
+                  Pendiente ({conteosResultado.pendiente})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroResultado('aprobado')}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${filtroResultado === 'aprobado'
                     ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
                     : 'bg-emerald-50 text-emerald-900 border-emerald-200 hover:bg-emerald-100'
                     }`}
                 >
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
-                  <span>Listo ({conteosSemaforo.operativo})</span>
+                  ✓ Aprobados ({conteosResultado.aprobado})
                 </button>
                 <button
                   type="button"
-                  onClick={() => setFiltroSemaforo('atencion')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${filtroSemaforo === 'atencion'
-                    ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-2xs'
-                    : 'bg-amber-50 text-amber-950 border-amber-200 hover:bg-amber-100'
-                    }`}
-                >
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white" />
-                  <span>En Revisión ({conteosSemaforo.atencion})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFiltroSemaforo('incidencia')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${filtroSemaforo === 'incidencia'
+                  onClick={() => setFiltroResultado('desaprobado')}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${filtroResultado === 'desaprobado'
                     ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
                     : 'bg-rose-50 text-rose-900 border-rose-200 hover:bg-rose-100'
                     }`}
                 >
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
-                  <span>Observado ({conteosSemaforo.incidencia})</span>
+                  ✕ Desaprobados ({conteosResultado.desaprobado})
                 </button>
               </div>
             </div>
@@ -1653,65 +1632,36 @@ export const SecretariaLogisticsPage: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-[#082F64] text-white text-[11px] uppercase tracking-wider">
-                    <th className="py-3 px-3.5 font-extrabold">Estado</th>
                     <th className="py-3 px-3.5 font-extrabold">Tesista / Matrícula</th>
                     <th className="py-3 px-3.5 font-extrabold min-w-[220px]">Tesis y Jurado</th>
-                    <th className="py-3 px-3.5 font-extrabold min-w-[270px]">Etapa (1 Clic)</th>
-                    <th className="py-3 px-3.5 font-extrabold min-w-[240px]">Apuntes / Observación</th>
+                    <th className="py-3 px-3.5 font-extrabold min-w-[260px]">Etapa (1 Clic)</th>
+                    <th className="py-3 px-3.5 font-extrabold min-w-[250px]">Resultado Sustentación</th>
                     <th className="py-3 px-3.5 font-extrabold text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 text-xs">
                   {seguimientosFiltrados.map((item) => {
                     const etapaActual = item.estacionActual;
-                    const sem = resolverSemaforo(item);
-                    const semMeta = SEMAFORO_META[sem];
                     const guardadoAhora = guardadoRecienteId === item.id;
+                    const tienePareja = Boolean(item.tesista2Nombre?.trim());
+                    const res1: ResultadoSustentacionId = item.resultadoTesista1 || 'pendiente';
+                    const res2: ResultadoSustentacionId = item.resultadoTesista2 || 'pendiente';
+                    const hayDesaprobado = res1 === 'desaprobado' || (tienePareja && res2 === 'desaprobado');
+                    const todosAprobados = tienePareja
+                      ? res1 === 'aprobado' && res2 === 'aprobado'
+                      : res1 === 'aprobado';
+                    const rowAccent = hayDesaprobado
+                      ? 'border-l-4 border-l-rose-500'
+                      : todosAprobados
+                        ? 'border-l-4 border-l-emerald-500'
+                        : 'border-l-4 border-l-transparent';
 
                     return (
                       <tr
                         key={item.id}
-                        className={`hover:bg-blue-50/30 transition-colors ${semMeta.rowBorder}`}
+                        className={`hover:bg-blue-50/30 transition-colors ${rowAccent}`}
                       >
-                        {/* Columna 1: Semáforo en 1 Clic */}
-                        <td className="py-3.5 px-3.5 align-top">
-                          <div className="flex flex-col gap-1.5">
-                            <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 w-fit">
-                              {(['operativo', 'atencion', 'incidencia'] as SemaforoEstadoId[]).map(
-                                (estadoKey) => {
-                                  const activoSem = sem === estadoKey;
-                                  const dotColor =
-                                    estadoKey === 'operativo'
-                                      ? 'bg-emerald-500'
-                                      : estadoKey === 'atencion'
-                                        ? 'bg-amber-500'
-                                        : 'bg-rose-600';
-                                  return (
-                                    <button
-                                      key={estadoKey}
-                                      type="button"
-                                      onClick={() => handleCambiarSemaforoDirecto(item.id, estadoKey)}
-                                      title={SEMAFORO_META[estadoKey].label}
-                                      className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all cursor-pointer ${activoSem
-                                        ? 'bg-white shadow-xs ring-2 ring-slate-400 scale-105'
-                                        : 'opacity-40 hover:opacity-90'
-                                        }`}
-                                    >
-                                      <span className={`w-3 h-3 rounded-full ${dotColor}`} />
-                                    </button>
-                                  );
-                                }
-                              )}
-                            </div>
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold border w-fit ${semMeta.badge}`}
-                            >
-                              {semMeta.label}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Columna 2: Tesista(s) + Matrícula 10 dígitos (soporta 1 o 2 tesistas en pareja) */}
+                        {/* Columna 1: Tesista(s) + Matrícula 10 dígitos (soporta 1 o 2 tesistas en pareja) */}
                         <td className="py-3.5 px-3.5 align-top">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-black text-slate-900 text-xs leading-snug">
@@ -1858,21 +1808,99 @@ export const SecretariaLogisticsPage: React.FC = () => {
                           </div>
                         </td>
 
-                        {/* Columna 5: Apuntes Directos en Línea (Offline-First) */}
+                        {/* Columna 4: Resultado de Sustentación por Tesista (1 o 2 tesistas) */}
                         <td className="py-3.5 px-3.5 align-top">
-                          <div className="relative">
-                            <textarea
-                              rows={2}
-                              value={item.notasSecretaria}
-                              onChange={(e) => handleActualizarNotaDirecto(item.id, e.target.value)}
-                              placeholder="Apunte rápido..."
-                              className="w-full p-2 rounded-xl bg-amber-50/60 border border-amber-200 text-xs text-slate-800 focus:bg-white focus:border-[#082F64] focus:outline-hidden"
-                            />
-                            {guardadoAhora && (
-                              <span className="absolute right-2 bottom-2 px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-bold">
-                                ✓ Guardado
-                              </span>
+                          <div className="space-y-2">
+                            {/* Tesista 1 */}
+                            <div className="space-y-1">
+                              {tienePareja && (
+                                <div className="text-[10px] font-bold text-slate-600 truncate max-w-[235px]">
+                                  1. {nombreCortoTesista(item.tesistaNombre)}
+                                </div>
+                              )}
+                              <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                                {(
+                                  [
+                                    { id: 'pendiente', label: 'Pendiente', active: 'bg-white text-slate-800 shadow-2xs ring-1 ring-slate-300' },
+                                    { id: 'aprobado', label: '✓ Aprobó', active: 'bg-emerald-600 text-white shadow-2xs' },
+                                    { id: 'desaprobado', label: '✕ Desaprobó', active: 'bg-rose-600 text-white shadow-2xs' }
+                                  ] as { id: ResultadoSustentacionId; label: string; active: string }[]
+                                ).map((op) => (
+                                  <button
+                                    key={op.id}
+                                    type="button"
+                                    onClick={() => handleCambiarResultadoSustentacion(item.id, 1, op.id)}
+                                    className={`px-2 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer ${
+                                      res1 === op.id
+                                        ? op.active
+                                        : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
+                                    }`}
+                                  >
+                                    {op.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Tesista 2 (cuando la tesis es en pareja) */}
+                            {tienePareja && (
+                              <div className="space-y-1 pt-1.5 border-t border-slate-100">
+                                <div className="text-[10px] font-bold text-sky-900 truncate max-w-[235px]">
+                                  2. {nombreCortoTesista(item.tesista2Nombre || '')}
+                                </div>
+                                <div className="inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                                  {(
+                                    [
+                                      { id: 'pendiente', label: 'Pendiente', active: 'bg-white text-slate-800 shadow-2xs ring-1 ring-slate-300' },
+                                      { id: 'aprobado', label: '✓ Aprobó', active: 'bg-emerald-600 text-white shadow-2xs' },
+                                      { id: 'desaprobado', label: '✕ Desaprobó', active: 'bg-rose-600 text-white shadow-2xs' }
+                                    ] as { id: ResultadoSustentacionId; label: string; active: string }[]
+                                  ).map((op) => (
+                                    <button
+                                      key={op.id}
+                                      type="button"
+                                      onClick={() => handleCambiarResultadoSustentacion(item.id, 2, op.id)}
+                                      className={`px-2 py-1 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer ${
+                                        res2 === op.id
+                                          ? op.active
+                                          : 'text-slate-500 hover:text-slate-800 hover:bg-white/60'
+                                      }`}
+                                    >
+                                      {op.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
                             )}
+
+                            {/* Resumen automático en pareja + confirmación de guardado */}
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {tienePareja && (res1 !== 'pendiente' || res2 !== 'pendiente') && (
+                                <span
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${
+                                    res1 === 'aprobado' && res2 === 'aprobado'
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                      : res1 === 'desaprobado' && res2 === 'desaprobado'
+                                        ? 'bg-rose-50 text-rose-800 border-rose-200'
+                                        : 'bg-amber-50 text-amber-900 border-amber-200'
+                                  }`}
+                                >
+                                  {res1 === 'aprobado' && res2 === 'aprobado'
+                                    ? '✓ Ambos aprobaron'
+                                    : res1 === 'desaprobado' && res2 === 'desaprobado'
+                                      ? '✕ Ambos desaprobaron'
+                                      : (res1 === 'aprobado' && res2 === 'desaprobado') ||
+                                          (res1 === 'desaprobado' && res2 === 'aprobado')
+                                        ? '⚠ Solo 1 aprobó'
+                                        : 'Resultado parcial'}
+                                </span>
+                              )}
+                              {guardadoAhora && (
+                                <span className="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-bold">
+                                  ✓ Guardado
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
 
@@ -2372,7 +2400,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
                 <div>
                   <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
-                    <label className="font-bold text-slate-700">Mensaje o Anuncio (editable · admite emojis y texto de ChatGPT):</label>
+                    <label className="font-bold text-slate-700">Mensaje o Anuncio:</label>
                     <div className="flex flex-wrap items-center gap-1">
                       {['📢', '📅', '⏰', '📍', '🎓', '📄', '👨‍🏫', '✅', '📌', '✨'].map((ico) => (
                         <button
@@ -2395,7 +2423,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                     rows={5}
                     value={mensajeChat}
                     onChange={(e) => setMensajeChat(e.target.value)}
-                    placeholder="Escribe o pega aquí tu mensaje (incluso desde ChatGPT con cualquier emoji)..."
+                    placeholder="Escribe o pega aquí el mensaje o anuncio..."
                     className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white"
                   />
                 </div>
