@@ -12,7 +12,7 @@
   "rewrites": [
     { "source": "/healthz", "destination": "/api/index.mjs" },
     { "source": "/api/(.*)", "destination": "/api/index.mjs" },
-    { "source": "/((?!assets/|images/|sw\\.js|manifest\\.webmanifest|favicon\\.svg|icons\\.svg).*)", "destination": "/index.html" }
+    { "source": "/((?!assets/|images/|docs/|sw\\.js|manifest\\.webmanifest|favicon\\.svg|icons\\.svg).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

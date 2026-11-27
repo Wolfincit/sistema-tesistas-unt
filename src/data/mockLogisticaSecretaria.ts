@@ -7,6 +7,7 @@ export type EstacionLogisticaId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type SemaforoEstadoId = 'operativo' | 'atencion' | 'incidencia';
 export type ResultadoSustentacionId = 'pendiente' | 'aprobado' | 'desaprobado';
 export type TipoTramiteId = 'titulado' | 'bachiller';
+export type ModalidadTrabajoId = 'tesis' | 'suficiencia';
 
 export interface EstacionLogisticaMeta {
   id: EstacionLogisticaId;
@@ -129,7 +130,8 @@ export interface SeguimientoTesisItem {
   tesista2Nombre?: string;
   tesista2Codigo?: string;
   tesista2Correo?: string;
-  tipoTramite?: TipoTramiteId; // 'titulado' (default) | 'bachiller' (ruta rápida sin Ética ni Repositorio)
+  modalidadTrabajo?: ModalidadTrabajoId; // 'tesis' (default) | 'suficiencia'
+  tipoTramite?: TipoTramiteId; // 'titulado' (default) | 'bachiller' (legado)
   sede?: 'Trujillo' | 'Valle Jequetepeque' | 'Huamachuco';
   tituloTesis: string;
   lineaInvestigacion: string;
@@ -202,6 +204,7 @@ export interface SustentacionJuevesItem {
   tesista2Nombre?: string;
   tesista2Codigo?: string;
   tesista2Correo?: string;
+  modalidadTrabajo?: ModalidadTrabajoId;
   tituloTesis: string;
   asesor: string;
   juradoPresidente: string;
