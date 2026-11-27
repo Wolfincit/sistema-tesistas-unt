@@ -637,7 +637,7 @@ export async function handleApiRequest(req, res) {
 
   if (urlObj.pathname === '/api/correo/enviar' && req.method === 'POST') {
     try {
-      const body = await readJsonBody(req, 12 * 1024 * 1024);
+      const body = await readJsonBody(req, 18 * 1024 * 1024);
       const out = await dispatchAnnouncementEmail(body);
       sendJson(res, 200, out);
     } catch (err) {

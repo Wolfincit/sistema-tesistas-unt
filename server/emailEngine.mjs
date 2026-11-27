@@ -174,9 +174,13 @@ function buildMimeMessagePayload({
   toList,
   subject,
   htmlBody,
-  attachment
+  attachment,
+  extraAttachments = []
 }) {
-  const boundary = `----=_UNT_Industrial_Boundary_${Date.now().toString(16)}`;
+  const tsHex = Date.now().toString(16);
+  const relBoundary = `----=_UNT_Rel_${tsHex}`;
+  const mixedBoundary = `----=_UNT_Mixed_${tsHex}`;
+  const hasExtras = Array.isArray(extraAttachments) && extraAttachments.length > 0;
   const encodedSubject = encodeMimeHeaderUtf8(subject);
   const encodedFromName = encodeMimeHeaderUtf8(fromName);
   const headers = [
@@ -186,14 +190,16 @@ function buildMimeMessagePayload({
     `Subject: ${encodedSubject}`,
     `Date: ${new Date().toUTCString()}`,
     'MIME-Version: 1.0',
-    `Content-Type: multipart/related; boundary="${boundary}"`
+    hasExtras
+      ? `Content-Type: multipart/mixed; boundary="${mixedBoundary}"`
+      : `Content-Type: multipart/related; boundary="${relBoundary}"`
   ];
 
   const htmlBase64 = Buffer.from(htmlBody, 'utf-8')
     .toString('base64')
     .replace(/(.{76})/g, '$1\r\n');
-  const bodyParts = [
-    `--${boundary}`,
+  const relatedParts = [
+    `--${relBoundary}`,
     'Content-Type: text/html; charset="UTF-8"',
     'Content-Transfer-Encoding: base64',
     '',
@@ -207,19 +213,53 @@ function buildMimeMessagePayload({
     const wrappedB64 = cleanB64.replace(/(.{76})/g, '$1\r\n');
     const mimeType = attachment.mimeType || 'image/png';
     const fileName = attachment.fileName || 'Flyer_Sustentacion_UNT.png';
-    bodyParts.push(
-      `--${boundary}`,
-      `Content-Type: ${mimeType}; name="${fileName}"`,
+    const encodedFileName = encodeMimeHeaderUtf8(fileName);
+    relatedParts.push(
+      `--${relBoundary}`,
+      `Content-Type: ${mimeType}; name="${encodedFileName}"`,
       'Content-Transfer-Encoding: base64',
       'Content-ID: <flyer_unt_cid>',
-      `Content-Disposition: inline; filename="${fileName}"`,
+      `Content-Disposition: inline; filename="${encodedFileName}"`,
       '',
       wrappedB64
     );
   }
 
-  bodyParts.push(`--${boundary}--`, '');
-  return [...headers, '', ...bodyParts].join('\r\n');
+  relatedParts.push(`--${relBoundary}--`);
+
+  if (!hasExtras) {
+    return [...headers, '', ...relatedParts, ''].join('\r\n');
+  }
+
+  const mixedParts = [
+    `--${mixedBoundary}`,
+    `Content-Type: multipart/related; boundary="${relBoundary}"`,
+    '',
+    ...relatedParts
+  ];
+
+  for (const extra of extraAttachments) {
+    if (!extra || !extra.base64Data) continue;
+    const cleanB64 = String(extra.base64Data)
+      .replace(/^data:[^;]+;base64,/, '')
+      .replace(/\s+/g, '');
+    if (!cleanB64) continue;
+    const wrappedB64 = cleanB64.replace(/(.{76})/g, '$1\r\n');
+    const mimeType = String(extra.mimeType || 'application/octet-stream').replace(/[\r\n;]/g, '');
+    const safeName = String(extra.fileName || 'Documento_UNT').replace(/[\r\n"]/g, '');
+    const encodedName = encodeMimeHeaderUtf8(safeName);
+    mixedParts.push(
+      `--${mixedBoundary}`,
+      `Content-Type: ${mimeType}; name="${encodedName}"`,
+      'Content-Transfer-Encoding: base64',
+      `Content-Disposition: attachment; filename="${encodedName}"`,
+      '',
+      wrappedB64
+    );
+  }
+
+  mixedParts.push(`--${mixedBoundary}--`, '');
+  return [...headers, '', ...mixedParts].join('\r\n');
 }
 
 function sendSmtpTlsMail({
@@ -233,6 +273,7 @@ function sendSmtpTlsMail({
   subject,
   htmlBody,
   attachment,
+  extraAttachments = [],
   timeoutMs = 4500
 }) {
   return new Promise((resolve, reject) => {
@@ -313,7 +354,8 @@ function sendSmtpTlsMail({
         toList,
         subject,
         htmlBody,
-        attachment
+        attachment,
+        extraAttachments
       });
 
     socket.on('error', (err) => fail(err));
@@ -377,7 +419,8 @@ export async function dispatchAnnouncementEmail({
   tesistasCorreos = [],
   juradoCorreos = [],
   flyerDataUrl = '',
-  flyerNombre = 'Flyer_Sustentacion_UNT.png'
+  flyerNombre = 'Flyer_Sustentacion_UNT.png',
+  adjuntos = []
 }) {
   const todos = Array.from(
     new Set(
@@ -409,6 +452,17 @@ export async function dispatchAnnouncementEmail({
       base64Data: flyerDataUrl
     };
   }
+
+  const extraAttachments = Array.isArray(adjuntos)
+    ? adjuntos
+        .filter((a) => a && typeof a.base64Data === 'string' && a.base64Data.length > 0)
+        .slice(0, 6)
+        .map((a) => ({
+          fileName: String(a.fileName || 'Documento_UNT').slice(0, 140),
+          mimeType: String(a.mimeType || 'application/octet-stream'),
+          base64Data: a.base64Data
+        }))
+    : [];
 
   const htmlBody = `
     <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;border:1px solid #cbd5e1;border-radius:14px;overflow:hidden;background:#ffffff;">
@@ -444,7 +498,8 @@ export async function dispatchAnnouncementEmail({
       toList: todos,
       subject: subjectFinal,
       htmlBody,
-      attachment
+      attachment,
+      extraAttachments
     });
     const rawMimeBase64Url = Buffer.from(rawMime, 'utf-8')
       .toString('base64')
@@ -477,15 +532,19 @@ export async function dispatchAnnouncementEmail({
     const htmlWithDataImg = attachment
       ? htmlBody.replace('cid:flyer_unt_cid', attachment.base64Data)
       : htmlBody;
+    const brevoAtts = [];
+    if (cleanB64) brevoAtts.push({ content: cleanB64, name: attachment.fileName || 'Flyer_UNT.png' });
+    for (const ex of extraAttachments) {
+      const b = ex.base64Data.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
+      if (b) brevoAtts.push({ content: b, name: ex.fileName });
+    }
     const brevoBody = {
       sender: { name: cfg.senderName, email: senderMailbox },
       replyTo: cfg.senderEmail ? { name: cfg.senderName, email: cfg.senderEmail } : undefined,
       to: todos.map((email) => ({ email })),
       subject: subjectFinal,
       htmlContent: htmlWithDataImg,
-      attachment: cleanB64
-        ? [{ content: cleanB64, name: attachment.fileName || 'Flyer_UNT.png' }]
-        : undefined
+      attachment: brevoAtts.length > 0 ? brevoAtts : undefined
     };
     const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -529,9 +588,13 @@ export async function dispatchAnnouncementEmail({
         to: todos,
         subject: subjectFinal,
         html: htmlWithDataImg,
-        attachments: cleanB64
-          ? [{ filename: attachment.fileName || 'Flyer_UNT.png', content: cleanB64 }]
-          : undefined
+        attachments: [
+          ...(cleanB64 ? [{ filename: attachment.fileName || 'Flyer_UNT.png', content: cleanB64 }] : []),
+          ...extraAttachments.map((ex) => ({
+            filename: ex.fileName,
+            content: ex.base64Data.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '')
+          }))
+        ]
       })
     });
     if (resendRes.ok) {
@@ -597,7 +660,8 @@ export async function dispatchAnnouncementEmail({
       toList: todos,
       subject: subjectFinal,
       htmlBody,
-      attachment
+      attachment,
+      extraAttachments
     });
     return {
       ok: true,

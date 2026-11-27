@@ -273,6 +273,7 @@ export const logisticaSecretariaService = {
     juradoCorreos: string[];
     flyerDataUrl?: string;
     flyerNombre?: string;
+    adjuntos?: { fileName: string; mimeType: string; base64Data: string }[];
   }): Promise<{
     ok: boolean;
     mode: 'smtp-direct' | 'registro-interno';

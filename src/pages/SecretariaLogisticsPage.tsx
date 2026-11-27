@@ -54,7 +54,8 @@ import {
   ChevronDown,
   ChevronUp,
   BellRing,
-  Undo2
+  Undo2,
+  Paperclip
 } from 'lucide-react';
 
 const sanitizeText = (val: string): string =>
@@ -682,26 +683,49 @@ export const SecretariaLogisticsPage: React.FC = () => {
     'Sustentación de Tesis — Escuela de Ingeniería Industrial UNT'
   );
   const [mensajeChat, setMensajeChat] = useState<string>('');
-  const asuntoInputRef = useRef<HTMLInputElement | null>(null);
-  const mensajeTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [adjuntosCorreo, setAdjuntosCorreo] = useState<
+    { id: string; fileName: string; mimeType: string; sizeBytes: number; base64Data: string }[]
+  >([]);
+  const adjuntoInputRef = useRef<HTMLInputElement | null>(null);
 
-  const insertarIconoEnCursor = (
-    el: HTMLInputElement | HTMLTextAreaElement | null,
-    valorActual: string,
-    setter: (v: string) => void,
-    icono: string
-  ) => {
-    const start = el && typeof el.selectionStart === 'number' ? el.selectionStart : valorActual.length;
-    const end = el && typeof el.selectionEnd === 'number' ? el.selectionEnd : valorActual.length;
-    const nuevo = `${valorActual.slice(0, start)}${icono}${valorActual.slice(end)}`;
-    setter(nuevo);
-    requestAnimationFrame(() => {
-      if (el) {
-        el.focus();
-        const pos = start + icono.length;
-        el.setSelectionRange(pos, pos);
+  const handleAdjuntarDocumentos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (files.length === 0) return;
+
+    const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
+    let totalActual = adjuntosCorreo.reduce((acc, a) => acc + a.sizeBytes, 0);
+    const nuevos: { id: string; fileName: string; mimeType: string; sizeBytes: number; base64Data: string }[] = [];
+
+    for (const file of files) {
+      if (adjuntosCorreo.length + nuevos.length >= 6) {
+        agregarToast('warning', 'Máximo 6 archivos', 'Puedes adjuntar hasta 6 documentos por correo.');
+        break;
       }
-    });
+      if (totalActual + file.size > MAX_TOTAL_BYTES) {
+        agregarToast('warning', 'Tamaño excedido', `"${file.name}" supera el límite total de 10 MB.`);
+        continue;
+      }
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+        reader.readAsDataURL(file);
+      }).catch(() => '');
+      if (!dataUrl) continue;
+      totalActual += file.size;
+      nuevos.push({
+        id: `adj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        sizeBytes: file.size,
+        base64Data: dataUrl
+      });
+    }
+
+    if (nuevos.length > 0) {
+      setAdjuntosCorreo((prev) => [...prev, ...nuevos]);
+    }
   };
   const [flyerPreview, setFlyerPreview] = useState<string>('');
   const [flyerNombre, setFlyerNombre] = useState<string>('');
@@ -884,7 +908,12 @@ export const SecretariaLogisticsPage: React.FC = () => {
         tesistasCorreos: listaTesistasFinal,
         juradoCorreos: listaJuradoFinal,
         flyerDataUrl: flyerPreview || undefined,
-        flyerNombre: flyerNombre || undefined
+        flyerNombre: flyerNombre || undefined,
+        adjuntos: adjuntosCorreo.map(({ fileName, mimeType, base64Data }) => ({
+          fileName,
+          mimeType,
+          base64Data
+        }))
       });
 
       const tesistasInfo = seguimientos
@@ -958,6 +987,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
         fechaHora
       });
       setCorreosManuales([]);
+      setAdjuntosCorreo([]);
       setInputCorreoManual('');
       agregarToast('success', 'Despacho y Aviso Completados', res.message);
     } catch (err: any) {
@@ -2369,27 +2399,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 )}
 
                 <div>
-                  <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
-                    <label className="font-bold text-slate-700">Asunto:</label>
-                    <div className="flex items-center gap-1">
-                      {['📢', '🎓', '📅', '🔔', '✅'].map((ico) => (
-                        <button
-                          key={`as-${ico}`}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() =>
-                            insertarIconoEnCursor(asuntoInputRef.current, asuntoChat, setAsuntoChat, ico)
-                          }
-                          title={`Insertar ${ico} donde está el cursor`}
-                          className="px-1.5 py-0.5 rounded-md bg-slate-100 hover:bg-blue-100 text-xs cursor-pointer transition-colors"
-                        >
-                          {ico}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  <label className="block font-bold text-slate-700 mb-1">Asunto:</label>
                   <input
-                    ref={asuntoInputRef}
                     type="text"
                     required
                     value={asuntoChat}
@@ -2399,33 +2410,61 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <div className="flex flex-wrap items-center justify-between gap-1.5 mb-1">
+                  <div className="flex items-center justify-between gap-2 mb-1">
                     <label className="font-bold text-slate-700">Mensaje o Anuncio:</label>
-                    <div className="flex flex-wrap items-center gap-1">
-                      {['📢', '📅', '⏰', '📍', '🎓', '📄', '👨‍🏫', '✅', '📌', '✨'].map((ico) => (
-                        <button
-                          key={`msg-${ico}`}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() =>
-                            insertarIconoEnCursor(mensajeTextareaRef.current, mensajeChat, setMensajeChat, ico)
-                          }
-                          title={`Insertar ${ico} donde está el cursor`}
-                          className="px-1.5 py-0.5 rounded-md bg-slate-100 hover:bg-blue-100 text-xs cursor-pointer transition-colors"
-                        >
-                          {ico}
-                        </button>
-                      ))}
-                    </div>
+                    <input
+                      ref={adjuntoInputRef}
+                      type="file"
+                      multiple
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg,.webp"
+                      onChange={handleAdjuntarDocumentos}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => adjuntoInputRef.current?.click()}
+                      title="Adjuntar documento(s)"
+                      aria-label="Adjuntar documento"
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-blue-100 text-slate-600 hover:text-[#082F64] border border-slate-200 transition-colors cursor-pointer"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </button>
                   </div>
                   <textarea
-                    ref={mensajeTextareaRef}
                     rows={5}
                     value={mensajeChat}
                     onChange={(e) => setMensajeChat(e.target.value)}
                     placeholder="Escribe o pega aquí el mensaje o anuncio..."
                     className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white"
                   />
+                  {adjuntosCorreo.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {adjuntosCorreo.map((adj) => (
+                        <span
+                          key={adj.id}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200 text-[#082F64] text-[11px] font-semibold max-w-full"
+                        >
+                          <Paperclip className="w-3 h-3 shrink-0" />
+                          <span className="truncate max-w-[200px]">{adj.fileName}</span>
+                          <span className="text-[10px] text-slate-500 shrink-0">
+                            ({adj.sizeBytes >= 1024 * 1024
+                              ? `${(adj.sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+                              : `${Math.max(1, Math.round(adj.sizeBytes / 1024))} KB`})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAdjuntosCorreo((prev) => prev.filter((item) => item.id !== adj.id))
+                            }
+                            title="Quitar archivo"
+                            className="p-0.5 rounded hover:bg-blue-200/70 text-slate-500 hover:text-rose-600 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Destinatario adicional por correo manual */}
