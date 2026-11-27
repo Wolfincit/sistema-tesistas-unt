@@ -2,6 +2,7 @@ import { ModalidadTrabajoId } from '../data/mockLogisticaSecretaria';
 
 export interface PlantillaMensajeInput {
   modalidad: ModalidadTrabajoId; // 'tesis' | 'suficiencia'
+  esReprogramacion?: boolean;
   tesistaNombre: string;
   tesista2Nombre?: string;
   tituloTesis: string;
@@ -103,6 +104,13 @@ function formatearNombresBachilleres(t1: string, t2?: string): {
   };
 }
 
+function formatearLugarConArticulo(lugarRaw: string): string {
+  const clean = (lugarRaw || 'Auditorio de la Escuela de Ingeniería Industrial').trim();
+  if (/^(el|la|los|las)\s+/i.test(clean)) return clean;
+  if (/^sala\b|^oficina\b/i.test(clean)) return `la ${clean}`;
+  return `el ${clean}`;
+}
+
 /**
  * PASO 2 — Correo oficial exacto para los JURADOS (Ingenieros).
  * Soporta Trabajo de Tesis y Trabajo de Suficiencia Profesional (1 o 2 bachilleres).
@@ -118,7 +126,7 @@ export function generarCorreoJuradosOficial(input: PlantillaMensajeInput): {
   );
   const { minuscula: fechaLarga } = formatearFechaLargaEs(input.fechaIso);
   const hora = normalizarHoraOficial(input.horaTexto);
-  const lugar = (input.lugar || 'Auditorio de la Escuela de Ingeniería Industrial').trim();
+  const lugarConArt = formatearLugarConArticulo(input.lugar);
   const titulo = (input.tituloTesis || '').trim().toUpperCase();
 
   const docentesLista = [input.jurado1, input.jurado2, input.jurado3, input.asesor]
@@ -143,8 +151,9 @@ export function generarCorreoJuradosOficial(input: PlantillaMensajeInput): {
 
   const introTitulo = esSuficiencia ? 'El trabajo se titula' : 'La tesis se titula';
   const firmaSecretaria = (input.secretariaNombre || 'Celia Chau Muñoz').trim();
+  const prefijoAsunto = input.esReprogramacion ? 'Reprogramación de Sustentación de' : 'Invitación a Sustentación de';
 
-  const asunto = `Invitación a Sustentación de ${modalidadEtiqueta} — ${nombresMayus} (${fechaLarga})`;
+  const asunto = `${prefijoAsunto} ${modalidadEtiqueta} — ${nombresMayus} (${fechaLarga})`;
 
   const mensaje = `Estimados Ingenieros:
 ${docentesLista.join('\n')}
@@ -152,7 +161,7 @@ Docentes del Departamento Académico de Ingeniería Industrial.
 
 Reciban un cordial saludo. Por medio del presente, se les adjunta la invitación para el proceso de evaluación de la sustentación del ${modalidadEtiqueta} de ${bachillerEtiqueta}, en calidad de Miembros del Jurado Dictaminador.
 
-${introTitulo}: “${titulo}” La sustentación se realizará el ${fechaLarga}, a las ${hora}, en ${lugar}.
+${introTitulo}: “${titulo}” La sustentación se realizará el ${fechaLarga}, a las ${hora}, en ${lugarConArt}.
 
 Documentación Adjunta:
 • ${docEmpastado}
@@ -188,22 +197,23 @@ export function generarCorreoTesistasOficial(input: PlantillaMensajeInput): {
   const { minuscula: fechaLarga } = formatearFechaLargaEs(input.fechaIso);
   const hora = normalizarHoraOficial(input.horaTexto);
   const horaLlegada = calcularHoraUnaHoraAntes(hora);
-  const lugar = (input.lugar || 'Auditorio de la Escuela de Ingeniería Industrial').trim();
+  const lugarConArt = formatearLugarConArticulo(input.lugar);
   const titulo = (input.tituloTesis || '').trim().toUpperCase();
 
   const modalidadEtiqueta = esSuficiencia
     ? 'Trabajo de Suficiencia Profesional'
     : 'Trabajo de Tesis';
 
-  const asunto = `Programación de Sustentación de ${modalidadEtiqueta} — ${nombresMayus} (${fechaLarga})`;
+  const prefijoAsunto = input.esReprogramacion ? 'Reprogramación de Sustentación de' : 'Programación de Sustentación de';
+  const asunto = `${prefijoAsunto} ${modalidadEtiqueta} — ${nombresMayus} (${fechaLarga})`;
 
   const lineaIntro = esPareja
     ? esSuficiencia
-      ? `Su sustentación del Trabajo de Suficiencia Profesional, titulado “${titulo}”, está programada para el ${fechaLarga}, a las ${hora}, en ${lugar}.`
-      : `Su sustentación de tesis, titulada “${titulo}”, está programada para el ${fechaLarga}, a las ${hora}, en ${lugar}.`
+      ? `Su sustentación del Trabajo de Suficiencia Profesional, titulado “${titulo}”, está programada para el ${fechaLarga}, a las ${hora}, en ${lugarConArt}.`
+      : `Su sustentación de tesis, titulada “${titulo}”, está programada para el ${fechaLarga}, a las ${hora}, en ${lugarConArt}.`
     : esSuficiencia
-      ? `Tu sustentación del Trabajo de Suficiencia Profesional, titulado “${titulo}”, está programada para el ${fechaLarga}, a las ${hora}, en ${lugar}.`
-      : `Tu sustentación de tesis, titulada “${titulo}”, está programada para el ${fechaLarga}, a las ${hora}, en ${lugar}.`;
+      ? `Tu sustentación del Trabajo de Suficiencia Profesional, titulado “${titulo}”, está programada para el ${fechaLarga}, a las ${hora}, en ${lugarConArt}.`
+      : `Tu sustentación de tesis, titulada “${titulo}”, está programada para el ${fechaLarga}, a las ${hora}, en ${lugarConArt}.`;
 
   const mensaje = esPareja
     ? `¡Hola, ${saludoNombres}! Felicitaciones por este gran paso hacia su titulación. Es un momento muy importante y todo va a salir excelente si se organizan bien.

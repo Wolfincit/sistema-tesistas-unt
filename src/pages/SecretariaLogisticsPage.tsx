@@ -460,9 +460,12 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
     // Si este tesista es el que está cargado en el flyer, regenerar el flyer al instante
     if (flyerDatosActivos && tesistaDespachoActivoId === nuevo.id) {
+      const modNuevo = nuevo.modalidadTrabajo || 'tesis';
+      setModalidadDespacho(modNuevo);
       regenerarFlyerDesdeDatos(
         {
           ...flyerDatosActivos,
+          modalidad: modNuevo,
           tesistaNombre: nuevo.tesistaNombre,
           segundoBachiller: nuevo.tesista2Nombre || '',
           tituloTesis: nuevo.tituloTesis,
@@ -471,7 +474,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
           juradoSecretario: nuevo.juradoSecretario,
           juradoVocal: nuevo.juradoVocal
         },
-        false
+        true,
+        modNuevo
       ).catch(() => {});
     }
 
@@ -642,7 +646,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
     datos: FlyerSustentacionInput,
     modalidadOverride?: ModalidadTrabajoId
   ): PlantillaMensajeInput => ({
-    modalidad: modalidadOverride || modalidadDespacho,
+    modalidad: modalidadOverride || datos.modalidad || modalidadDespacho,
+    esReprogramacion: datos.tipo === 'reprogramacion',
     tesistaNombre: datos.tesistaNombre,
     tesista2Nombre: datos.segundoBachiller,
     tituloTesis: datos.tituloTesis,
@@ -792,6 +797,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
     const flyerInput: FlyerSustentacionInput = {
       tipo: tipoFlyer,
+      modalidad: modSeg,
       tesistaNombre: seg.tesistaNombre,
       segundoBachiller: seg.tesista2Nombre || '',
       tituloTesis: seg.tituloTesis,
@@ -1138,9 +1144,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
     // Si el flyer activo corresponde a esta sustentación/tesista, actualizarlo al instante
     if (flyerDatosActivos) {
+      setModalidadDespacho(calModalidad);
       await regenerarFlyerDesdeDatos(
         {
           ...flyerDatosActivos,
+          modalidad: calModalidad,
           tesistaNombre: registro.tesistaNombre,
           segundoBachiller: registro.tesista2Nombre || '',
           tituloTesis: registro.tituloTesis,
@@ -1152,7 +1160,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
           juradoSecretario: registro.juradoSecretario,
           juradoVocal: registro.juradoVocal
         },
-        false
+        true,
+        calModalidad
       );
     }
 
@@ -1897,6 +1906,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         tesista2Nombre: sust.tesista2Nombre ?? seg?.tesista2Nombre,
                         tesista2Codigo: sust.tesista2Codigo ?? seg?.tesista2Codigo,
                         tesista2Correo: sust.tesista2Correo ?? seg?.tesista2Correo,
+                        modalidadTrabajo: sust.modalidadTrabajo || seg?.modalidadTrabajo || 'tesis',
                         tituloTesis: sust.tituloTesis || seg?.tituloTesis || '',
                         asesor: sust.asesor || seg?.asesor || '',
                         juradoPresidente: sust.juradoPresidente || seg?.juradoPresidente || '',
@@ -2002,7 +2012,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                                 ...flyerDatosActivos,
                                 lugar: 'Auditorio de la Escuela de Ingeniería Industrial'
                               },
-                              false
+                              true
                             )
                           }
                           className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer border ${
@@ -2016,7 +2026,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() =>
-                            regenerarFlyerDesdeDatos({ ...flyerDatosActivos, lugar: 'Aula II-6' }, false)
+                            regenerarFlyerDesdeDatos({ ...flyerDatosActivos, lugar: 'Aula II-6' }, true)
                           }
                           className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer border ${
                             flyerDatosActivos.lugar === 'Aula II-6'
@@ -2063,7 +2073,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                               onChange={(e) =>
                                 regenerarFlyerDesdeDatos(
                                   { ...flyerDatosActivos, horario: e.target.value },
-                                  false
+                                  true
                                 )
                               }
                               className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
@@ -2077,7 +2087,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                               onChange={(e) =>
                                 regenerarFlyerDesdeDatos(
                                   { ...flyerDatosActivos, lugar: e.target.value },
-                                  false
+                                  true
                                 )
                               }
                               className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold"
@@ -2275,7 +2285,16 @@ export const SecretariaLogisticsPage: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setModalidadDespacho('tesis');
-                        aplicarPlantillaCorreo(plantillaCorreoActiva, flyerDatosActivos, 'tesis');
+                        if (flyerDatosActivos) {
+                          regenerarFlyerDesdeDatos(
+                            { ...flyerDatosActivos, modalidad: 'tesis' },
+                            true,
+                            'tesis',
+                            plantillaCorreoActiva
+                          );
+                        } else {
+                          aplicarPlantillaCorreo(plantillaCorreoActiva, flyerDatosActivos, 'tesis');
+                        }
                       }}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-extrabold cursor-pointer transition-colors ${
                         modalidadDespacho === 'tesis'
@@ -2289,7 +2308,16 @@ export const SecretariaLogisticsPage: React.FC = () => {
                       type="button"
                       onClick={() => {
                         setModalidadDespacho('suficiencia');
-                        aplicarPlantillaCorreo(plantillaCorreoActiva, flyerDatosActivos, 'suficiencia');
+                        if (flyerDatosActivos) {
+                          regenerarFlyerDesdeDatos(
+                            { ...flyerDatosActivos, modalidad: 'suficiencia' },
+                            true,
+                            'suficiencia',
+                            plantillaCorreoActiva
+                          );
+                        } else {
+                          aplicarPlantillaCorreo(plantillaCorreoActiva, flyerDatosActivos, 'suficiencia');
+                        }
                       }}
                       className={`px-2.5 py-1 rounded-md text-[10px] font-extrabold cursor-pointer transition-colors ${
                         modalidadDespacho === 'suficiencia'
@@ -3236,6 +3264,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         tesista2Nombre: calTesista2Nombre.trim() || undefined,
                         tesista2Codigo: calTesista2Codigo.trim() || segExistente?.tesista2Codigo,
                         tesista2Correo: calTesista2Correo.trim() || undefined,
+                        modalidadTrabajo: calModalidad,
                         tituloTesis: calTituloTesis.trim(),
                         asesor: calAsesor.trim(),
                         juradoPresidente: calPresidente.trim(),

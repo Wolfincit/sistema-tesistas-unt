@@ -12,6 +12,7 @@ export type TipoFlyerInvitacion = 'normal' | 'reprogramacion';
 
 export interface FlyerSustentacionInput {
   tipo?: TipoFlyerInvitacion;
+  modalidad?: 'tesis' | 'suficiencia';
   tesistaNombre: string;
   segundoBachiller?: string;
   tituloTesis: string;
@@ -123,6 +124,7 @@ export async function generarFlyerOficialPng(data: FlyerSustentacionInput): Prom
 }> {
   const tipo: TipoFlyerInvitacion = data.tipo === 'reprogramacion' ? 'reprogramacion' : 'normal';
   const esReprog = tipo === 'reprogramacion';
+  const esSuficiencia = data.modalidad === 'suficiencia';
 
   const W = 1200;
   const H = 896;
@@ -149,6 +151,61 @@ export async function generarFlyerOficialPng(data: FlyerSustentacionInput): Prom
     // para que no quede ningún rastro ni deformación debajo del logo real transparente
     const headerPatchH = esReprog ? 120 : 122;
     ctx.drawImage(templateImg, 990, 0, 36, headerPatchH, 1052, 0, W - 1052, headerPatchH);
+
+    // Si es Trabajo de Suficiencia Profesional, reemplazar limpiamente el banner azul y el texto introductorio
+    if (esSuficiencia) {
+      // 1) Parche exacto del banner azul (copiando una franja vertical limpia del margen izquierdo x=12..32)
+      const bannerY = esReprog ? 115 : 114;
+      const bannerH = 208 - bannerY;
+      ctx.drawImage(templateImg, 12, bannerY, 20, bannerH, 0, bannerY, W, bannerH);
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#FFFFFF';
+      if (esReprog) {
+        ctx.font = '800 36px Poppins, "Segoe UI", Arial, sans-serif';
+        ctx.fillText('REPROGRAMACIÓN DE EXPOSICIÓN Y DEFENSA DE', W / 2, 154);
+        ctx.font = '800 38px Poppins, "Segoe UI", Arial, sans-serif';
+        ctx.fillText('TRABAJO DE SUFICIENCIA PROFESIONAL', W / 2, 196);
+      } else {
+        ctx.font = '800 37px Poppins, "Segoe UI", Arial, sans-serif';
+        ctx.fillText('EXPOSICIÓN Y DEFENSA DE TRABAJO DE', W / 2, 154);
+        ctx.font = '800 40px Poppins, "Segoe UI", Arial, sans-serif';
+        ctx.fillText('SUFICIENCIA PROFESIONAL', W / 2, 197);
+      }
+
+      // 2) Parche suave del párrafo introductorio ("...a la sustentación de trabajo de tesis, titulado:")
+      // Conserva el degradado fotográfico real de fondo muestreando la franja limpia superior
+      const introSrcY = esReprog ? 225 : 235;
+      const introDestY = esReprog ? 231 : 241;
+      const introDestH = esReprog ? 60 : 61;
+      ctx.drawImage(templateImg, 165, introSrcY, W - 185, 8, 165, introDestY, W - 185, introDestH);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#10107A';
+      const introCenterX = 656;
+      const introMaxW = 1005;
+      const line1Y = esReprog ? 255 : 265;
+      const line2Y = esReprog ? 282 : 293;
+      const line1Text = 'Se invita a los docentes, estudiantes, egresados de la Escuela de Ingeniería';
+      const line2Text = 'Industrial y público en general, a la sustentación de trabajo de suficiencia profesional, titulado:';
+
+      let s1 = 24;
+      ctx.font = `500 ${s1}px Poppins, "Segoe UI", Arial, sans-serif`;
+      while (s1 > 17 && ctx.measureText(line1Text).width > introMaxW) {
+        s1 -= 1;
+        ctx.font = `500 ${s1}px Poppins, "Segoe UI", Arial, sans-serif`;
+      }
+      ctx.fillText(line1Text, introCenterX, line1Y);
+
+      let s2 = 22;
+      ctx.font = `500 ${s2}px Poppins, "Segoe UI", Arial, sans-serif`;
+      while (s2 > 16 && ctx.measureText(line2Text).width > introMaxW) {
+        s2 -= 1;
+        ctx.font = `500 ${s2}px Poppins, "Segoe UI", Arial, sans-serif`;
+      }
+      ctx.fillText(line2Text, introCenterX, line2Y);
+    }
 
     // Limpiar el pie del Director y el año "2026" fijo con una banda uniforme suave sin costuras
     // (preservando la curva azul inferior izquierda) para que Director y Año se actualicen limpio
@@ -434,7 +491,13 @@ export async function generarFlyerOficialPng(data: FlyerSustentacionInput): Prom
     .replace(/[^a-zA-Z0-9]+/g, '_')
     .slice(0, 32);
 
-  const prefix = esReprog ? 'Flyer_Reprogramacion' : 'Flyer_Invitacion';
+  const prefix = esReprog
+    ? esSuficiencia
+      ? 'Flyer_Reprogramacion_Suficiencia'
+      : 'Flyer_Reprogramacion'
+    : esSuficiencia
+      ? 'Flyer_Suficiencia'
+      : 'Flyer_Invitacion';
   return {
     dataUrl: canvas.toDataURL('image/png'),
     fileName: `${prefix}_${data.fechaJueves || 'Jueves'}_${safeSlug}.png`
