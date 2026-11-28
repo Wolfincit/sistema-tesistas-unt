@@ -197,20 +197,21 @@ export async function generarFlyerAgradecimientoPng(data: FlyerSustentacionInput
   }
 
   // 1. ESTAMPAR LOGO NÍTIDO TRANSPARENTE DE INGENIERÍA INDUSTRIAL EN ESQUINA SUPERIOR DERECHA
+  // Coordenadas medidas al píxel en plantilla-flyer-agradecimiento.jpg (1376x768):
+  // Engranaje original: x=1242..1346, y=25..124 (cx=1295, cy=74.5). "Trujillo" inicia recién en y=138.
   if (logoInd) {
-    // Limpiar el engranaje base con fondo claro suave antes de estampar el logo PNG real sin borrosidad
     ctx.save();
-    ctx.fillStyle = '#F8F9FA';
+    ctx.fillStyle = '#FAFBF9';
     ctx.beginPath();
-    ctx.arc(1269, 108, 86, 0, Math.PI * 2);
+    ctx.arc(1295, 74.5, 55, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
     const natW = logoInd.naturalWidth || 242;
     const natH = logoInd.naturalHeight || 250;
-    const drawH = 164;
+    const drawH = 104;
     const drawW = Math.round(drawH * (natW / natH));
-    ctx.drawImage(logoInd, 1269 - drawW / 2, 108 - drawH / 2, drawW, drawH);
+    ctx.drawImage(logoInd, Math.round(1295 - drawW / 2), Math.round(74.5 - drawH / 2), drawW, drawH);
   }
 
   // 2. FOTO CIRCULAR DEL JURADO Y TESISTA(S) EN EL MARCO AZUL MARINO IZQUIERDO (cx=334, cy=377, r=298)
@@ -301,17 +302,17 @@ export async function generarFlyerAgradecimientoPng(data: FlyerSustentacionInput
       .forEach((w) => allWords.push({ text: w, bold: seg.bold }));
   }
 
-  // Párrafo principal en caja estricta y=236..356, x=716..1352
+  // Párrafo principal en caja estricta y=236..358, x=716..1346
   const paraX = 716;
-  const paraMaxW = 636;
+  const paraMaxW = 630;
   const paraTop = 236;
   const paraMaxH = 122;
 
-  let pFontSize = 19;
+  let pFontSize = 18;
   let pLineH = 24;
   let pLines: RichWord[][] = [];
-  for (let size = 19; size >= 13; size -= 1) {
-    const lh = Math.round(size * 1.28);
+  for (let size = 18; size >= 13; size -= 1) {
+    const lh = Math.round(size * 1.3);
     const wrapped = wrapRichWords(ctx, allWords, paraMaxW, size, FONT_SANS);
     const totalH = (wrapped.length - 1) * lh + size;
     if (totalH <= paraMaxH || size === 13) {
@@ -331,7 +332,6 @@ export async function generarFlyerAgradecimientoPng(data: FlyerSustentacionInput
   pLines.forEach((lineWords, li) => {
     const y = paraTop + li * pLineH;
     const isLast = li === pLines.length - 1;
-    // Justificar suavemente las líneas intermedias si hay varias palabras
     let totalWordsW = 0;
     const widths = lineWords.map((w) => {
       ctx.font = `${w.bold ? '800' : '500'} ${pFontSize}px ${FONT_SANS}`;
@@ -358,7 +358,7 @@ export async function generarFlyerAgradecimientoPng(data: FlyerSustentacionInput
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#06205A';
   const nameX = 716;
-  const nameMaxW = 562; // Termina antes del birrete (x=1290)
+  const nameMaxW = 558; // Termina limpio antes del birrete (x=1290)
 
   if (!esPareja) {
     const textoNombre = `- ${bachilleres[0]}`;
@@ -366,11 +366,11 @@ export async function generarFlyerAgradecimientoPng(data: FlyerSustentacionInput
       ctx,
       textoNombre,
       nameX,
-      422,
+      418,
       nameMaxW,
-      `800 38px ${FONT_SANS}`,
-      20,
-      38,
+      `800 36px ${FONT_SANS}`,
+      19,
+      36,
       '800',
       FONT_SANS
     );
@@ -379,11 +379,11 @@ export async function generarFlyerAgradecimientoPng(data: FlyerSustentacionInput
       ctx,
       `- ${bachilleres[0]}`,
       nameX,
-      400,
+      396,
       nameMaxW,
-      `800 30px ${FONT_SANS}`,
-      18,
-      30,
+      `800 29px ${FONT_SANS}`,
+      17,
+      29,
       '800',
       FONT_SANS
     );
@@ -391,28 +391,28 @@ export async function generarFlyerAgradecimientoPng(data: FlyerSustentacionInput
       ctx,
       `- ${bachilleres[1]}`,
       nameX,
-      438,
+      434,
       nameMaxW,
-      `800 30px ${FONT_SANS}`,
-      18,
-      30,
+      `800 29px ${FONT_SANS}`,
+      17,
+      29,
       '800',
       FONT_SANS
     );
   }
 
   // 5. MENSAJE DE FELICITACIÓN Y FRASE MOTIVACIONAL (adaptada a Él / Ella / Pareja)
-  const rightCenterX = 1034;
+  const rightCenterX = 1031;
   ctx.textAlign = 'center';
   ctx.fillStyle = NAVY;
   drawFittedSingleLine(
     ctx,
     'EXTENDEMOS NUESTRAS MÁS SINCERAS FELICITACIONES, POR ESTE GRAN LOGRO.',
     rightCenterX,
-    498,
-    636,
+    494,
+    628,
     `600 17px ${FONT_SANS}`,
-    13,
+    12,
     17,
     '600',
     FONT_SANS
@@ -429,16 +429,47 @@ export async function generarFlyerAgradecimientoPng(data: FlyerSustentacionInput
       ? 'PARA RECIBIRLA.”'
       : 'PARA RECIBIRLO.”';
 
-  ctx.font = `500 16.5px ${FONT_SANS}`;
-  ctx.fillText(citaLinea1, rightCenterX, 548);
-  ctx.fillText(citaLinea2, rightCenterX, 576);
+  drawFittedSingleLine(
+    ctx,
+    citaLinea1,
+    rightCenterX,
+    546,
+    624,
+    `500 16.5px ${FONT_SANS}`,
+    12,
+    16.5,
+    '500',
+    FONT_SANS
+  );
+  drawFittedSingleLine(
+    ctx,
+    citaLinea2,
+    rightCenterX,
+    574,
+    624,
+    `500 16.5px ${FONT_SANS}`,
+    12,
+    16.5,
+    '500',
+    FONT_SANS
+  );
 
   // 6. FECHA DE SUSTENTACIÓN (inferior derecha)
   const fechaSinDia = formatearFechaSinDiaSemana(data.fechaJueves);
   ctx.textAlign = 'right';
   ctx.fillStyle = NAVY;
-  ctx.font = `800 25px ${FONT_SANS}`;
-  ctx.fillText(`Fecha de sustentación: ${fechaSinDia}`, 1344, 692);
+  drawFittedSingleLine(
+    ctx,
+    `Fecha de sustentación: ${fechaSinDia}`,
+    1344,
+    690,
+    620,
+    `800 25px ${FONT_SANS}`,
+    18,
+    25,
+    '800',
+    FONT_SANS
+  );
 
   const safeSlug = String(data.tesistaNombre || 'felicitacion')
     .normalize('NFD')
