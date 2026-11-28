@@ -237,12 +237,28 @@ export async function generarFlyerAgradecimientoPng(data: FlyerSustentacionInput
   } else {
     ctx.fillStyle = '#EEF2F7';
     ctx.fillRect(CX - R, CY - R, R * 2, R * 2);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#64748B';
-    ctx.font = '700 22px Poppins, "Segoe UI", Arial, sans-serif';
-    ctx.fillText('Sube la foto del jurado', CX, CY - 14);
-    ctx.fillText('y tesista(s) aquí', CX, CY + 18);
+    // Ícono limpio y grande de subida (flecha hacia arriba + bandeja) sin texto redundante
+    ctx.save();
+    ctx.strokeStyle = '#64748B';
+    ctx.lineWidth = 10;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // Flecha vertical
+    ctx.beginPath();
+    ctx.moveTo(CX, CY + 28);
+    ctx.lineTo(CX, CY - 44);
+    ctx.moveTo(CX - 32, CY - 14);
+    ctx.lineTo(CX, CY - 46);
+    ctx.lineTo(CX + 32, CY - 14);
+    ctx.stroke();
+    // Bandeja inferior
+    ctx.beginPath();
+    ctx.moveTo(CX - 54, CY + 22);
+    ctx.lineTo(CX - 54, CY + 54);
+    ctx.lineTo(CX + 54, CY + 54);
+    ctx.lineTo(CX + 54, CY + 22);
+    ctx.stroke();
+    ctx.restore();
   }
   ctx.restore();
 

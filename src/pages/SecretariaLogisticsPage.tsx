@@ -57,7 +57,7 @@ import {
   Paperclip,
   FileText,
   ExternalLink,
-  Camera,
+  Upload,
   Award,
   Globe
 } from 'lucide-react';
@@ -625,6 +625,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [adjuntarColacionFijo, setAdjuntarColacionFijo] = useState<boolean>(false);
   const colacionPdfBase64Ref = useRef<string>('');
   const [fotoAgradecimientoUrl, setFotoAgradecimientoUrl] = useState<string>('');
+  const [arrastrandoFoto, setArrastrandoFoto] = useState<boolean>(false);
   const [generoBachiller, setGeneroBachiller] = useState<GeneroBachiller>('femenino');
   const fotoAgradecimientoInputRef = useRef<HTMLInputElement | null>(null);
   const [fbStatus, setFbStatus] = useState<{
@@ -812,10 +813,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const handleSubirFotoAgradecimiento = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
+  const procesarArchivoFotoAgradecimiento = (file: File | null | undefined) => {
+    if (!file || !file.type.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = String(reader.result || '');
@@ -834,6 +833,28 @@ export const SecretariaLogisticsPage: React.FC = () => {
     };
     reader.readAsDataURL(file);
   };
+
+  const handleSubirFotoAgradecimiento = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    procesarArchivoFotoAgradecimiento(file);
+  };
+
+  // Permitir pegar imagen directamente con Ctrl + V cuando está activo el Flyer de Agradecimiento
+  useEffect(() => {
+    if (tab !== 'despacho' || flyerDatosActivos?.tipo !== 'agradecimiento') return;
+    const onPaste = (e: ClipboardEvent) => {
+      const items = Array.from(e.clipboardData?.items || []);
+      const imgItem = items.find((it) => it.type.startsWith('image/'));
+      if (!imgItem) return;
+      const file = imgItem.getAsFile();
+      if (!file) return;
+      e.preventDefault();
+      procesarArchivoFotoAgradecimiento(file);
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [tab, flyerDatosActivos, generoBachiller]);
 
   const handlePublicarEnFacebook = async () => {
     if (!flyerPreview) {
@@ -2207,12 +2228,27 @@ export const SecretariaLogisticsPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => fotoAgradecimientoInputRef.current?.click()}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#082F64] hover:bg-[#0C4D96] text-white text-[11px] font-extrabold cursor-pointer shadow-2xs"
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              setArrastrandoFoto(true);
+                            }}
+                            onDragLeave={() => setArrastrandoFoto(false)}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setArrastrandoFoto(false);
+                              procesarArchivoFotoAgradecimiento(e.dataTransfer.files?.[0]);
+                            }}
+                            title="Subir, arrastrar o pegar foto (Ctrl + V)"
+                            aria-label="Subir foto"
+                            className={`w-12 h-11 rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all shrink-0 ${
+                              arrastrandoFoto
+                                ? 'bg-[#082F64] text-amber-300 border-[#082F64] scale-105 shadow-md'
+                                : fotoAgradecimientoUrl
+                                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-400'
+                                  : 'bg-blue-50 hover:bg-[#082F64] text-[#082F64] hover:text-amber-300 border-[#082F64]/50'
+                            }`}
                           >
-                            <Camera className="w-3.5 h-3.5 text-amber-300" />
-                            <span>
-                              {fotoAgradecimientoUrl ? 'Cambiar foto (Jurado y Tesista)' : 'Subir foto (Jurado y Tesista)'}
-                            </span>
+                            <Upload className="w-6 h-6" />
                           </button>
 
                           {!flyerDatosActivos.segundoBachiller && (
@@ -2407,8 +2443,30 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Caja Grande y Amigable para Subir el Flyer */}
-                <div className="p-4 rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50/30 text-center space-y-3">
+                {/* Caja Grande y Amigable para Subir/Arrastrar el Flyer o Foto */}
+                <div
+                  onDragOver={(e) => {
+                    if (flyerDatosActivos?.tipo === 'agradecimiento') {
+                      e.preventDefault();
+                      setArrastrandoFoto(true);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (arrastrandoFoto) setArrastrandoFoto(false);
+                  }}
+                  onDrop={(e) => {
+                    if (flyerDatosActivos?.tipo === 'agradecimiento') {
+                      e.preventDefault();
+                      setArrastrandoFoto(false);
+                      procesarArchivoFotoAgradecimiento(e.dataTransfer.files?.[0]);
+                    }
+                  }}
+                  className={`p-4 rounded-2xl border-2 border-dashed text-center space-y-3 transition-colors ${
+                    arrastrandoFoto
+                      ? 'border-[#082F64] bg-blue-100/60'
+                      : 'border-blue-200 bg-blue-50/30'
+                  }`}
+                >
                   {!flyerPreview ? (
                     <label className="cursor-pointer block py-4 space-y-2">
                       <div className="w-12 h-12 rounded-2xl bg-[#082F64] text-amber-300 flex items-center justify-center mx-auto shadow-xs">
@@ -2503,10 +2561,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 </div>
 
                 {flyerDatosActivos?.tipo === 'agradecimiento' ? (
-                  <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 text-xs text-[#082F64] flex items-center justify-between gap-2">
-                    <span>
-                      <strong>Flyer de Agradecimiento exclusivo para Facebook:</strong> sube la foto del jurado y tesista(s) arriba y publícalo directo en Facebook (solo imagen, sin envío a correos).
-                    </span>
+                  <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200 text-xs text-[#082F64] font-semibold">
+                    Flyer exclusivo para Facebook (no se envía por correo).
                   </div>
                 ) : (
                   <>
