@@ -133,17 +133,23 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [directorioJurado, setDirectorioJurado] = useState<IngenieroJuradoItem[]>(() =>
     logisticaSecretariaService.getDirectorioJurado()
   );
-  useEffect(() => {
-    if (!cargando) {
-      setDirectorioJurado(logisticaSecretariaService.getDirectorioJurado());
-    }
-  }, [cargando]);
   const [sustentaciones, setSustentaciones] = useState<SustentacionJuevesItem[]>(() =>
     logisticaSecretariaService.getSustentacionesJueves()
   );
   const [historialChat, setHistorialChat] = useState<DespachoChatAnuncioItem[]>(() =>
     logisticaSecretariaService.getHistorialDespachos()
   );
+
+  // Sincronizar con los datos frescos de la nube en cuanto AppContext termine de hidratar localStorage
+  useEffect(() => {
+    if (!cargando) {
+      setSeguimientos(logisticaSecretariaService.getSeguimientos());
+      setDirectorioJurado(logisticaSecretariaService.getDirectorioJurado());
+      setSustentaciones(logisticaSecretariaService.getSustentacionesJueves());
+      setHistorialChat(logisticaSecretariaService.getHistorialDespachos());
+      setConfigColacion(logisticaSecretariaService.getConfigColacion());
+    }
+  }, [cargando]);
 
   // Correo institucional pre-vinculado de la Srta. Celia (@unitru.edu.pe)
   const [emailStatus, setEmailStatus] = useState<EmailConfigStatus>({
