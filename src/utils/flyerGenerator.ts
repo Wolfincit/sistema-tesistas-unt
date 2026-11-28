@@ -16,6 +16,9 @@ export interface FlyerSustentacionInput {
   modalidad?: 'tesis' | 'suficiencia';
   generoBachiller?: GeneroBachiller;
   fotoAgradecimientoDataUrl?: string;
+  fotoOffsetX?: number;
+  fotoOffsetY?: number;
+  fotoZoom?: number;
   tesistaNombre: string;
   segundoBachiller?: string;
   tituloTesis: string;
@@ -33,11 +36,25 @@ export interface FlyerSustentacionInput {
 const DEFAULT_DIRECTOR_NOMBRE = 'Ms. Angel Hernández Molina';
 const DEFAULT_DIRECTOR_CARGO = 'Director (e) de Escuela de Ingeniería Industrial';
 
+const imageCache = new Map<string, HTMLImageElement>();
+
 function loadImageSafe(src: string): Promise<HTMLImageElement | null> {
+  if (!src) return Promise.resolve(null);
+  const cached = imageCache.get(src);
+  if (cached && cached.complete && cached.naturalWidth > 0) {
+    return Promise.resolve(cached);
+  }
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
+    img.onload = () => {
+      if (imageCache.size > 16) {
+        const firstKey = imageCache.keys().next().value;
+        if (firstKey) imageCache.delete(firstKey);
+      }
+      imageCache.set(src, img);
+      resolve(img);
+    };
     img.onerror = () => resolve(null);
     img.src = src;
   });
@@ -227,12 +244,22 @@ export async function generarFlyerAgradecimientoPng(data: FlyerSustentacionInput
 
   if (fotoImg && fotoImg.naturalWidth > 0 && fotoImg.naturalHeight > 0) {
     const diam = R * 2;
-    const scale = Math.max(diam / fotoImg.naturalWidth, diam / fotoImg.naturalHeight);
+    const zoom = Math.max(1, Math.min(2.6, Number(data.fotoZoom) || 1));
+    const baseScale = Math.max(diam / fotoImg.naturalWidth, diam / fotoImg.naturalHeight);
+    const scale = baseScale * zoom;
     const drawW = fotoImg.naturalWidth * scale;
     const drawH = fotoImg.naturalHeight * scale;
-    const dx = CX - drawW / 2;
-    // Sesgo ligeramente hacia arriba (0.42) para no cortar cabezas en fotos de pie con el jurado
-    const dy = CY - R - (drawH - diam) * 0.42;
+
+    // Límites seguros para que nunca queden bordes blancos vacíos dentro del círculo
+    const baseDx = CX - drawW / 2;
+    const baseDy = CY - R - (drawH - diam) * 0.42;
+    const minDx = CX + R - drawW;
+    const maxDx = CX - R;
+    const minDy = CY + R - drawH;
+    const maxDy = CY - R;
+
+    const dx = Math.max(minDx, Math.min(maxDx, baseDx + (Number(data.fotoOffsetX) || 0)));
+    const dy = Math.max(minDy, Math.min(maxDy, baseDy + (Number(data.fotoOffsetY) || 0)));
     ctx.drawImage(fotoImg, dx, dy, drawW, drawH);
   } else {
     ctx.fillStyle = '#EEF2F7';

@@ -59,7 +59,10 @@ import {
   ExternalLink,
   Upload,
   Award,
-  Globe
+  Globe,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw
 } from 'lucide-react';
 
 const DOC_COLACION_FIJO_URL = '/docs/Procedimiento_Colacion_Ordinaria_Titulo_UNT.pdf';
@@ -625,7 +628,19 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [adjuntarColacionFijo, setAdjuntarColacionFijo] = useState<boolean>(false);
   const colacionPdfBase64Ref = useRef<string>('');
   const [fotoAgradecimientoUrl, setFotoAgradecimientoUrl] = useState<string>('');
+  const [fotoOffsetX, setFotoOffsetX] = useState<number>(0);
+  const [fotoOffsetY, setFotoOffsetY] = useState<number>(0);
+  const [fotoZoom, setFotoZoom] = useState<number>(1);
   const [arrastrandoFoto, setArrastrandoFoto] = useState<boolean>(false);
+  const dragEncuadreRef = useRef<{
+    activo: boolean;
+    startX: number;
+    startY: number;
+    origOx: number;
+    origOy: number;
+    scaleCanvas: number;
+  }>({ activo: false, startX: 0, startY: 0, origOx: 0, origOy: 0, scaleCanvas: 1 });
+  const encuadreRafRef = useRef<number | null>(null);
   const [generoBachiller, setGeneroBachiller] = useState<GeneroBachiller>('femenino');
   const fotoAgradecimientoInputRef = useRef<HTMLInputElement | null>(null);
   const [fbStatus, setFbStatus] = useState<{
@@ -760,7 +775,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
     datos: FlyerSustentacionInput,
     actualizarTextoCorreo = true,
     modalidadOverride?: ModalidadTrabajoId,
-    tipoPlantillaOverride?: 'jurados' | 'tesistas'
+    tipoPlantillaOverride?: 'jurados' | 'tesistas',
+    silencioso = false
   ) => {
     setFlyerDatosActivos(datos);
     const mod = modalidadOverride || modalidadDespacho;
@@ -775,7 +791,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setAsuntoChat(generado.asunto);
       setMensajeChat(generado.mensaje);
     }
-    setGenerandoFlyer(true);
+    if (!silencioso) setGenerandoFlyer(true);
     try {
       const generado = await generarFlyerOficialPng(datos);
       setFlyerPreview(generado.dataUrl);
@@ -783,7 +799,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
     } catch {
       // Puede subir uno manual si falla canvas
     } finally {
-      setGenerandoFlyer(false);
+      if (!silencioso) setGenerandoFlyer(false);
     }
   };
 
@@ -813,19 +829,53 @@ export const SecretariaLogisticsPage: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
+  const actualizarEncuadreFoto = (nextOx: number, nextOy: number, nextZoom: number) => {
+    const zClamped = Math.max(1, Math.min(2.6, Number(nextZoom.toFixed(2))));
+    const oxClamped = Math.max(-520, Math.min(520, Math.round(nextOx)));
+    const oyClamped = Math.max(-520, Math.min(520, Math.round(nextOy)));
+    setFotoOffsetX(oxClamped);
+    setFotoOffsetY(oyClamped);
+    setFotoZoom(zClamped);
+    if (!flyerDatosActivos || flyerDatosActivos.tipo !== 'agradecimiento' || !fotoAgradecimientoUrl) return;
+    if (encuadreRafRef.current) cancelAnimationFrame(encuadreRafRef.current);
+    encuadreRafRef.current = requestAnimationFrame(() => {
+      regenerarFlyerDesdeDatos(
+        {
+          ...flyerDatosActivos,
+          tipo: 'agradecimiento',
+          generoBachiller,
+          fotoAgradecimientoDataUrl: fotoAgradecimientoUrl,
+          fotoOffsetX: oxClamped,
+          fotoOffsetY: oyClamped,
+          fotoZoom: zClamped
+        },
+        false,
+        undefined,
+        undefined,
+        true
+      ).catch(() => {});
+    });
+  };
+
   const procesarArchivoFotoAgradecimiento = (file: File | null | undefined) => {
     if (!file || !file.type.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = String(reader.result || '');
       setFotoAgradecimientoUrl(dataUrl);
+      setFotoOffsetX(0);
+      setFotoOffsetY(0);
+      setFotoZoom(1);
       if (flyerDatosActivos) {
         regenerarFlyerDesdeDatos(
           {
             ...flyerDatosActivos,
             tipo: 'agradecimiento',
             generoBachiller,
-            fotoAgradecimientoDataUrl: dataUrl
+            fotoAgradecimientoDataUrl: dataUrl,
+            fotoOffsetX: 0,
+            fotoOffsetY: 0,
+            fotoZoom: 1
           },
           false
         ).catch(() => {});
@@ -2487,8 +2537,90 @@ export const SecretariaLogisticsPage: React.FC = () => {
                       <img
                         src={flyerPreview}
                         alt="Flyer cargado"
-                        className="max-h-64 w-auto mx-auto rounded-xl border border-slate-200 shadow-xs"
+                        draggable={false}
+                        onPointerDown={(e) => {
+                          if (flyerDatosActivos?.tipo !== 'agradecimiento' || !fotoAgradecimientoUrl) return;
+                          e.preventDefault();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const scaleCanvas = rect.width > 0 ? 1376 / rect.width : 2;
+                          e.currentTarget.setPointerCapture(e.pointerId);
+                          dragEncuadreRef.current = {
+                            activo: true,
+                            startX: e.clientX,
+                            startY: e.clientY,
+                            origOx: fotoOffsetX,
+                            origOy: fotoOffsetY,
+                            scaleCanvas
+                          };
+                        }}
+                        onPointerMove={(e) => {
+                          if (!dragEncuadreRef.current.activo) return;
+                          const { startX, startY, origOx, origOy, scaleCanvas } = dragEncuadreRef.current;
+                          const nextOx = origOx + (e.clientX - startX) * scaleCanvas;
+                          const nextOy = origOy + (e.clientY - startY) * scaleCanvas;
+                          actualizarEncuadreFoto(nextOx, nextOy, fotoZoom);
+                        }}
+                        onPointerUp={() => {
+                          dragEncuadreRef.current.activo = false;
+                        }}
+                        onPointerCancel={() => {
+                          dragEncuadreRef.current.activo = false;
+                        }}
+                        onWheel={(e) => {
+                          if (flyerDatosActivos?.tipo !== 'agradecimiento' || !fotoAgradecimientoUrl) return;
+                          e.preventDefault();
+                          const delta = e.deltaY < 0 ? 0.1 : -0.1;
+                          actualizarEncuadreFoto(fotoOffsetX, fotoOffsetY, fotoZoom + delta);
+                        }}
+                        className={`max-h-72 w-auto mx-auto rounded-xl border border-slate-200 shadow-xs select-none ${
+                          flyerDatosActivos?.tipo === 'agradecimiento' && fotoAgradecimientoUrl
+                            ? 'cursor-grab active:cursor-grabbing touch-none'
+                            : ''
+                        }`}
                       />
+                      {flyerDatosActivos?.tipo === 'agradecimiento' && fotoAgradecimientoUrl && (
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-white border border-slate-200 shadow-2xs">
+                          <button
+                            type="button"
+                            onClick={() => actualizarEncuadreFoto(fotoOffsetX, fotoOffsetY, fotoZoom - 0.15)}
+                            title="Alejar"
+                            aria-label="Alejar"
+                            className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 cursor-pointer"
+                          >
+                            <ZoomOut className="w-3.5 h-3.5" />
+                          </button>
+                          <input
+                            type="range"
+                            min={1}
+                            max={2.6}
+                            step={0.05}
+                            value={fotoZoom}
+                            onChange={(e) =>
+                              actualizarEncuadreFoto(fotoOffsetX, fotoOffsetY, parseFloat(e.target.value))
+                            }
+                            aria-label="Zoom"
+                            className="w-28 sm:w-36 accent-[#082F64] cursor-pointer"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => actualizarEncuadreFoto(fotoOffsetX, fotoOffsetY, fotoZoom + 0.15)}
+                            title="Acercar"
+                            aria-label="Acercar"
+                            className="p-1 rounded-lg hover:bg-slate-100 text-slate-600 cursor-pointer"
+                          >
+                            <ZoomIn className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => actualizarEncuadreFoto(0, 0, 1)}
+                            title="Restablecer encuadre"
+                            aria-label="Restablecer encuadre"
+                            className="p-1 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-[#082F64] cursor-pointer border-l border-slate-200 pl-2"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                       <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                         <span className="font-mono text-[11px] text-slate-600">{flyerNombre}</span>
                         <a
