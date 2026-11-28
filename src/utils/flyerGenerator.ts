@@ -8,11 +8,14 @@
  * y estampa únicamente los datos dinámicos calibrados al píxel exacto.
  */
 
-export type TipoFlyerInvitacion = 'normal' | 'reprogramacion';
+export type TipoFlyerInvitacion = 'normal' | 'reprogramacion' | 'agradecimiento';
+export type GeneroBachiller = 'femenino' | 'masculino';
 
 export interface FlyerSustentacionInput {
   tipo?: TipoFlyerInvitacion;
   modalidad?: 'tesis' | 'suficiencia';
+  generoBachiller?: GeneroBachiller;
+  fotoAgradecimientoDataUrl?: string;
   tesistaNombre: string;
   segundoBachiller?: string;
   tituloTesis: string;
@@ -118,10 +121,344 @@ function drawFittedSingleLine(
   ctx.fillText(text, x, y);
 }
 
+export function formatearFechaSinDiaSemana(iso: string): string {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso || 'por confirmar';
+  const [y, m, d] = iso.split('-').map(Number);
+  const meses = [
+    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+  ];
+  return `${d} de ${meses[(m - 1) % 12]} de ${y}`;
+}
+
+interface RichWord {
+  text: string;
+  bold: boolean;
+}
+
+function wrapRichWords(
+  ctx: CanvasRenderingContext2D,
+  words: RichWord[],
+  maxWidth: number,
+  fontSize: number,
+  family: string
+): RichWord[][] {
+  const lines: RichWord[][] = [];
+  let current: RichWord[] = [];
+  let currentW = 0;
+  ctx.font = `500 ${fontSize}px ${family}`;
+  const spaceW = ctx.measureText(' ').width;
+
+  for (const w of words) {
+    ctx.font = `${w.bold ? '800' : '500'} ${fontSize}px ${family}`;
+    const ww = ctx.measureText(w.text).width;
+    const needed = current.length === 0 ? ww : currentW + spaceW + ww;
+    if (needed <= maxWidth || current.length === 0) {
+      current.push(w);
+      currentW = needed;
+    } else {
+      lines.push(current);
+      current = [w];
+      currentW = ww;
+    }
+  }
+  if (current.length > 0) lines.push(current);
+  return lines;
+}
+
+/**
+ * Generador Oficial del Flyer de Agradecimiento / Felicitación (1376×768 PNG — exclusivamente para Facebook).
+ * Estampa automáticamente la foto circular del jurado y tesista(s) y adapta el texto oficial
+ * según modalidad (Tesis / Suficiencia Profesional), cantidad (1 o 2 bachilleres) y género (Él / Ella).
+ */
+export async function generarFlyerAgradecimientoPng(data: FlyerSustentacionInput): Promise<{
+  dataUrl: string;
+  fileName: string;
+}> {
+  const W = 1376;
+  const H = 768;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('El navegador no soporta generación de imagen Canvas.');
+
+  const [templateImg, logoInd, fotoImg] = await Promise.all([
+    loadImageSafe('/images/plantilla-flyer-agradecimiento.jpg'),
+    loadImageSafe('/images/logo-industrial.png'),
+    data.fotoAgradecimientoDataUrl ? loadImageSafe(data.fotoAgradecimientoDataUrl) : Promise.resolve(null)
+  ]);
+
+  if (templateImg) {
+    ctx.drawImage(templateImg, 0, 0, W, H);
+  } else {
+    ctx.fillStyle = '#F8FAFC';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // 1. ESTAMPAR LOGO NÍTIDO TRANSPARENTE DE INGENIERÍA INDUSTRIAL EN ESQUINA SUPERIOR DERECHA
+  if (logoInd) {
+    // Limpiar el engranaje base con fondo claro suave antes de estampar el logo PNG real sin borrosidad
+    ctx.save();
+    ctx.fillStyle = '#F8F9FA';
+    ctx.beginPath();
+    ctx.arc(1269, 108, 86, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    const natW = logoInd.naturalWidth || 242;
+    const natH = logoInd.naturalHeight || 250;
+    const drawH = 164;
+    const drawW = Math.round(drawH * (natW / natH));
+    ctx.drawImage(logoInd, 1269 - drawW / 2, 108 - drawH / 2, drawW, drawH);
+  }
+
+  // 2. FOTO CIRCULAR DEL JURADO Y TESISTA(S) EN EL MARCO AZUL MARINO IZQUIERDO (cx=334, cy=377, r=298)
+  const CX = 334;
+  const CY = 377;
+  const R = 299;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(CX, CY, R, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+
+  if (fotoImg && fotoImg.naturalWidth > 0 && fotoImg.naturalHeight > 0) {
+    const diam = R * 2;
+    const scale = Math.max(diam / fotoImg.naturalWidth, diam / fotoImg.naturalHeight);
+    const drawW = fotoImg.naturalWidth * scale;
+    const drawH = fotoImg.naturalHeight * scale;
+    const dx = CX - drawW / 2;
+    // Sesgo ligeramente hacia arriba (0.42) para no cortar cabezas en fotos de pie con el jurado
+    const dy = CY - R - (drawH - diam) * 0.42;
+    ctx.drawImage(fotoImg, dx, dy, drawW, drawH);
+  } else {
+    ctx.fillStyle = '#EEF2F7';
+    ctx.fillRect(CX - R, CY - R, R * 2, R * 2);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#64748B';
+    ctx.font = '700 22px Poppins, "Segoe UI", Arial, sans-serif';
+    ctx.fillText('Sube la foto del jurado', CX, CY - 14);
+    ctx.fillText('y tesista(s) aquí', CX, CY + 18);
+  }
+  ctx.restore();
+
+  // Aro fino azul marino para sellar perfectamente el borde interno del círculo
+  ctx.save();
+  ctx.strokeStyle = '#06205A';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(CX, CY, R, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // 3. DATOS DEL TEXTO OFICIAL (DERECHA)
+  const NAVY = '#0A265C';
+  const FONT_SANS = 'Poppins, "Segoe UI", Arial, sans-serif';
+  const esSuficiencia = data.modalidad === 'suficiencia';
+
+  const bachilleresRaw: string[] = [];
+  String(data.tesistaNombre || 'BACHILLER')
+    .split(/\n|\s*\/\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .forEach((n) => bachilleresRaw.push(n.toUpperCase()));
+  if (data.segundoBachiller && data.segundoBachiller.trim()) {
+    bachilleresRaw.push(data.segundoBachiller.trim().toUpperCase());
+  }
+  const bachilleres = Array.from(new Set(bachilleresRaw)).slice(0, 2);
+  const esPareja = bachilleres.length >= 2;
+  const esFemenino = !esPareja && (data.generoBachiller || 'femenino') === 'femenino';
+
+  const modalidadBold = esSuficiencia
+    ? 'SUSTENTACIÓN DEL TRABAJO DE SUFICIENCIA PROFESIONAL,'
+    : 'SUSTENTACIÓN DEL TRABAJO DE TESIS,';
+  const tituloLimpio = String(data.tituloTesis || 'TRABAJO DE INVESTIGACIÓN')
+    .replace(/^[“""]+|[”""]+$/g, '')
+    .trim()
+    .toUpperCase();
+  const deBachillerTexto = esPareja
+    ? 'DE LOS BACHILLERES:'
+    : esFemenino
+      ? 'DE LA BACHILLER:'
+      : 'DEL BACHILLER:';
+
+  const segmentos: { text: string; bold: boolean }[] = [
+    {
+      text: 'LA DIRECCIÓN DE ESCUELA DE INGENIERÍA INDUSTRIAL, AGRADECE A LOS MIEMBROS DEL JURADO CALIFICADOR Y A TODOS LOS PRESENTES POR HABER PARTICIPADO EN LA',
+      bold: false
+    },
+    { text: modalidadBold, bold: true },
+    { text: `TITULADO “${tituloLimpio}” ${deBachillerTexto}`, bold: false }
+  ];
+  const allWords: RichWord[] = [];
+  for (const seg of segmentos) {
+    seg.text
+      .split(/\s+/)
+      .filter(Boolean)
+      .forEach((w) => allWords.push({ text: w, bold: seg.bold }));
+  }
+
+  // Párrafo principal en caja estricta y=236..356, x=716..1352
+  const paraX = 716;
+  const paraMaxW = 636;
+  const paraTop = 236;
+  const paraMaxH = 122;
+
+  let pFontSize = 19;
+  let pLineH = 24;
+  let pLines: RichWord[][] = [];
+  for (let size = 19; size >= 13; size -= 1) {
+    const lh = Math.round(size * 1.28);
+    const wrapped = wrapRichWords(ctx, allWords, paraMaxW, size, FONT_SANS);
+    const totalH = (wrapped.length - 1) * lh + size;
+    if (totalH <= paraMaxH || size === 13) {
+      pFontSize = size;
+      pLineH = lh;
+      pLines = wrapped;
+      break;
+    }
+  }
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = NAVY;
+  ctx.font = `500 ${pFontSize}px ${FONT_SANS}`;
+  const spaceW = ctx.measureText(' ').width;
+
+  pLines.forEach((lineWords, li) => {
+    const y = paraTop + li * pLineH;
+    const isLast = li === pLines.length - 1;
+    // Justificar suavemente las líneas intermedias si hay varias palabras
+    let totalWordsW = 0;
+    const widths = lineWords.map((w) => {
+      ctx.font = `${w.bold ? '800' : '500'} ${pFontSize}px ${FONT_SANS}`;
+      const ww = ctx.measureText(w.text).width;
+      totalWordsW += ww;
+      return ww;
+    });
+    const gaps = lineWords.length - 1;
+    const extraGap =
+      !isLast && gaps > 0 && paraMaxW - totalWordsW < spaceW * gaps * 2.2
+        ? (paraMaxW - totalWordsW) / gaps
+        : spaceW;
+
+    let curX = paraX;
+    lineWords.forEach((w, wi) => {
+      ctx.font = `${w.bold ? '800' : '500'} ${pFontSize}px ${FONT_SANS}`;
+      ctx.fillText(w.text, curX, y);
+      curX += widths[wi] + extraGap;
+    });
+  });
+
+  // 4. NOMBRE(S) DEL/DE LOS BACHILLER(ES) (junto al birrete en x=1290..1374)
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#06205A';
+  const nameX = 716;
+  const nameMaxW = 562; // Termina antes del birrete (x=1290)
+
+  if (!esPareja) {
+    const textoNombre = `- ${bachilleres[0]}`;
+    drawFittedSingleLine(
+      ctx,
+      textoNombre,
+      nameX,
+      422,
+      nameMaxW,
+      `800 38px ${FONT_SANS}`,
+      20,
+      38,
+      '800',
+      FONT_SANS
+    );
+  } else {
+    drawFittedSingleLine(
+      ctx,
+      `- ${bachilleres[0]}`,
+      nameX,
+      400,
+      nameMaxW,
+      `800 30px ${FONT_SANS}`,
+      18,
+      30,
+      '800',
+      FONT_SANS
+    );
+    drawFittedSingleLine(
+      ctx,
+      `- ${bachilleres[1]}`,
+      nameX,
+      438,
+      nameMaxW,
+      `800 30px ${FONT_SANS}`,
+      18,
+      30,
+      '800',
+      FONT_SANS
+    );
+  }
+
+  // 5. MENSAJE DE FELICITACIÓN Y FRASE MOTIVACIONAL (adaptada a Él / Ella / Pareja)
+  const rightCenterX = 1034;
+  ctx.textAlign = 'center';
+  ctx.fillStyle = NAVY;
+  drawFittedSingleLine(
+    ctx,
+    'EXTENDEMOS NUESTRAS MÁS SINCERAS FELICITACIONES, POR ESTE GRAN LOGRO.',
+    rightCenterX,
+    498,
+    636,
+    `600 17px ${FONT_SANS}`,
+    13,
+    17,
+    '600',
+    FONT_SANS
+  );
+
+  const citaLinea1 = esPareja
+    ? '“SU ESFUERZO Y DEDICACIÓN LOS HA TRAÍDO HASTA AQUÍ; EL FUTURO ESTÁ LISTO'
+    : esFemenino
+      ? '“SU ESFUERZO Y DEDICACIÓN LA HA TRAÍDO HASTA AQUÍ; EL FUTURO ESTÁ LISTO'
+      : '“SU ESFUERZO Y DEDICACIÓN LO HA TRAÍDO HASTA AQUÍ; EL FUTURO ESTÁ LISTO';
+  const citaLinea2 = esPareja
+    ? 'PARA RECIBIRLOS.”'
+    : esFemenino
+      ? 'PARA RECIBIRLA.”'
+      : 'PARA RECIBIRLO.”';
+
+  ctx.font = `500 16.5px ${FONT_SANS}`;
+  ctx.fillText(citaLinea1, rightCenterX, 548);
+  ctx.fillText(citaLinea2, rightCenterX, 576);
+
+  // 6. FECHA DE SUSTENTACIÓN (inferior derecha)
+  const fechaSinDia = formatearFechaSinDiaSemana(data.fechaJueves);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = NAVY;
+  ctx.font = `800 25px ${FONT_SANS}`;
+  ctx.fillText(`Fecha de sustentación: ${fechaSinDia}`, 1344, 692);
+
+  const safeSlug = String(data.tesistaNombre || 'felicitacion')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .slice(0, 32);
+
+  return {
+    dataUrl: canvas.toDataURL('image/png'),
+    fileName: `Flyer_Agradecimiento_${data.fechaJueves || 'UNT'}_${safeSlug}.png`
+  };
+}
+
 export async function generarFlyerOficialPng(data: FlyerSustentacionInput): Promise<{
   dataUrl: string;
   fileName: string;
 }> {
+  if (data.tipo === 'agradecimiento') {
+    return generarFlyerAgradecimientoPng(data);
+  }
   const tipo: TipoFlyerInvitacion = data.tipo === 'reprogramacion' ? 'reprogramacion' : 'normal';
   const esReprog = tipo === 'reprogramacion';
   const esSuficiencia = data.modalidad === 'suficiencia';

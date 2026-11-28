@@ -289,5 +289,82 @@ export const logisticaSecretariaService = {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'No se pudo procesar el envío.');
     return data;
+  },
+
+  async getFacebookStatus(): Promise<{
+    connected: boolean;
+    pageId: string;
+    pageName: string;
+    pageUrl: string;
+    source: string;
+  }> {
+    try {
+      const res = await fetch('/api/facebook/status');
+      if (!res.ok) throw new Error('Error');
+      return await res.json();
+    } catch {
+      return {
+        connected: false,
+        pageId: '',
+        pageName: '',
+        pageUrl: 'https://www.facebook.com/escueladeingenieriaindustrialunt',
+        source: 'none'
+      };
+    }
+  },
+
+  async saveFacebookConfig(params: {
+    pageId: string;
+    pageAccessToken: string;
+    pageName?: string;
+  }): Promise<{
+    connected: boolean;
+    pageId: string;
+    pageName: string;
+    pageUrl: string;
+    source: string;
+  }> {
+    const res = await fetch('/api/facebook/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'No se pudo guardar la configuración de Facebook.');
+    return data;
+  },
+
+  async disconnectFacebook(): Promise<{
+    connected: boolean;
+    pageId: string;
+    pageName: string;
+    pageUrl: string;
+    source: string;
+  }> {
+    const res = await fetch('/api/facebook/disconnect', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'No se pudo desconectar Facebook.');
+    return data;
+  },
+
+  async publicarFlyerFacebook(params: {
+    imageDataUrl: string;
+    fileName?: string;
+  }): Promise<{
+    ok: boolean;
+    photoId: string;
+    postId: string;
+    postUrl: string;
+    pageName: string;
+    message: string;
+  }> {
+    const res = await fetch('/api/facebook/publicar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'No se pudo publicar en Facebook.');
+    return data;
   }
 };

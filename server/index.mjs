@@ -29,6 +29,12 @@ import {
   dispatchAnnouncementEmail
 } from './emailEngine.mjs';
 import {
+  getFacebookStatusHydrated,
+  saveFacebookConfig,
+  disconnectFacebook,
+  publishFlyerImageToFacebook
+} from './facebookEngine.mjs';
+import {
   getVapidPublicKey,
   registerPushSubscription,
   unregisterPushSubscription,
@@ -647,6 +653,50 @@ export async function handleApiRequest(req, res) {
   }
 
   // ======================================================
+  // API PUBLICACIÓN DIRECTA DE FLYERS EN FACEBOOK (SOLO IMAGEN)
+  // ======================================================
+  if (urlObj.pathname === '/api/facebook/status' && req.method === 'GET') {
+    try {
+      sendJson(res, 200, await getFacebookStatusHydrated());
+    } catch (err) {
+      sendJson(res, 500, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/facebook/config' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req);
+      const out = await saveFacebookConfig(body);
+      sendJson(res, 200, out);
+    } catch (err) {
+      sendJson(res, 400, { error: err?.message || 'No se pudo guardar la conexión de Facebook.' });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/facebook/disconnect' && req.method === 'POST') {
+    try {
+      const out = await disconnectFacebook();
+      sendJson(res, 200, out);
+    } catch (err) {
+      sendJson(res, 400, { error: err.message });
+    }
+    return true;
+  }
+
+  if (urlObj.pathname === '/api/facebook/publicar' && req.method === 'POST') {
+    try {
+      const body = await readJsonBody(req, 12 * 1024 * 1024);
+      const out = await publishFlyerImageToFacebook(body);
+      sendJson(res, 200, out);
+    } catch (err) {
+      sendJson(res, 400, { error: err?.message || 'No se pudo publicar el flyer en Facebook.' });
+    }
+    return true;
+  }
+
+  // ======================================================
   // API NOTIFICACIONES WEB PUSH (PWA CELULARES + BANDEJA)
   // ======================================================
   if (urlObj.pathname.startsWith('/api/push/')) {
@@ -969,6 +1019,7 @@ if (isDirectRun) {
         req.url.startsWith('/api/db/') ||
         req.url.startsWith('/api/files/') ||
         req.url.startsWith('/api/correo/') ||
+        req.url.startsWith('/api/facebook/') ||
         req.url.startsWith('/api/push/') ||
         req.url.startsWith('/api/auth/'))
     ) {

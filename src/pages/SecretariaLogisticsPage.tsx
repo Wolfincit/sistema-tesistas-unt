@@ -18,7 +18,8 @@ import { pushClientService, PushStatsInfo } from '../services/pushClientService'
 import {
   generarFlyerOficialPng,
   FlyerSustentacionInput,
-  TipoFlyerInvitacion
+  TipoFlyerInvitacion,
+  GeneroBachiller
 } from '../utils/flyerGenerator';
 import {
   generarCorreoJuradosOficial,
@@ -55,7 +56,10 @@ import {
   Undo2,
   Paperclip,
   FileText,
-  ExternalLink
+  ExternalLink,
+  Camera,
+  Award,
+  Globe
 } from 'lucide-react';
 
 const DOC_COLACION_FIJO_URL = '/docs/Procedimiento_Colacion_Ordinaria_Titulo_UNT.pdf';
@@ -90,6 +94,13 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
   useEffect(() => {
     pushClientService.getStats().then(setPushStats).catch(() => { });
+    logisticaSecretariaService
+      .getFacebookStatus()
+      .then((st) => {
+        setFbStatus(st);
+        if (st.pageId) setCfgFbPageId(st.pageId);
+      })
+      .catch(() => { });
   }, []);
   const [directorioJurado, setDirectorioJurado] = useState<IngenieroJuradoItem[]>(() =>
     logisticaSecretariaService.getDirectorioJurado()
@@ -613,6 +624,30 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [plantillaCorreoActiva, setPlantillaCorreoActiva] = useState<'jurados' | 'tesistas'>('jurados');
   const [adjuntarColacionFijo, setAdjuntarColacionFijo] = useState<boolean>(false);
   const colacionPdfBase64Ref = useRef<string>('');
+  const [fotoAgradecimientoUrl, setFotoAgradecimientoUrl] = useState<string>('');
+  const [generoBachiller, setGeneroBachiller] = useState<GeneroBachiller>('femenino');
+  const fotoAgradecimientoInputRef = useRef<HTMLInputElement | null>(null);
+  const [fbStatus, setFbStatus] = useState<{
+    connected: boolean;
+    pageId: string;
+    pageName: string;
+    pageUrl: string;
+    source: string;
+  }>({
+    connected: false,
+    pageId: '',
+    pageName: '',
+    pageUrl: 'https://www.facebook.com/escueladeingenieriaindustrialunt',
+    source: 'none'
+  });
+  const [cfgFbPageId, setCfgFbPageId] = useState<string>('');
+  const [cfgFbToken, setCfgFbToken] = useState<string>('');
+  const [guardandoFb, setGuardandoFb] = useState<boolean>(false);
+  const [publicandoFb, setPublicandoFb] = useState<boolean>(false);
+  const [ultimaPublicacionFb, setUltimaPublicacionFb] = useState<{
+    postUrl: string;
+    pageName: string;
+  } | null>(null);
   const [generandoFlyer, setGenerandoFlyer] = useState<boolean>(false);
   const [tesistaDespachoActivoId, setTesistaDespachoActivoId] = useState<string>('');
   const [flyerDatosActivos, setFlyerDatosActivos] = useState<FlyerSustentacionInput | null>(null);
@@ -777,6 +812,59 @@ export const SecretariaLogisticsPage: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
+  const handleSubirFotoAgradecimiento = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      setFotoAgradecimientoUrl(dataUrl);
+      if (flyerDatosActivos) {
+        regenerarFlyerDesdeDatos(
+          {
+            ...flyerDatosActivos,
+            tipo: 'agradecimiento',
+            generoBachiller,
+            fotoAgradecimientoDataUrl: dataUrl
+          },
+          false
+        ).catch(() => {});
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePublicarEnFacebook = async () => {
+    if (!flyerPreview) {
+      agregarToast('warning', 'Sin imagen', 'Primero genera o sube un flyer para publicar.');
+      return;
+    }
+    if (!fbStatus.connected) {
+      setModalCorreoAbierto(true);
+      agregarToast(
+        'info',
+        'Falta vincular Facebook',
+        'Pega el Page ID y el Token de tu Página de Facebook en la sección inferior para activar la subida directa.'
+      );
+      return;
+    }
+    setPublicandoFb(true);
+    setUltimaPublicacionFb(null);
+    try {
+      const res = await logisticaSecretariaService.publicarFlyerFacebook({
+        imageDataUrl: flyerPreview,
+        fileName: flyerNombre || 'Flyer_UNT_Industrial.png'
+      });
+      setUltimaPublicacionFb({ postUrl: res.postUrl, pageName: res.pageName });
+      agregarToast('success', 'Publicado en Facebook', res.message);
+    } catch (err: any) {
+      agregarToast('error', 'Error al publicar en Facebook', err?.message || 'No se pudo subir la imagen.');
+    } finally {
+      setPublicandoFb(false);
+    }
+  };
+
   const prepararDespachoParaTesistaYJurado = async (
     seg: SeguimientoTesisItem,
     fechaJueves?: string,
@@ -793,11 +881,16 @@ export const SecretariaLogisticsPage: React.FC = () => {
     setModalidadDespacho(modSeg);
     setPlantillaCorreoActiva('jurados');
     setAdjuntarColacionFijo(false);
-    seleccionarDestinatariosPorPlantilla('jurados', seg);
+    setUltimaPublicacionFb(null);
+    if (tipoFlyer !== 'agradecimiento') {
+      seleccionarDestinatariosPorPlantilla('jurados', seg);
+    }
 
     const flyerInput: FlyerSustentacionInput = {
       tipo: tipoFlyer,
       modalidad: modSeg,
+      generoBachiller,
+      fotoAgradecimientoDataUrl: tipoFlyer === 'agradecimiento' ? fotoAgradecimientoUrl : undefined,
       tesistaNombre: seg.tesistaNombre,
       segundoBachiller: seg.tesista2Nombre || '',
       tituloTesis: seg.tituloTesis,
@@ -812,7 +905,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
       directorCargo: directorFlyerCargo
     };
     setTab('despacho');
-    await regenerarFlyerDesdeDatos(flyerInput, true, modSeg, 'jurados');
+    await regenerarFlyerDesdeDatos(flyerInput, tipoFlyer !== 'agradecimiento', modSeg, 'jurados');
   };
 
   const handleEnviarAnuncioYFlyer = async (e: React.FormEvent) => {
@@ -1808,11 +1901,31 @@ export const SecretariaLogisticsPage: React.FC = () => {
                                 type="button"
                                 onClick={() => prepararDespachoParaTesistaYJurado(item)}
                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] font-extrabold cursor-pointer"
-                                title="Enviar Flyer al Jurado, Tesista y copias de los Martes"
+                                title="Preparar Flyer y Correos"
                               >
                                 <Send className="w-3.5 h-3.5" />
                                 <span>Flyer</span>
                               </button>
+
+                              {(res1 === 'aprobado' || res2 === 'aprobado') && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    prepararDespachoParaTesistaYJurado(
+                                      item,
+                                      undefined,
+                                      undefined,
+                                      undefined,
+                                      'agradecimiento'
+                                    )
+                                  }
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold cursor-pointer"
+                                  title="Crear Flyer de Agradecimiento para Facebook (con foto)"
+                                >
+                                  <Award className="w-3.5 h-3.5 text-amber-300" />
+                                  <span>Felicitación</span>
+                                </button>
+                              )}
                             </div>
 
                             <div className="flex items-center gap-1">
@@ -1972,16 +2085,17 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 onSubmit={handleEnviarAnuncioYFlyer}
                 className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs space-y-4 text-xs"
               >
-                {/* Barra limpia de 1 sola fila: Invitación Normal / Reprogramación · Lugar rápido · Ajustes discretos */}
+                {/* Barra limpia de modos de Flyer: Invitación Normal · Reprogramación · Agradecimiento (Facebook) */}
                 {flyerDatosActivos && (
                   <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 text-left">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() =>
-                            regenerarFlyerDesdeDatos({ ...flyerDatosActivos, tipo: 'normal' }, true)
-                          }
+                          onClick={() => {
+                            setUltimaPublicacionFb(null);
+                            regenerarFlyerDesdeDatos({ ...flyerDatosActivos, tipo: 'normal' }, true);
+                          }}
                           className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
                             (flyerDatosActivos.tipo || 'normal') === 'normal'
                               ? 'bg-[#004AAD] text-white shadow-2xs'
@@ -1992,9 +2106,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() =>
-                            regenerarFlyerDesdeDatos({ ...flyerDatosActivos, tipo: 'reprogramacion' }, true)
-                          }
+                          onClick={() => {
+                            setUltimaPublicacionFb(null);
+                            regenerarFlyerDesdeDatos({ ...flyerDatosActivos, tipo: 'reprogramacion' }, true);
+                          }}
                           className={`px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
                             flyerDatosActivos.tipo === 'reprogramacion'
                               ? 'bg-amber-500 text-slate-950 shadow-2xs'
@@ -2003,52 +2118,200 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         >
                           Reprogramación
                         </button>
-                        <span className="text-slate-300 px-0.5">|</span>
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={() => {
+                            setUltimaPublicacionFb(null);
                             regenerarFlyerDesdeDatos(
                               {
                                 ...flyerDatosActivos,
-                                lugar: 'Auditorio de la Escuela de Ingeniería Industrial'
+                                tipo: 'agradecimiento',
+                                generoBachiller,
+                                fotoAgradecimientoDataUrl: fotoAgradecimientoUrl || undefined
                               },
-                              true
-                            )
-                          }
-                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer border ${
-                            flyerDatosActivos.lugar.toLowerCase().includes('auditorio')
-                              ? 'bg-blue-50 border-blue-300 text-[#082F64]'
-                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                              false
+                            );
+                          }}
+                          className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                            flyerDatosActivos.tipo === 'agradecimiento'
+                              ? 'bg-emerald-600 text-white shadow-2xs'
+                              : 'bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-50'
                           }`}
                         >
-                          Auditorio
+                          <Award className="w-3.5 h-3.5" />
+                          <span>Agradecimiento (Facebook)</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            regenerarFlyerDesdeDatos({ ...flyerDatosActivos, lugar: 'Aula II-6' }, true)
-                          }
-                          className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer border ${
-                            flyerDatosActivos.lugar === 'Aula II-6'
-                              ? 'bg-blue-50 border-blue-300 text-[#082F64]'
-                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
-                          }`}
-                        >
-                          Aula II-6
-                        </button>
+
+                        {flyerDatosActivos.tipo !== 'agradecimiento' && (
+                          <>
+                            <span className="text-slate-300 px-0.5">|</span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                regenerarFlyerDesdeDatos(
+                                  {
+                                    ...flyerDatosActivos,
+                                    lugar: 'Auditorio de la Escuela de Ingeniería Industrial'
+                                  },
+                                  true
+                                )
+                              }
+                              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer border ${
+                                flyerDatosActivos.lugar.toLowerCase().includes('auditorio')
+                                  ? 'bg-blue-50 border-blue-300 text-[#082F64]'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              Auditorio
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                regenerarFlyerDesdeDatos({ ...flyerDatosActivos, lugar: 'Aula II-6' }, true)
+                              }
+                              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer border ${
+                                flyerDatosActivos.lugar === 'Aula II-6'
+                                  ? 'bg-blue-50 border-blue-300 text-[#082F64]'
+                                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              Aula II-6
+                            </button>
+                          </>
+                        )}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => setMostrarAjustesFlyer((v) => !v)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-bold text-slate-600 cursor-pointer"
-                      >
-                        <Settings className="w-3 h-3" />
-                        <span>{mostrarAjustesFlyer ? 'Ocultar' : 'Editar Director / Fecha'}</span>
-                      </button>
+                      {flyerDatosActivos.tipo !== 'agradecimiento' && (
+                        <button
+                          type="button"
+                          onClick={() => setMostrarAjustesFlyer((v) => !v)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-bold text-slate-600 cursor-pointer"
+                        >
+                          <Settings className="w-3 h-3" />
+                          <span>{mostrarAjustesFlyer ? 'Ocultar' : 'Editar Director / Fecha'}</span>
+                        </button>
+                      )}
                     </div>
 
-                    {mostrarAjustesFlyer && (
+                    {/* Controles exclusivos del Flyer de Agradecimiento (foto circular + modalidad + género + fecha) */}
+                    {flyerDatosActivos.tipo === 'agradecimiento' && (
+                      <div className="pt-2.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 animate-in fade-in">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            ref={fotoAgradecimientoInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleSubirFotoAgradecimiento}
+                            className="hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => fotoAgradecimientoInputRef.current?.click()}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#082F64] hover:bg-[#0C4D96] text-white text-[11px] font-extrabold cursor-pointer shadow-2xs"
+                          >
+                            <Camera className="w-3.5 h-3.5 text-amber-300" />
+                            <span>
+                              {fotoAgradecimientoUrl ? 'Cambiar foto (Jurado y Tesista)' : 'Subir foto (Jurado y Tesista)'}
+                            </span>
+                          </button>
+
+                          {!flyerDatosActivos.segundoBachiller && (
+                            <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGeneroBachiller('femenino');
+                                  regenerarFlyerDesdeDatos(
+                                    { ...flyerDatosActivos, tipo: 'agradecimiento', generoBachiller: 'femenino' },
+                                    false
+                                  );
+                                }}
+                                className={`px-2 py-1 rounded-md text-[10px] font-extrabold cursor-pointer ${
+                                  generoBachiller === 'femenino'
+                                    ? 'bg-[#082F64] text-white'
+                                    : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                Ella (La Bachiller)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGeneroBachiller('masculino');
+                                  regenerarFlyerDesdeDatos(
+                                    { ...flyerDatosActivos, tipo: 'agradecimiento', generoBachiller: 'masculino' },
+                                    false
+                                  );
+                                }}
+                                className={`px-2 py-1 rounded-md text-[10px] font-extrabold cursor-pointer ${
+                                  generoBachiller === 'masculino'
+                                    ? 'bg-[#082F64] text-white'
+                                    : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                Él (El Bachiller)
+                              </button>
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setModalidadDespacho('tesis');
+                                regenerarFlyerDesdeDatos(
+                                  { ...flyerDatosActivos, tipo: 'agradecimiento', modalidad: 'tesis' },
+                                  false,
+                                  'tesis'
+                                );
+                              }}
+                              className={`px-2 py-1 rounded-md text-[10px] font-extrabold cursor-pointer ${
+                                modalidadDespacho === 'tesis'
+                                  ? 'bg-amber-400 text-slate-950'
+                                  : 'text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              Tesis
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setModalidadDespacho('suficiencia');
+                                regenerarFlyerDesdeDatos(
+                                  { ...flyerDatosActivos, tipo: 'agradecimiento', modalidad: 'suficiencia' },
+                                  false,
+                                  'suficiencia'
+                                );
+                              }}
+                              className={`px-2 py-1 rounded-md text-[10px] font-extrabold cursor-pointer ${
+                                modalidadDespacho === 'suficiencia'
+                                  ? 'bg-violet-600 text-white'
+                                  : 'text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              Suficiencia Prof.
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-slate-500">Fecha:</span>
+                          <input
+                            type="date"
+                            value={flyerDatosActivos.fechaJueves}
+                            onChange={(e) =>
+                              regenerarFlyerDesdeDatos(
+                                { ...flyerDatosActivos, tipo: 'agradecimiento', fechaJueves: e.target.value },
+                                false
+                              )
+                            }
+                            className="px-2 py-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {mostrarAjustesFlyer && flyerDatosActivos.tipo !== 'agradecimiento' && (
                       <div className="pt-2.5 border-t border-slate-200/80 space-y-2 animate-in fade-in">
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                           <div>
@@ -2173,11 +2436,31 @@ export const SecretariaLogisticsPage: React.FC = () => {
                         <a
                           href={flyerPreview}
                           download={flyerNombre || 'Flyer_Sustentacion_UNT.png'}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#082F64] text-white font-bold cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#082F64] hover:bg-[#0C4D96] text-white font-bold cursor-pointer"
                         >
                           <Download className="w-3 h-3 text-amber-300" />
-                          <span>Descargar para Facebook</span>
+                          <span>Descargar imagen</span>
                         </a>
+                        <button
+                          type="button"
+                          disabled={publicandoFb}
+                          onClick={handlePublicarEnFacebook}
+                          title={
+                            fbStatus.connected
+                              ? `Publicar solo esta imagen en ${fbStatus.pageName}`
+                              : 'Configura Page ID y Token en ⚙️ para subir directo a Facebook'
+                          }
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1877F2] hover:bg-[#1565D8] disabled:opacity-50 text-white font-extrabold cursor-pointer shadow-2xs"
+                        >
+                          <Globe className="w-3.5 h-3.5" />
+                          <span>
+                            {publicandoFb
+                              ? 'Subiendo a Facebook...'
+                              : fbStatus.connected
+                                ? 'Publicar en Facebook'
+                                : 'Publicar en Facebook (API)'}
+                          </span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => {
@@ -2188,12 +2471,28 @@ export const SecretariaLogisticsPage: React.FC = () => {
                             });
                             setFlyerPreview('');
                             setFlyerNombre('');
+                            setUltimaPublicacionFb(null);
                           }}
-                          className="px-2.5 py-1 rounded-lg bg-rose-100 text-rose-700 font-bold cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg bg-rose-100 text-rose-700 font-bold cursor-pointer"
                         >
                           Cambiar imagen
                         </button>
                       </div>
+                      {ultimaPublicacionFb && (
+                        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] font-bold">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Imagen publicada en {ultimaPublicacionFb.pageName}</span>
+                          <a
+                            href={ultimaPublicacionFb.postUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-0.5 text-[#1877F2] hover:underline"
+                          >
+                            <span>Ver publicación</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      )}
                     </div>
                   )}
                   {generandoFlyer && (
@@ -2203,6 +2502,14 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   )}
                 </div>
 
+                {flyerDatosActivos?.tipo === 'agradecimiento' ? (
+                  <div className="p-3.5 rounded-xl bg-blue-50/70 border border-blue-200 text-xs text-[#082F64] flex items-center justify-between gap-2">
+                    <span>
+                      <strong>Flyer de Agradecimiento exclusivo para Facebook:</strong> sube la foto del jurado y tesista(s) arriba y publícalo directo en Facebook (solo imagen, sin envío a correos).
+                    </span>
+                  </div>
+                ) : (
+                  <>
                 {(whatsappDocentesTexto || mensajeChat.trim()) && (
                   <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-emerald-900">
@@ -2508,18 +2815,25 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   );
                   return (
                     <>
-                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-700">
-                        <span className="font-bold text-slate-900">
-                          Destinatarios exactos ({previewDestinatarios.length}):{' '}
-                        </span>
-                        {previewDestinatarios.length > 0 ? (
-                          <span className="font-mono text-unt-blue break-all">
-                            {previewDestinatarios.join(', ')}
+                      <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-700 space-y-1">
+                        <div>
+                          <span className="font-bold text-slate-900">
+                            Destinatarios exactos ({previewDestinatarios.length}):{' '}
                           </span>
-                        ) : (
-                          <span className="text-slate-500">
-                            Ninguno seleccionado aún (marca checks a la derecha o añade un correo manual arriba).
-                          </span>
+                          {previewDestinatarios.length > 0 ? (
+                            <span className="font-mono text-unt-blue break-all">
+                              {previewDestinatarios.join(', ')}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">
+                              Ninguno seleccionado aún (marca checks a la derecha o añade un correo manual arriba).
+                            </span>
+                          )}
+                        </div>
+                        {adjuntarColacionFijo && (
+                          <div className="text-emerald-800 font-bold">
+                            📎 Incluye documento fijo: {DOC_COLACION_FIJO_NOMBRE}
+                          </div>
                         )}
                       </div>
 
@@ -2548,6 +2862,8 @@ export const SecretariaLogisticsPage: React.FC = () => {
                       {confirmacionEnvio.fechaHora}
                     </span>
                   </div>
+                )}
+                  </>
                 )}
               </form>
 
@@ -3559,7 +3875,7 @@ export const SecretariaLogisticsPage: React.FC = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 bg-[#082F64] text-white flex items-center justify-between">
-              <h3 className="text-sm font-bold">Vincular Mi Correo y WhatsApp</h3>
+              <h3 className="text-sm font-bold">Correo, WhatsApp y Facebook</h3>
               <button
                 type="button"
                 onClick={() => setModalCorreoAbierto(false)}
@@ -3665,6 +3981,77 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 <p className="text-[10px] text-slate-500 mt-1">
                   Aparecerá en el Asistente de Dudas junto a la advertencia de leer primero todos los pasos antes de escribir.
                 </p>
+              </div>
+
+              {/* Vinculación opcional de Página de Facebook (API Meta Graph — subida directa de flyers sin texto) */}
+              <div className="pt-3 border-t border-slate-100 space-y-2">
+                <label className="block font-bold text-[#1877F2] flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Página de Facebook — Subida directa de Flyers (API):</span>
+                </label>
+
+                {fbStatus.connected ? (
+                  <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200 space-y-2">
+                    <div className="font-bold text-[#082F64]">
+                      ✓ Conectado a {fbStatus.pageName}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-600">
+                      Page ID: {fbStatus.pageId}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const st = await logisticaSecretariaService.disconnectFacebook();
+                        setFbStatus(st);
+                        setCfgFbToken('');
+                        agregarToast('info', 'Facebook desconectado', 'Puedes volver a vincular la página cuando desees.');
+                      }}
+                      className="w-full py-1.5 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 font-bold cursor-pointer"
+                    >
+                      Desconectar Página de Facebook
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                    <input
+                      type="text"
+                      value={cfgFbPageId}
+                      onChange={(e) => setCfgFbPageId(e.target.value)}
+                      placeholder="Facebook Page ID (ej. 104829384712345)"
+                      className="w-full p-2 rounded-lg border border-slate-300 bg-white font-mono text-[11px]"
+                    />
+                    <input
+                      type="password"
+                      value={cfgFbToken}
+                      onChange={(e) => setCfgFbToken(e.target.value)}
+                      placeholder="Page Access Token (Meta Developers)"
+                      className="w-full p-2 rounded-lg border border-slate-300 bg-white font-mono text-[11px]"
+                    />
+                    <button
+                      type="button"
+                      disabled={guardandoFb || !cfgFbPageId.trim() || !cfgFbToken.trim()}
+                      onClick={async () => {
+                        setGuardandoFb(true);
+                        try {
+                          const st = await logisticaSecretariaService.saveFacebookConfig({
+                            pageId: cfgFbPageId,
+                            pageAccessToken: cfgFbToken
+                          });
+                          setFbStatus(st);
+                          setCfgFbToken('');
+                          agregarToast('success', 'Facebook conectado', `Página vinculada: ${st.pageName}`);
+                        } catch (err: any) {
+                          agregarToast('error', 'No se pudo conectar Facebook', err?.message || 'Verifica el Page ID y Token.');
+                        } finally {
+                          setGuardandoFb(false);
+                        }
+                      }}
+                      className="w-full py-2 rounded-lg bg-[#1877F2] hover:bg-[#1565D8] disabled:opacity-50 text-white font-bold cursor-pointer"
+                    >
+                      {guardandoFb ? 'Validando con Meta...' : 'Conectar Página de Facebook'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
