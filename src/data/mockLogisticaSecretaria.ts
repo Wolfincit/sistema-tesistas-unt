@@ -329,7 +329,7 @@ export const INITIAL_DIRECTORIO_JURADO: IngenieroJuradoItem[] = [
   {
     id: 'ing-unt-04',
     nombre: 'Ms. César Enrique Santos Gonzales',
-    correo: '',
+    correo: 'csantoso@unitru.edu.pe',
     especialidad: 'Ingeniería Industrial',
     categoria: 'Docente UNT',
     activo: true
@@ -337,7 +337,7 @@ export const INITIAL_DIRECTORIO_JURADO: IngenieroJuradoItem[] = [
   {
     id: 'ing-unt-05',
     nombre: 'Dr. Francisco Elías Rodríguez Novoa',
-    correo: '',
+    correo: 'frodriguez@unitru.edu.pe',
     especialidad: 'Ingeniería Industrial',
     categoria: 'Docente UNT',
     activo: true
@@ -465,7 +465,7 @@ export const INITIAL_DIRECTORIO_JURADO: IngenieroJuradoItem[] = [
   {
     id: 'ing-unt-21',
     nombre: 'Mg. Segundo Miguel Ramírez Córdova',
-    correo: '',
+    correo: 'sramirez@unitru.edu.pe',
     especialidad: 'Ingeniería Industrial',
     categoria: 'Docente UNT',
     activo: true

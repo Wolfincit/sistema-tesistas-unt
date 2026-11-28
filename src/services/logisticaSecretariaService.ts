@@ -87,9 +87,22 @@ export function mergeDirectorioOficial(
 ): { merged: IngenieroJuradoItem[]; changed: boolean } {
   const lista = Array.isArray(actuales) ? actuales : [];
   // Si ya contiene docentes oficiales del catálogo UNT (ing-unt-*), respetar cambios de Secretaría
+  // y completar únicamente correos vacíos que ahora estén confirmados en el catálogo oficial
   const yaSembrado = lista.some((item) => String(item?.id || '').startsWith('ing-unt-'));
   if (yaSembrado) {
-    return { merged: lista, changed: false };
+    const mapaOficial = new Map(INITIAL_DIRECTORIO_JURADO.map((of) => [of.id, of]));
+    let backfilled = false;
+    const actualizados = lista.map((item) => {
+      if (!String(item?.correo || '').trim()) {
+        const oficial = mapaOficial.get(item.id);
+        if (oficial?.correo) {
+          backfilled = true;
+          return { ...item, correo: oficial.correo };
+        }
+      }
+      return item;
+    });
+    return { merged: actualizados, changed: backfilled };
   }
 
   const correosExistentes = new Set(
