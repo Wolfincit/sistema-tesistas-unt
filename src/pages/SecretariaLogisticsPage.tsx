@@ -28,6 +28,7 @@ import {
   PlantillaMensajeInput
 } from '../utils/officialMessageTemplates';
 import { SecretariaHoyTab } from '../components/secretaria/SecretariaHoyTab';
+import { IngenieroCombobox } from '../components/secretaria/IngenieroCombobox';
 import { InstruccionesSustentacionPage } from './InstruccionesSustentacionPage';
 import { PreguntasFrecuentesPage } from './PreguntasFrecuentesPage';
 import { useApp } from '../context/AppContext';
@@ -35,6 +36,7 @@ import {
   ClipboardList,
   Send,
   Calendar,
+  Check,
   CheckCircle2,
   Plus,
   Trash2,
@@ -71,6 +73,29 @@ const DOC_COLACION_FIJO_NOMBRE = 'Procedimiento_Colacion_Ordinaria_Titulo_UNT.pd
 const sanitizeText = (val: string): string =>
   val.replace(/<[^>]*>?/gm, '').replace(/[<>]/g, '');
 
+const normalizarNombreDocente = (val: string): string =>
+  String(val || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\b(dr|dra|ms|mg|msc|ing|lic)\.?\s*/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const coincideDocente = (nombreIng: string, nombreBuscado: string): boolean => {
+  const a = normalizarNombreDocente(nombreIng);
+  const b = normalizarNombreDocente(nombreBuscado);
+  if (!a || !b) return false;
+  if (a === b || a.includes(b) || b.includes(a)) return true;
+  const tokensA = a.split(' ').filter((t) => t.length >= 3);
+  const tokensB = b.split(' ').filter((t) => t.length >= 3);
+  if (tokensA.length < 2 || tokensB.length < 2) return false;
+  const [corto, largo] = tokensA.length <= tokensB.length ? [tokensA, new Set(tokensB)] : [tokensB, new Set(tokensA)];
+  const hits = corto.filter((t) => largo.has(t)).length;
+  return hits >= Math.min(2, corto.length) && hits >= corto.length - 1;
+};
+
 const nombreCortoTesista = (nombre: string): string => {
   const partes = String(nombre || '').trim().split(/\s+/).filter(Boolean);
   if (partes.length <= 2) return partes.join(' ');
@@ -78,7 +103,7 @@ const nombreCortoTesista = (nombre: string): string => {
 };
 
 export const SecretariaLogisticsPage: React.FC = () => {
-  const { usuario, agregarToast } = useApp();
+  const { usuario, agregarToast, cargando } = useApp();
   const [tab, setTab] = useState<'hoy' | 'seguimiento' | 'instrucciones' | 'despacho' | 'calendario'>('hoy');
 
   // Estados sincronizados en todo el sistema
@@ -108,6 +133,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [directorioJurado, setDirectorioJurado] = useState<IngenieroJuradoItem[]>(() =>
     logisticaSecretariaService.getDirectorioJurado()
   );
+  useEffect(() => {
+    if (!cargando) {
+      setDirectorioJurado(logisticaSecretariaService.getDirectorioJurado());
+    }
+  }, [cargando]);
   const [sustentaciones, setSustentaciones] = useState<SustentacionJuevesItem[]>(() =>
     logisticaSecretariaService.getSustentacionesJueves()
   );
@@ -364,10 +394,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
       setFormCodigo2('');
       setFormCorreo2('');
       setFormTitulo('');
-      setFormAsesor(directorioJurado[0]?.nombre || '');
-      setFormPresidente(directorioJurado[0]?.nombre || '');
-      setFormSecretario(directorioJurado[1]?.nombre || '');
-      setFormVocal(directorioJurado[2]?.nombre || '');
+      setFormAsesor('');
+      setFormPresidente('');
+      setFormSecretario('');
+      setFormVocal('');
       setFormModalidad('tesis');
       setFormNotas('');
     }
@@ -472,10 +502,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
       await logisticaSecretariaService.saveSustentacionesJueves(sustSync);
     }
 
-    // Si este tesista es el que está cargado en el flyer, regenerar el flyer al instante
+    // Si este tesista es el que está cargado en el flyer, regenerar el flyer y sincronizar correos al instante
     if (flyerDatosActivos && tesistaDespachoActivoId === nuevo.id) {
       const modNuevo = nuevo.modalidadTrabajo || 'tesis';
       setModalidadDespacho(modNuevo);
+      seleccionarDestinatariosPorPlantilla(plantillaCorreoActiva, nuevo);
       regenerarFlyerDesdeDatos(
         {
           ...flyerDatosActivos,
@@ -620,6 +651,9 @@ export const SecretariaLogisticsPage: React.FC = () => {
   const [nuevoTesistaCorreo, setNuevoTesistaCorreo] = useState<string>('');
   const [nuevoIngNombre, setNuevoIngNombre] = useState<string>('');
   const [nuevoIngCorreo, setNuevoIngCorreo] = useState<string>('');
+  const [editIngId, setEditIngId] = useState<string>('');
+  const [editIngNombre, setEditIngNombre] = useState<string>('');
+  const [editIngCorreo, setEditIngCorreo] = useState<string>('');
   const [correosManuales, setCorreosManuales] = useState<string[]>([]);
   const [inputCorreoManual, setInputCorreoManual] = useState<string>('');
   const [whatsappDocentesTexto, setWhatsappDocentesTexto] = useState<string>('');
@@ -716,27 +750,37 @@ export const SecretariaLogisticsPage: React.FC = () => {
 
   const seleccionarDestinatariosPorPlantilla = (
     tipo: 'jurados' | 'tesistas',
-    seg?: SeguimientoTesisItem | null
+    seg?: SeguimientoTesisItem | null,
+    directorioOverride?: IngenieroJuradoItem[]
   ) => {
     const activo = seg || seguimientos.find((s) => s.id === tesistaDespachoActivoId);
-    if (!activo) return;
-    const correosTesista = [activo.tesistaCorreo, activo.tesista2Correo]
-      .map((c) => String(c || '').trim().toLowerCase())
-      .filter((c) => c.includes('@'));
-    const nombresJurado = [activo.juradoPresidente, activo.juradoSecretario, activo.juradoVocal, activo.asesor]
-      .map((n) => String(n || '').toLowerCase())
-      .filter(Boolean);
-    const correosJuradoMatch = directorioJurado
+    const directorioActual = directorioOverride || directorioJurado;
+    const nombresJurado = activo
+      ? [activo.juradoPresidente, activo.juradoSecretario, activo.juradoVocal, activo.asesor]
+      : flyerDatosActivos
+      ? [
+          flyerDatosActivos.juradoPresidente,
+          flyerDatosActivos.juradoSecretario,
+          flyerDatosActivos.juradoVocal,
+          flyerDatosActivos.asesor || ''
+        ]
+      : [];
+    const nombresLimpios = nombresJurado.map((n) => String(n || '').trim()).filter(Boolean);
+
+    const correosTesista = activo
+      ? [activo.tesistaCorreo, activo.tesista2Correo]
+          .map((c) => String(c || '').trim().toLowerCase())
+          .filter((c) => c.includes('@'))
+      : [];
+
+    const correosJuradoMatch = directorioActual
       .filter(
         (ing) =>
-          ing.categoria === 'Copia Martes' ||
-          nombresJurado.some(
-            (nj) =>
-              ing.nombre.toLowerCase().includes(nj) ||
-              nj.includes(ing.nombre.toLowerCase().replace(/^dr\.\s*|^mg\.\s*|^ms\.\s*|^ing\.\s*/g, '').trim())
-          )
+          ing.correo.includes('@') &&
+          (ing.categoria === 'Copia Martes' ||
+            nombresLimpios.some((nj) => coincideDocente(ing.nombre, nj)))
       )
-      .map((ing) => ing.correo.toLowerCase());
+      .map((ing) => ing.correo.trim().toLowerCase());
 
     if (tipo === 'jurados') {
       setTesistasChecks([]);
@@ -1306,9 +1350,23 @@ export const SecretariaLogisticsPage: React.FC = () => {
       await logisticaSecretariaService.saveSeguimientos(segActualizados);
     }
 
-    // Si el flyer activo corresponde a esta sustentación/tesista, actualizarlo al instante
+    // Si el flyer activo corresponde a esta sustentación/tesista, actualizarlo y sincronizar correos al instante
     if (flyerDatosActivos) {
       setModalidadDespacho(calModalidad);
+      if (plantillaCorreoActiva === 'jurados') {
+        const nombresAct = [registro.juradoPresidente, registro.juradoSecretario, registro.juradoVocal, registro.asesor]
+          .map((n) => String(n || '').trim())
+          .filter(Boolean);
+        const correosSync = directorioJurado
+          .filter(
+            (ing) =>
+              ing.correo.includes('@') &&
+              (ing.categoria === 'Copia Martes' ||
+                nombresAct.some((nj) => coincideDocente(ing.nombre, nj)))
+          )
+          .map((ing) => ing.correo.trim().toLowerCase());
+        setJuradoChecks(Array.from(new Set(correosSync)));
+      }
       await regenerarFlyerDesdeDatos(
         {
           ...flyerDatosActivos,
@@ -3018,6 +3076,27 @@ export const SecretariaLogisticsPage: React.FC = () => {
                             </span>
                           )}
                         </div>
+                        {(() => {
+                          if (plantillaCorreoActiva !== 'jurados' || !flyerDatosActivos) return null;
+                          const asignados = [
+                            flyerDatosActivos.juradoPresidente,
+                            flyerDatosActivos.juradoSecretario,
+                            flyerDatosActivos.juradoVocal,
+                            flyerDatosActivos.asesor || ''
+                          ]
+                            .map((n) => n.trim())
+                            .filter(Boolean);
+                          const sinCorreo = asignados.filter((nombre) => {
+                            const match = directorioJurado.find((ing) => coincideDocente(ing.nombre, nombre));
+                            return !match || !match.correo.includes('@');
+                          });
+                          if (sinCorreo.length === 0) return null;
+                          return (
+                            <div className="text-amber-700 font-semibold pt-0.5">
+                              Sin correo registrado: {Array.from(new Set(sinCorreo)).join(', ')}
+                            </div>
+                          );
+                        })()}
                         {adjuntarColacionFijo && (
                           <div className="text-emerald-800 font-bold">
                             📎 Incluye documento fijo: {DOC_COLACION_FIJO_NOMBRE}
@@ -3239,7 +3318,11 @@ export const SecretariaLogisticsPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() =>
-                        setJuradoChecks(directorioJurado.map((j) => j.correo.toLowerCase()))
+                        setJuradoChecks(
+                          directorioJurado
+                            .map((j) => j.correo.trim().toLowerCase())
+                            .filter((c) => c.includes('@'))
+                        )
                       }
                       className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 font-semibold cursor-pointer"
                     >
@@ -3263,28 +3346,110 @@ export const SecretariaLogisticsPage: React.FC = () => {
                   className="w-full px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs"
                 />
 
-                <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
                   {directorioJurado
-                    .filter(
-                      (ing) =>
-                        !busquedaJuradoCheck.trim() ||
-                        ing.nombre.toLowerCase().includes(busquedaJuradoCheck.toLowerCase()) ||
-                        ing.correo.toLowerCase().includes(busquedaJuradoCheck.toLowerCase())
-                    )
+                    .filter((ing) => {
+                      const q = normalizarNombreDocente(busquedaJuradoCheck);
+                      if (!q) return true;
+                      return (
+                        normalizarNombreDocente(ing.nombre).includes(q) ||
+                        ing.correo.toLowerCase().includes(q)
+                      );
+                    })
                     .map((ing) => {
-                      const correoLow = ing.correo.toLowerCase();
-                      const marcado = juradoChecks.includes(correoLow);
+                      const correoLow = ing.correo.trim().toLowerCase();
+                      const tieneCorreo = correoLow.includes('@');
+                      const marcado = tieneCorreo && juradoChecks.includes(correoLow);
+                      const enEdicion = editIngId === ing.id;
+
+                      if (enEdicion) {
+                        const guardarEdicionIng = async () => {
+                          const nuevoNombre = editIngNombre.trim() || ing.nombre;
+                          const nuevoCorreo = editIngCorreo.trim().toLowerCase();
+                          const actualizados = directorioJurado.map((item) =>
+                            item.id === ing.id
+                              ? { ...item, nombre: nuevoNombre, correo: nuevoCorreo }
+                              : item
+                          );
+                          setDirectorioJurado(actualizados);
+                          await logisticaSecretariaService.saveDirectorioJurado(actualizados);
+                          setEditIngId('');
+                          if (plantillaCorreoActiva === 'jurados') {
+                            seleccionarDestinatariosPorPlantilla('jurados', null, actualizados);
+                          } else if (correoLow && nuevoCorreo && juradoChecks.includes(correoLow)) {
+                            setJuradoChecks((prev) =>
+                              Array.from(
+                                new Set(prev.map((c) => (c === correoLow ? nuevoCorreo : c)))
+                              )
+                            );
+                          }
+                          agregarToast('success', 'Docente actualizado', `${nuevoNombre} guardado.`);
+                        };
+
+                        return (
+                          <div key={ing.id} className="p-2.5 bg-blue-50/70 space-y-1.5 text-xs">
+                            <input
+                              type="text"
+                              value={editIngNombre}
+                              onChange={(e) => setEditIngNombre(e.target.value)}
+                              className="w-full px-2 py-1 rounded-lg border border-slate-300 bg-white font-semibold"
+                            />
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="email"
+                                value={editIngCorreo}
+                                onChange={(e) => setEditIngCorreo(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    guardarEdicionIng();
+                                  } else if (e.key === 'Escape') {
+                                    setEditIngId('');
+                                  }
+                                }}
+                                placeholder="correo@unitru.edu.pe"
+                                autoFocus
+                                className="flex-1 px-2 py-1 rounded-lg border border-slate-300 bg-white font-mono text-[11px]"
+                              />
+                              <button
+                                type="button"
+                                onClick={guardarEdicionIng}
+                                title="Guardar"
+                                className="p-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer shrink-0"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditIngId('')}
+                                title="Cancelar"
+                                className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-700 cursor-pointer shrink-0"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
                       return (
                         <div
                           key={ing.id}
-                          className={`flex items-center justify-between p-2.5 text-xs ${marcado ? 'bg-emerald-50/80' : 'hover:bg-slate-50'
-                            }`}
+                          className={`flex items-center justify-between gap-1.5 p-2.5 text-xs ${
+                            marcado ? 'bg-emerald-50/80' : 'hover:bg-slate-50'
+                          }`}
                         >
-                          <label className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer">
+                          <label
+                            className={`flex items-center gap-2.5 min-w-0 flex-1 ${
+                              tieneCorreo ? 'cursor-pointer' : 'cursor-default'
+                            }`}
+                          >
                             <input
                               type="checkbox"
+                              disabled={!tieneCorreo}
                               checked={marcado}
                               onChange={(e) => {
+                                if (!tieneCorreo) return;
                                 if (e.target.checked) {
                                   setJuradoChecks((prev) =>
                                     Array.from(new Set([...prev, correoLow]))
@@ -3293,31 +3458,59 @@ export const SecretariaLogisticsPage: React.FC = () => {
                                   setJuradoChecks((prev) => prev.filter((c) => c !== correoLow));
                                 }
                               }}
-                              className="w-4 h-4 rounded text-emerald-600 cursor-pointer"
+                              className="w-4 h-4 rounded text-emerald-600 cursor-pointer disabled:opacity-40"
                             />
                             <div className="min-w-0">
                               <div className="font-bold text-slate-900 truncate">{ing.nombre}</div>
-                              <div className="font-mono text-[11px] text-emerald-700 truncate">
-                                {ing.correo}
-                              </div>
+                              {tieneCorreo ? (
+                                <div className="font-mono text-[11px] text-emerald-700 truncate">
+                                  {ing.correo}
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditIngId(ing.id);
+                                    setEditIngNombre(ing.nombre);
+                                    setEditIngCorreo('');
+                                  }}
+                                  className="text-[10px] font-semibold text-amber-700 hover:underline cursor-pointer"
+                                >
+                                  + Agregar correo @unitru.edu.pe
+                                </button>
+                              )}
                             </div>
                           </label>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setConfirmarEliminar({
-                                tipo: 'jurado',
-                                id: ing.id,
-                                nombre: ing.nombre,
-                                correo: ing.correo
-                              })
-                            }
-                            className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer shrink-0"
-                            title="Eliminar ingeniero"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditIngId(ing.id);
+                                setEditIngNombre(ing.nombre);
+                                setEditIngCorreo(ing.correo);
+                              }}
+                              className="p-1 text-slate-400 hover:text-[#082F64] cursor-pointer"
+                              title="Editar nombre o correo"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setConfirmarEliminar({
+                                  tipo: 'jurado',
+                                  id: ing.id,
+                                  nombre: ing.nombre,
+                                  correo: ing.correo
+                                })
+                              }
+                              className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer"
+                              title="Eliminar ingeniero"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -3686,46 +3879,45 @@ export const SecretariaLogisticsPage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Jurado 1:</label>
-                  <input
-                    list="lista-ingenieros-unt"
+                  <IngenieroCombobox
                     value={calPresidente}
-                    onChange={(e) => setCalPresidente(e.target.value)}
-                    className="w-full p-2 rounded-lg border border-slate-300 bg-white"
+                    onChange={setCalPresidente}
+                    options={directorioJurado}
+                    excludeNames={[calSecretario, calVocal, calAsesor]}
+                    placeholder="Elegir o escribir Jurado 1..."
                   />
                 </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Jurado 2:</label>
-                  <input
-                    list="lista-ingenieros-unt"
+                  <IngenieroCombobox
                     value={calSecretario}
-                    onChange={(e) => setCalSecretario(e.target.value)}
-                    className="w-full p-2 rounded-lg border border-slate-300 bg-white"
+                    onChange={setCalSecretario}
+                    options={directorioJurado}
+                    excludeNames={[calPresidente, calVocal, calAsesor]}
+                    placeholder="Elegir o escribir Jurado 2..."
                   />
                 </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Jurado 3:</label>
-                  <input
-                    list="lista-ingenieros-unt"
+                  <IngenieroCombobox
                     value={calVocal}
-                    onChange={(e) => setCalVocal(e.target.value)}
-                    className="w-full p-2 rounded-lg border border-slate-300 bg-white"
+                    onChange={setCalVocal}
+                    options={directorioJurado}
+                    excludeNames={[calPresidente, calSecretario, calAsesor]}
+                    placeholder="Elegir o escribir Jurado 3..."
                   />
                 </div>
                 <div>
                   <label className="block font-bold text-[#082F64] mb-1">Asesor:</label>
-                  <input
-                    list="lista-ingenieros-unt"
+                  <IngenieroCombobox
                     value={calAsesor}
-                    onChange={(e) => setCalAsesor(e.target.value)}
-                    placeholder="Nombre del docente asesor"
-                    className="w-full p-2 rounded-lg border border-blue-200 bg-white"
+                    onChange={setCalAsesor}
+                    options={directorioJurado}
+                    excludeNames={[calPresidente, calSecretario, calVocal]}
+                    accent="blue"
+                    placeholder="Elegir o escribir Asesor..."
                   />
                 </div>
-                <datalist id="lista-ingenieros-unt">
-                  {directorioJurado.map((ing) => (
-                    <option key={ing.id} value={ing.nombre} />
-                  ))}
-                </datalist>
               </div>
 
               <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
@@ -3838,10 +4030,10 @@ export const SecretariaLogisticsPage: React.FC = () => {
           onClick={() => setModalSeguimientoAbierto(false)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 bg-[#082F64] text-white flex items-center justify-between">
+            <div className="p-4 bg-[#082F64] text-white flex items-center justify-between rounded-t-2xl sticky top-0 z-10">
               <h3 className="text-sm font-bold">
                 {editandoSeg ? 'Editar Tesista' : 'Nuevo Tesista'}
               </h3>
@@ -3977,49 +4169,48 @@ export const SecretariaLogisticsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Jurado 1:</label>
-                  <input
-                    list="lista-ingenieros-modal"
+                  <IngenieroCombobox
                     value={formPresidente}
-                    onChange={(e) => setFormPresidente(e.target.value)}
-                    className="w-full p-2 rounded-xl border border-slate-300"
+                    onChange={setFormPresidente}
+                    options={directorioJurado}
+                    excludeNames={[formSecretario, formVocal, formAsesor]}
+                    placeholder="Elegir o escribir Jurado 1..."
                   />
                 </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Jurado 2:</label>
-                  <input
-                    list="lista-ingenieros-modal"
+                  <IngenieroCombobox
                     value={formSecretario}
-                    onChange={(e) => setFormSecretario(e.target.value)}
-                    className="w-full p-2 rounded-xl border border-slate-300"
+                    onChange={setFormSecretario}
+                    options={directorioJurado}
+                    excludeNames={[formPresidente, formVocal, formAsesor]}
+                    placeholder="Elegir o escribir Jurado 2..."
                   />
                 </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Jurado 3:</label>
-                  <input
-                    list="lista-ingenieros-modal"
+                  <IngenieroCombobox
                     value={formVocal}
-                    onChange={(e) => setFormVocal(e.target.value)}
-                    className="w-full p-2 rounded-xl border border-slate-300"
+                    onChange={setFormVocal}
+                    options={directorioJurado}
+                    excludeNames={[formPresidente, formSecretario, formAsesor]}
+                    placeholder="Elegir o escribir Jurado 3..."
                   />
                 </div>
                 <div>
                   <label className="block font-bold text-[#082F64] mb-1">Asesor:</label>
-                  <input
-                    list="lista-ingenieros-modal"
+                  <IngenieroCombobox
                     value={formAsesor}
-                    onChange={(e) => setFormAsesor(e.target.value)}
-                    placeholder="Nombre del docente asesor"
-                    className="w-full p-2 rounded-xl border border-blue-200 bg-blue-50/20"
+                    onChange={setFormAsesor}
+                    options={directorioJurado}
+                    excludeNames={[formPresidente, formSecretario, formVocal]}
+                    accent="blue"
+                    placeholder="Elegir o escribir Asesor..."
                   />
                 </div>
-                <datalist id="lista-ingenieros-modal">
-                  {directorioJurado.map((ing) => (
-                    <option key={ing.id} value={ing.nombre} />
-                  ))}
-                </datalist>
               </div>
 
               <div>

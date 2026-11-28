@@ -73,6 +73,47 @@ export function purgarHistorialDespachos(items: DespachoChatAnuncioItem[]): Desp
     );
 }
 
+const normalizarClavePersona = (val: string): string =>
+  String(val || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\b(dr|dra|ms|mg|msc|ing|lic)\.?\s*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+export function mergeDirectorioOficial(
+  actuales: IngenieroJuradoItem[]
+): { merged: IngenieroJuradoItem[]; changed: boolean } {
+  const lista = Array.isArray(actuales) ? actuales : [];
+  // Si ya contiene docentes oficiales del catálogo UNT (ing-unt-*), respetar cambios de Secretaría
+  const yaSembrado = lista.some((item) => String(item?.id || '').startsWith('ing-unt-'));
+  if (yaSembrado) {
+    return { merged: lista, changed: false };
+  }
+
+  const correosExistentes = new Set(
+    lista.map((i) => String(i?.correo || '').trim().toLowerCase()).filter(Boolean)
+  );
+  const nombresExistentes = new Set(
+    lista.map((i) => normalizarClavePersona(i?.nombre || '')).filter(Boolean)
+  );
+
+  const faltantes = INITIAL_DIRECTORIO_JURADO.filter((oficial) => {
+    const correo = oficial.correo.trim().toLowerCase();
+    const nombreNorm = normalizarClavePersona(oficial.nombre);
+    if (correo && correosExistentes.has(correo)) return false;
+    if (nombreNorm && nombresExistentes.has(nombreNorm)) return false;
+    return true;
+  });
+
+  if (faltantes.length === 0) {
+    return { merged: lista, changed: false };
+  }
+
+  return { merged: [...lista, ...faltantes], changed: true };
+}
+
 export const logisticaSecretariaService = {
   getSeguimientos(): SeguimientoTesisItem[] {
     return storageService.get<SeguimientoTesisItem[]>(SEGUIMIENTO_KEY, INITIAL_SEGUIMIENTO_LOGISTICO);
@@ -84,7 +125,12 @@ export const logisticaSecretariaService = {
   },
 
   getDirectorioJurado(): IngenieroJuradoItem[] {
-    return storageService.get<IngenieroJuradoItem[]>(JURADO_KEY, INITIAL_DIRECTORIO_JURADO);
+    const raw = storageService.get<IngenieroJuradoItem[]>(JURADO_KEY, INITIAL_DIRECTORIO_JURADO);
+    const { merged, changed } = mergeDirectorioOficial(raw);
+    if (changed) {
+      storageService.set(JURADO_KEY, merged);
+    }
+    return merged;
   },
 
   async saveDirectorioJurado(items: IngenieroJuradoItem[]): Promise<void> {

@@ -26,6 +26,7 @@ import { comunicadosService } from '../services/comunicadosService';
 import { faqService } from '../services/faqService';
 import { storageService } from '../services/storageService';
 import { driveApiService } from '../services/driveApiService';
+import { mergeDirectorioOficial } from '../services/logisticaSecretariaService';
 import confetti from 'canvas-confetti';
 
 export interface ToastMessage {
@@ -259,7 +260,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (Array.isArray(c.comunicados)) storageService.set('unt_industrial_comunicados_generales', c.comunicados);
         if (Array.isArray(c.faqs)) storageService.set('unt_industrial_faqs_v3', c.faqs);
         if (Array.isArray(c.seguimientoLogistico)) storageService.set('unt_industrial_seguimiento_logistico_v3', c.seguimientoLogistico);
-        if (Array.isArray(c.directorioJurado)) storageService.set('unt_industrial_directorio_jurado_v3', c.directorioJurado);
+        if (Array.isArray(c.directorioJurado)) {
+          const { merged, changed } = mergeDirectorioOficial(c.directorioJurado);
+          storageService.set('unt_industrial_directorio_jurado_v3', merged);
+          if (changed) {
+            driveApiService.saveCollection('directorioJurado', merged).catch(() => {});
+          }
+        }
         if (Array.isArray(c.sustentacionesJueves)) storageService.set('unt_industrial_sustentaciones_jueves_v2', c.sustentacionesJueves);
         if (Array.isArray(c.historialDespachos)) storageService.set('unt_industrial_historial_despachos_v1', c.historialDespachos);
         if (Array.isArray(c.instruccionesSustentacion)) storageService.set('unt_industrial_instrucciones_pasos_v3', c.instruccionesSustentacion);

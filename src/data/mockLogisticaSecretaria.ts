@@ -301,7 +301,208 @@ export interface DespachoChatAnuncioItem {
   enviadoPor: string;
 }
 
-export const INITIAL_DIRECTORIO_JURADO: IngenieroJuradoItem[] = [];
+export const INITIAL_DIRECTORIO_JURADO: IngenieroJuradoItem[] = [
+  {
+    id: 'ing-unt-01',
+    nombre: 'Ms. Ángel Hernández Molina',
+    correo: 'ahernandez@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-02',
+    nombre: 'Dr. Carlos Antonio Esquivel Flores',
+    correo: 'cesquivel@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-03',
+    nombre: 'Dr. Carlos José Sandoval Reyes',
+    correo: 'csandoval@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-04',
+    nombre: 'Ms. César Enrique Santos Gonzales',
+    correo: '',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-05',
+    nombre: 'Dr. Francisco Elías Rodríguez Novoa',
+    correo: '',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-06',
+    nombre: 'Mg. Gloria Irene Poémape Rojas',
+    correo: 'gpoemape@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-07',
+    nombre: 'Dr. Iván Martín Olivares Espino',
+    correo: 'iolivares@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-08',
+    nombre: 'Dr. Joe Alexis González Vásquez',
+    correo: 'jgonzalezv@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-09',
+    nombre: 'Ms. Joel David Vargas Sagástegui',
+    correo: 'jvargass@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-10',
+    nombre: 'Dr. Jorge Enrique Medina Rodríguez',
+    correo: 'jmedina@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-11',
+    nombre: 'Ms. José Luis Gonzales Sánchez',
+    correo: 'jgonzales@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-12',
+    nombre: 'Ms. José Ronald Ruiz Sirlopú',
+    correo: 'jsirlopu@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-13',
+    nombre: 'Ms. Luis Antonio Jara Llajaruna',
+    correo: 'ljaral@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-14',
+    nombre: 'Dra. Luisa Angélica Orejuela Guerrero',
+    correo: 'lorejuela@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-15',
+    nombre: 'Ms. Manuel Franklin Sánchez Terán',
+    correo: 'msanchez@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-16',
+    nombre: 'Ms. Marco Antonio Reyes Aroca',
+    correo: 'mreyesa@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-17',
+    nombre: 'Mg. Marcos Gregorio Baca López',
+    correo: 'mbaca@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-18',
+    nombre: 'Dr. Miguel Armando Benites Gutiérrez',
+    correo: 'mbenites@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-19',
+    nombre: 'Dr. Orivel Jackson Buchelli Perales',
+    correo: 'jbuchelli@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-20',
+    nombre: 'Ms. Pablo Alejandro Burgos Zavaleta',
+    correo: 'pburgos@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-21',
+    nombre: 'Mg. Segundo Miguel Ramírez Córdova',
+    correo: '',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-22',
+    nombre: 'Dr. Segundo Seijas Velásquez',
+    correo: 'sseijas@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-23',
+    nombre: 'Ms. Teodoro Alberto Geldres Marchena',
+    correo: 'tgeldres@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-24',
+    nombre: 'Ms. Víctor Fernando Calla Delgado',
+    correo: 'vcalla@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  },
+  {
+    id: 'ing-unt-25',
+    nombre: 'Dr. Víctor Manuel Del Castillo Miranda',
+    correo: 'vdelcastillo@unitru.edu.pe',
+    especialidad: 'Ingeniería Industrial',
+    categoria: 'Docente UNT',
+    activo: true
+  }
+];
 
 export const INITIAL_SEGUIMIENTO_LOGISTICO: SeguimientoTesisItem[] = [];
 
